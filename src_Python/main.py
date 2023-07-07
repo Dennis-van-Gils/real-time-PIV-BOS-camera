@@ -2,13 +2,18 @@
 # -*- coding: utf-8 -*-
 """Image processing algorithm for 2D Particle Imaging Velocimetry (PIV) and
 Background Oriented Schlieren (BOS)
+
+Used abbrevations
+-----------------
+IW: Interrogation window
+VM: Displacement vector map
 """
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
 __date__ = "07-07-2023"
 __version__ = "1.0"
-# pylint: disable=bare-except, broad-except, missing-function-docstring, wrong-import-position
+# pylint: disable=missing-function-docstring
 
 import os
 import sys
@@ -25,14 +30,15 @@ from my_fun import IW_Grid
 
 import_file = "E:/Work/_GitHub_repo/2D-PIV-BOS/test_imgs/PIV_rising_vortex_plume/B00001.tif"
 
+# Set the IW sizes for multigrid analysis
+# Subsequent IW sizes should be the exact half of the prev IW size
+# IW_SIZES   = [128 96 64 48 32];
+IW_SIZES = [64, 32]
+IW_OVERLAP = 0.5
+
 # ------------------------------------------------------------------------------
 #   Main
 # ------------------------------------------------------------------------------
-
-# Used abbrevations
-# -----------------
-# IW: Interrogation window
-# VM: Displacement vector map
 
 if __name__ == "__main__":
     # Read double image and split into frames A & B
@@ -56,12 +62,6 @@ if __name__ == "__main__":
     # ----------------------------------------------------------------------
     #   Initialize
     # ----------------------------------------------------------------------
-
-    # Set the IW sizes for multigrid analysis
-    # Subsequent IW sizes should be the exact half of the prev IW size
-    # IW_SIZES   = [128 96 64 48 32];
-    IW_SIZES = [64, 32]
-    IW_OVERLAP = 0.5
 
     # Allocate multigrid maps
     nIW_SIZES = len(IW_SIZES)
