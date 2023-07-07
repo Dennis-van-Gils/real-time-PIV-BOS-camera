@@ -8,6 +8,9 @@ __version__ = "1.0"
 
 import numpy as np
 
+from matplotlib import pyplot as plt
+from matplotlib.patches import Rectangle
+
 
 class IW_Grid:
     """
@@ -90,3 +93,38 @@ class IW_Grid:
         )
         self.x_range = np.tile(x_range, (self.nIWs_y, 1))
         self.y_range = np.repeat(y_range, self.nIWs_x, axis=0)
+
+        if 0:  # DEBUG flag: Examine IW_grid
+            plt.figure()
+            plt.plot(
+                self.x_range[:, 0],
+                self.y_range[:, 0],
+                "xg",
+                linewidth=2,
+                label="IW starts",
+            )
+            plt.plot(
+                self.x_range[:, 1],
+                self.y_range[:, 1],
+                "xr",
+                linewidth=2,
+                label="IW endings",
+            )
+
+            # Plot IW centers, but not all. Just the bottom and left chords.
+            plt.plot(self.x[:, 0], self.y[:, 0], "ok", label="IW centers")
+            plt.plot(self.x[0, :], self.y[0, :], "ok", label="_nolegend_")
+
+            # Plot image bounding box
+            plt.gca().add_patch(
+                Rectangle(
+                    (0, 0),
+                    img_w - 1,
+                    img_h - 1,
+                    edgecolor="k",
+                    fill=None,
+                    lw=1,
+                )
+            )
+            plt.legend()
+            plt.show()

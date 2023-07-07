@@ -41,25 +41,17 @@ if __name__ == "__main__":
     img_h = int(img_2h / 2)
     A = img[:img_h, :]
     B = img[img_h:, :]
-    print(A.shape)
-    print(B.shape)
+    print(f"Img A: {A.shape}")
+    print(f"Img B: {B.shape}")
 
     # Mean background removal
     A = A - np.mean(A)
     B = B - np.mean(B)
 
-    fig = plt.figure()
-    # fig.add_subplot(1, 2, 1)
-    # plt.imshow(A, cmap="gray", interpolation="none")
-
-    # fig.add_subplot(1, 2, 2)
-    # plt.imshow(
-    #     B,
-    #     cmap="gray",
-    #     interpolation="none",
-    # )
-
-    # plt.show()
+    if 0:  # DEBUG flag: Show image A
+        fig = plt.figure()
+        plt.imshow(A, cmap="gray", interpolation="none")
+        plt.show()
 
     # ----------------------------------------------------------------------
     #   Initialize
@@ -87,51 +79,6 @@ if __name__ == "__main__":
         # Create IW_grid for frame B
         IW_grid_A = IW_Grid(img_w, img_h, IW_size, IW_OVERLAP)
         IW_grid_B = IW_grid_A
-
-        if 0:
-            # DEBUG: Examine IW_grid
-
-            # fig.clear()
-            plt.plot(
-                IW_grid_A.x_range[:, 0],
-                IW_grid_A.y_range[:, 0],
-                "xg",
-                linewidth=2,
-                label="IW starts",
-            )
-
-            plt.plot(
-                IW_grid_A.x_range[:, 1],
-                IW_grid_A.y_range[:, 1],
-                "xr",
-                linewidth=2,
-                label="IW endings",
-            )
-
-            # Plot IW centers, but not all. Just the bottom and left chords.
-            plt.plot(
-                IW_grid_A.x[:, 0], IW_grid_A.y[:, 0], "ok", label="IW centers"
-            )
-            plt.plot(
-                IW_grid_A.x[0, :], IW_grid_A.y[0, :], "ok", label="_nolegend_"
-            )
-
-            # Plot image bounding box
-            plt.gca().add_patch(
-                Rectangle(
-                    (0, 0), img_w - 1, img_h - 1, edgecolor="k", fill=None, lw=1
-                )
-            )
-            # plt.plot([0, 0], [0, img_h - 1], "-k", label="_nolegend_")
-            # plt.plot([0, img_w - 1], [0, 0], "-k", label="_nolegend_")
-            # plt.plot(
-            #     [img_w - 1, img_w - 1], [0, img_h - 1], "-k", label="_nolegend_"
-            # )
-            # plt.plot(
-            #     [0, img_w - 1], [img_h - 1, img_h - 1], "-k", label="_nolegend_"
-            # )
-            plt.legend()
-            plt.show()
 
         # Already store IW_grid_A in the multigrid map for the first IW size
         if iIW_size == 1:
