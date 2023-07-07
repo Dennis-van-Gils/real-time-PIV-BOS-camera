@@ -39,7 +39,7 @@ function VM_filt = detect_bad_vectors_by_LP_filt(VM, ...
       iR1 = find(abs((y - y_LP)) > outlierThreshold);
       iR1 = iR1 + y_offset;
       iR1 = sub2ind(size(VM.x), iR1, ones(size(iR1)) * iCol);
-      
+
       if fDEBUG && iCol == DEBUG.iCol
         figure(10); clf
         plot(y   , 'x-k', 'Linewidth', 2); hold on
@@ -52,11 +52,11 @@ function VM_filt = detect_bad_vectors_by_LP_filt(VM, ...
         drawnow
         pause
       end
-      
+
       iReplaced = [iReplaced; iR1];                                         %#ok<*AGROW>
     end
   end
-  
+
   VM_filt = VM;
   VM_filt.descr = 'filtered';
   VM_filt.dx(iReplaced)   = nan;

@@ -21,31 +21,31 @@ function IW_grid = create_IW_grid(img_w, img_h, IW_size, overlap)
   %
   % Dennis van Gils
   % 24-02-2016
-  
+
   % Store the input arguments in the output structure
   IW_grid.IW_size = IW_size;
   IW_grid.overlap = overlap;
-  
+
   % Calculate number of IWs that will fit in the source image
   nIWs_x = floor((img_w - IW_size)/IW_size/(1 - overlap)) + 1;
   nIWs_y = floor((img_h - IW_size)/IW_size/(1 - overlap)) + 1;
   IW_grid.nIWs_x = nIWs_x;
   IW_grid.nIWs_y = nIWs_y;
   IW_grid.nIWs   = nIWs_x * nIWs_y;
-  
+
   % Calculate IW positions
   array_x = round((0:nIWs_x - 1) * (1 - overlap) * IW_size + ...
                   floor(IW_size/2) + 1);
   array_y = round((0:nIWs_y - 1) * (1 - overlap) * IW_size + ...
                   floor(IW_size/2) + 1);
   [IW_grid.x, IW_grid.y] = meshgrid(array_x, array_y);
-            
+
   % Calculate IW ranges
   x_range = [array_x - floor(IW_size/2); array_x + floor(IW_size/2) - 1]';
   y_range = [array_y - floor(IW_size/2); array_y + floor(IW_size/2) - 1]';
   IW_grid.x_range = sortrows(repmat(x_range, nIWs_y, 1));
   IW_grid.y_range = repmat(y_range, nIWs_x, 1);
-  
+
   fDEBUG = 0;
   if fDEBUG
     figure(1); clf

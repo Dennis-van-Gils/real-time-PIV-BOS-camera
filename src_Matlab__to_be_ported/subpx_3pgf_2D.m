@@ -5,7 +5,7 @@ function [px_sub, py_sub] = subpx_3pgf_2D(C, px, py)
   % Dennis van Gils
   % 26-02-2016
 
-  
+
   % Along x
   if px > 1 && px < size(C, 2) - 1
     % Fit possible
@@ -17,7 +17,7 @@ function [px_sub, py_sub] = subpx_3pgf_2D(C, px, py)
     % No fit possible
     px_sub = px;
   end
-  
+
   % Along y
   if py > 1 && py < size(C, 1) - 1
     % Fit possible

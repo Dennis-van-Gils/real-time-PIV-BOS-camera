@@ -12,7 +12,7 @@ fontSize = 20;
 if(~isdeployed)
 	cd(fileparts(which(mfilename)));
 end
-	
+
 % Check that user has the Image Processing Toolbox installed.
 hasIPT = license('test', 'image_toolbox');
 if ~hasIPT
@@ -42,7 +42,7 @@ if ~exist(fullFileName, 'file')
 	end
 end
 grayImage = imread(fullFileName);
-% Get the dimensions of the image.  
+% Get the dimensions of the image.
 % numberOfColorBands should be = 1.
 [rows, columns, numberOfColorBands] = size(grayImage)
 if numberOfColorBands > 3
@@ -56,11 +56,11 @@ title('Original Grayscale Image', 'FontSize', fontSize);
 % Enlarge figure to full screen.
 set(gcf, 'units','normalized','outerposition',[0 0 1 1]);
 % Give a name to the title bar.
-set(gcf,'name','MAD noise removal Demo','numbertitle','off') 
+set(gcf,'name','MAD noise removal Demo','numbertitle','off')
 
 % Let's compute and display the histogram.
 [pixelCount, grayLevels] = imhist(grayImage);
-subplot(2, 2, 2); 
+subplot(2, 2, 2);
 bar(grayLevels, pixelCount);
 grid on;
 title('Histogram of Original Image', 'FontSize', fontSize);
@@ -104,7 +104,7 @@ if isempty(caUserInput),return,end; % Bail out if they clicked Cancel.
 madRatioThreshold = round(str2double(cell2mat(caUserInput)));
 % Check for a valid integer.
 if isnan(madRatioThreshold)
-    % They didn't enter a number.  
+    % They didn't enter a number.
     % They clicked Cancel, or entered a character, symbols, or something else not allowed.
     madRatioThreshold = defaultValue;
     message = sprintf('I said it had to be an integer.\nI will use %d and continue.', madRatioThreshold);
@@ -137,7 +137,7 @@ title('MAD Filtered Image (Outliers)', 'FontSize', fontSize);
 % Enlarge figure to full screen.
 set(gcf, 'units','normalized','outerposition',[0 0 1 1]);
 % Give a name to the title bar.
-set(gcf,'name','MAD noise removal Demo','numbertitle','off') 
+set(gcf,'name','MAD noise removal Demo','numbertitle','off')
 
 % Display the original, noisy image.
 subplot(2, 2, 3);
@@ -165,17 +165,17 @@ function output = MAD_Filter(pixelsInBlock)
 	try
 		% Assign default value.
 		output = 0;
-		
+
 		% Get the median of those values.
 		medianValue = median(pixelsInBlock(:));
-		
+
 		% Get the absolute deviation
 		absoluteDeviation = abs(single(pixelsInBlock) - single(medianValue));
 
 		% Get the median of those values.
 		% This is the "Median Absolute Deviation" value.
 		MAD_Value = uint8(median(absoluteDeviation(:)));
-		
+
 		% Determine if it's an outlier
 		middleIndex = ceil(numel(pixelsInBlock) / 2);
 		centralValue = absoluteDeviation(middleIndex);
@@ -184,7 +184,7 @@ function output = MAD_Filter(pixelsInBlock)
 		if centralValue > madRatioThreshold * MAD_Value % && centralValue > 0
 			itIsAnOutlier = true;
 		else
-			itIsAnOutlier = false;			
+			itIsAnOutlier = false;
 		end
 
 		% Assign this to our output argument.
@@ -199,6 +199,6 @@ function output = MAD_Filter(pixelsInBlock)
 		% uiwait(warndlg(errorMessage));
 		fprintf(1, '%s\n', errorMessage);
 	end
-	return; 
+	return;
 
 

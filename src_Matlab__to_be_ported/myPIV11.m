@@ -26,18 +26,18 @@ for iFile = 1:1
   % ----------------------------------------------------------------------
   fn = char(filelist(iFile).name);
   img_blend = imread(fn);
-  
+
   % Read double image and split into frames A and B
   [img_h, img_w] = size(img_blend);
   A = img_blend(1:img_h/2, :);
   B = img_blend(img_h/2+1:end, :);
   img_h = img_h/2;
   clear img_blend
-  
+
   % Background removal
   A = A - mean(mean(A));
   B = B - mean(mean(B));
-  
+
   if fDEBUG
     % Show original full figure A
     h1 = figure(1); clf
@@ -47,7 +47,7 @@ for iFile = 1:1
     title('frame A')
     axis on; axis tight; hold on
     h1_ax = gca;
-  
+
     % Show original full figure B
     h2 = figure(2); clf
     set(gcf, 'Position', get(h1, 'Position') + [520 0 0 0])
@@ -63,38 +63,38 @@ for iFile = 1:1
     set(h3, 'Position', [650, 685, 500, 500])
     %set(h3, 'Position', [3620, -225, 500, 500])
   end
-  
+
   % ----------------------------------------------------------------------
-  %   Initialize 
+  %   Initialize
   % ----------------------------------------------------------------------
-  
+
   % Set the IW sizes for multigrid analysis
   % Subsequent IW sizes should be the exact half of the prev IW size
   %IW_SIZES   = [128 96 64 48 32];
   IW_SIZES   = [64 32];
   IW_OVERLAP = .5;
-  
+
   % Allocate memory for multigrid maps
   nIW_SIZES   = length(IW_SIZES);
   IW_grid_As  = cell(nIW_SIZES, 1);
   IW_grid_Bs  = cell(nIW_SIZES, 1);
   VMs         = cell(nIW_SIZES, 1);
-  
+
   %% ---------------------------------------------------------------------
   %   Walk over all interrogation window (IW) sizes
   % ----------------------------------------------------------------------
-  
+
   for iIW_size = 1:nIW_SIZES
     IW_size = IW_SIZES(iIW_size);
-    
+
     % Create IW_grid for frame A
     % Create IW_grid for frame B
     IW_grid_A = create_IW_grid(img_w, img_h, IW_size, IW_OVERLAP);
     IW_grid_B = IW_grid_A;
-    
+
     % Already store IW_grid_A in the multigrid map for the first IW size
     if iIW_size == 1; IW_grid_As{1} = IW_grid_A; end
-    
+
     % Allocate memory for displacement vector map
     VM.descr = 'unfiltered';
     VM.x  = IW_grid_A.x;
@@ -105,22 +105,22 @@ for iFile = 1:1
     VM.nReplaced    = 0;
     VM.iReplacedCum = [];   % Cumulative list of vectors marked as bad
     VM.nReplacedCum = 0;
-    
+
     % Look up the IW index to be debugged
     iIW_debug = lookup_IW_Idx(IW_grid_A, DEBUG.x_pixel, DEBUG.y_pixel);
-    
+
     %% -------------------------------------------------------------------
     %   Walk over all IWs
     % --------------------------------------------------------------------
-    
+
     for iIW = 1:IW_grid_A.nIWs
       %fprintf('\niIW = %i\n', iIW)
-      
+
       %% -----------------------------------------------------------------
-      %   Calculate IW of frame B 
+      %   Calculate IW of frame B
       %   Apply window shifting technique
       % ------------------------------------------------------------------
-      
+
       if iIW_size == 1
         % First IW size, no pre-shift available
         shift_x = 0;                                          % [px]
@@ -135,7 +135,7 @@ for iFile = 1:1
         shift_y = round(VMs{iIW_size - 1}.dy(iIW_parent));    % [px]
         if isnan(shift_x); shift_x = 0; end
         if isnan(shift_y); shift_y = 0; end
-      
+
         % Calculate new center and range of the shifted IW in frame B
         IW_grid_B.x(iIW)          = IW_grid_B.x(iIW)          + shift_x;
         IW_grid_B.y(iIW)          = IW_grid_B.y(iIW)          + shift_y;
@@ -162,15 +162,15 @@ for iFile = 1:1
           IW_grid_A.y_range(iIW, 2) = img_h - shift_y;
         end
       end
-      
+
       if fDEBUG && iIW == iIW_debug
         % Show interrogation windows on top of image
         show_IW_borders(h1_ax, IW_grid_A, iIW, DEBUG.cm{iIW_size})
         show_IW_borders(h2_ax, IW_grid_B, iIW, DEBUG.cm{iIW_size})
-        
+
         plot(h2_ax, IW_grid_B.x(iIW), IW_grid_B.y(iIW), 'x', ...
              'Color', DEBUG.cm{iIW_size}, 'MarkerSize', 8)
-        
+
         % Zoom to the vicinity of the largest corresponding IW
         iIW_tmp = lookup_IW_Idx(IW_grid_As{1}, ...
                                 DEBUG.x_pixel, DEBUG.y_pixel);
@@ -180,11 +180,11 @@ for iFile = 1:1
         xlim(h2_ax, IW_grid_As{1}.x_range(iIW_tmp, :) + zoom_extend)
         ylim(h2_ax, IW_grid_As{1}.y_range(iIW_tmp, :) + zoom_extend)
       end
-      
+
       %% -----------------------------------------------------------------
       %   Retrieve images of IW frame A and IW frame B
       % ------------------------------------------------------------------
-      
+
       img_IW_A = A(IW_grid_A.y_range(iIW, 1):IW_grid_A.y_range(iIW, 2), ...
                    IW_grid_A.x_range(iIW, 1):IW_grid_A.x_range(iIW, 2));
       img_IW_B = B(IW_grid_B.y_range(iIW, 1):IW_grid_B.y_range(iIW, 2), ...
@@ -204,7 +204,7 @@ for iFile = 1:1
                    single(img_IW_A));   % Fast but slightly less accurate
         C = C/max(C(:));                % Normalize
       end
-      
+
       % Find maximum correlation peak
       if isnan(max(C(:)))
         dx = nan; dy = nan;
@@ -214,16 +214,16 @@ for iFile = 1:1
 
         % Sub-pixel resolution algorithm, 3-point Gaussian fit
         [peak_x, peak_y] = subpx_3pgf_2D(C, peak_x, peak_y);
-        
+
         % Calculate displacement vector
         dx = peak_x - floor(size(C, 2)/2 + 1) + shift_x;
         dy = peak_y - floor(size(C, 1)/2 + 1) + shift_y;
       end
-      
+
       % Store result in vector map
       VM.dx(iIW) = dx;
       VM.dy(iIW) = dy;
-      
+
       if fDEBUG && iIW == iIW_debug && numel(C) > 1
         % Show correlation map
         figure(h3); cla
@@ -244,58 +244,58 @@ for iFile = 1:1
       end
     end
     %%
-    
-    
+
+
     % ********************************************************************
     %
     %         All IWs of the current IW_grid have been processed
     %
     % ********************************************************************
-    
-    
-    
+
+
+
     %% -------------------------------------------------------------------
     %   Calculate derived quantities from velocity vectors
     % --------------------------------------------------------------------
     VM = calculate_derived_quantities_from_velocity_vectors(VM);
-    
+
     % Plot velocity magnitude
     h = figure;
     imshow(VM.magn, [0 max(VM.magn(:))], ...
            'InitialMagnification', 'fit', 'Colormap', jet(256))
-    title(['IW size = ' num2str(IW_size), ... 
+    title(['IW size = ' num2str(IW_size), ...
            ', overlap = ' num2str(IW_OVERLAP)])
     axis on; axis tight; hold on
-    
+
     %% --------------------------------------------------------------------
     %   DEBUG: quicksave results
     % --------------------------------------------------------------------
-    
+
     %save('full_mem_dump.mat')
     %return
-    
+
     %% -------------------------------------------------------------------
     %   Process bad vectors
     % --------------------------------------------------------------------
-    
+
     % Create a copy of the vector map to contain the filtered result
     VM_filt = VM;
-    
+
     % Detect bad vectors based on the median absolute deviation of the
     % magnitude
     if 1
       MAD_threshold = 2.5;
       VM_filt = detect_bad_vectors_by_MAD(VM_filt, MAD_threshold);
-      
+
       %%%%%%%%%%%% Replace bad vectors by nearest neighborhood
       VM_filt = replace_bad_vectors_by_nn(VM_filt);
-      
+
       % Plot bad vector indicators
       [i, j] = ind2sub(size(VM_filt.x), VM_filt.iReplaced);
       plot(j, i, 'xw', 'MarkerSize', 6, 'LineWidth', 2)
       fprintf('filtered vectors MAD: %i\n', VM_filt.nReplaced)
     end
-    
+
     % Detect bad vectors based on LP filtering the vector angle and
     % magnitude
     if 1
@@ -314,10 +314,10 @@ for iFile = 1:1
       VM_filt = detect_bad_vectors_by_LP_filt(VM_filt, ...
                   unwrap(VM.angle)/pi*180, ...
                   angleDiffThreshold);
-      
+
       %%%%%%%%%%%% Replace bad vectors by nearest neighborhood
       VM_filt = replace_bad_vectors_by_nn(VM_filt);
-                
+
       % Plot bad vector indicators
       [i, j] = ind2sub(size(VM_filt.x), VM_filt.iReplaced);
       plot(j, i, 'xr', 'MarkerSize', 6, 'LineWidth', 2)
@@ -327,38 +327,38 @@ for iFile = 1:1
       VM_filt = detect_bad_vectors_by_LP_filt(VM_filt, ...
                   VM.magn, ...
                   magnDiffThreshold);
-                
+
       %%%%%%%%%%%% Replace bad vectors by nearest neighborhood
       VM_filt = replace_bad_vectors_by_nn(VM_filt);
-      
+
       % Plot bad vector indicators
       [i, j] = ind2sub(size(VM_filt.x), VM_filt.iReplaced);
       plot(j, i, 'xk', 'MarkerSize', 6, 'LineWidth', 2)
       fprintf('filtered vectors LP magn : %i\n', VM_filt.nReplaced)
     end
-    
+
     if 1
       % LP filter vector dx
       VM_filt = detect_bad_vectors_by_LP_filt(VM_filt, ...
                   VM.dx, ...
                   2);
-                
+
       %%%%%%%%%%%% Replace bad vectors by nearest neighborhood
       VM_filt = replace_bad_vectors_by_nn(VM_filt);
-    
+
       % Plot bad vector indicators
       [i, j] = ind2sub(size(VM_filt.x), VM_filt.iReplaced);
       plot(j, i, 'xy', 'MarkerSize', 6, 'LineWidth', 2)
       fprintf('filtered vectors LP dx   : %i\n', VM_filt.nReplaced)
-      
+
       % LP filter vector dy
       VM_filt = detect_bad_vectors_by_LP_filt(VM_filt, ...
                   VM.dy, ...
                   2);
-                
+
       %%%%%%%%%%%% Replace bad vectors by nearest neighborhood
       VM_filt = replace_bad_vectors_by_nn(VM_filt);
-    
+
       % Plot bad vector indicators
       [i, j] = ind2sub(size(VM_filt.x), VM_filt.iReplaced);
       plot(j, i, 'xy', 'MarkerSize', 6, 'LineWidth', 2)
@@ -368,29 +368,29 @@ for iFile = 1:1
     %% -------------------------------------------------------------------
     %   Revisit bad vectors and try the 2, 3 or 4th max correlation peak
     % --------------------------------------------------------------------
-    
+
     if 0
     for iNr = 1:nRemove
       iIW = iRemove(iNr);
-      
+
       img_IW_A = A(IW_grid_A.y_range(iIW, 1):IW_grid_A.y_range(iIW, 2), ...
                    IW_grid_A.x_range(iIW, 1):IW_grid_A.x_range(iIW, 2));
       img_IW_B = B(IW_grid_B.y_range(iIW, 1):IW_grid_B.y_range(iIW, 2), ...
                    IW_grid_B.x_range(iIW, 1):IW_grid_B.x_range(iIW, 2));
-                 
+
       C = xcorr2(single(img_IW_B), single(img_IW_A));
       C = C/max(C(:));            % Normalize
 
       [maxC, iMaxC] = max(C(:));
       [peak_y, peak_x] = ind2sub(size(C), iMaxC);
-      
+
       % Sub-pixel resolution algorithm, 3-point Gaussian fit
       [peak_x, peak_y] = subpx_3pgf_2D(C, peak_x, peak_y);
-        
+
       % Calculate displacement vector
       dx = peak_x - floor(size(C, 2)/2 + 1) + shift_x;
       dy = peak_y - floor(size(C, 1)/2 + 1) + shift_y;
-      
+
       % DEBUG: working out multipeak detection
       figure(5); clf
       C_BW = imextendedmax(C, .2, 8);
@@ -403,7 +403,7 @@ for iFile = 1:1
         local_peak_intensity(iPeak) = ...
           max(C(local_peaks(iPeak).PixelIdxList));
       end
-      
+
       % Show correlation map
       figure(3); cla
       imshow(double(C), 'InitialMagnification', 'fit', 'Colormap', jet(256))
@@ -418,20 +418,20 @@ for iFile = 1:1
       axis on; axis tight
 
       linkaxes([h3_ax h5_ax], 'xy')
-      
+
       drawnow
       pause
     end
     end % if 0
-    
-    
+
+
     %% -------------------------------------------------------------------
     %   Store multigrid maps
     % --------------------------------------------------------------------
-    
+
     IW_grid_As{iIW_size} = IW_grid_A;
     IW_grid_Bs{iIW_size} = IW_grid_B;
-    
+
     % Store the filtered vector map if we are not yet at the final IW size
     if iIW_size == nIW_SIZES
       VMs{iIW_size} = VM;
@@ -443,12 +443,12 @@ for iFile = 1:1
 
 
   % **********************************************************************
-  % 
+  %
   %                           Display results
-  % 
+  %
   % **********************************************************************
-  
-  
+
+
   if fPROFILER
     profile off
     profile viewer
@@ -489,7 +489,7 @@ for iFile = 1:1
     thisVM.x(isnan(thisVM.dx)) = nan;
     thisVM.y(isnan(thisVM.dy)) = nan;
 
-    % Turn velocity magnitude map into rgb image  
+    % Turn velocity magnitude map into rgb image
     [px_x, px_y] = meshgrid(1:img_w, 1:img_h);
 
     magn_nan2zero = thisVM.magn;
@@ -537,7 +537,7 @@ for iFile = 1:1
     thisVM.x(isnan(thisVM.dx)) = nan;
     thisVM.y(isnan(thisVM.dy)) = nan;
 
-    % Turn velocity component map into rgb image  
+    % Turn velocity component map into rgb image
     [px_x, px_y] = meshgrid(1:img_w, 1:img_h);
 
     comp_nan2zero = thisVM.dx;
@@ -606,7 +606,7 @@ for iFile = 1:1
     set(gca, 'YDir', 'reverse')
     axis tight; axis square
   end
-  
+
   %imwrite(img_blend, ['magn_' fn(1:end - 4) '_2.png']);
   linkaxes([h6_ax h7_ax], 'xy')
   %xlim([950 1110]); ylim([306 426])

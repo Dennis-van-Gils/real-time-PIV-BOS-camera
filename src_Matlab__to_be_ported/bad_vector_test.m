@@ -42,10 +42,10 @@ quiver(h2_ax, VM.x(iReplaced), VM.y(iReplaced), ...
        VM.dy(iReplaced) * quiverX, ...
        0, 'k', 'LineWidth', 2)
 
-     
-     
-     
-     
+
+
+
+
 % Filter vectors based on the angle
 tmp_grad = diff(unwrap(VM.angle));                  % column wise
 %tmp_grad = [tmp_grad(1, :); tmp_grad];
@@ -95,34 +95,34 @@ angleThreshold = 30;  % [degrees]
 %for iCol = 9:9
 for iCol = 1:size(VM.x, 2)
   y = unwrap(VM.angle(:, iCol))/pi*180;
-  
+
   % Split vector according to nans
   cut = isnan(y);
   id = cumsum(cut) + 1;
   mask = cut==0;
   out = accumarray(id(mask), y(mask), [], @(x) {x});
   offsets = find(cut == 1);
-  
+
   for iSeg = 1:length(out)
     y = out{iSeg};
-    
+
     if length(y) < 5
       % Do not perform outlier detection when segment is too short
       continue
     end
-    
+
     if iSeg == 1
       y_offset = 0;
     else
       y_offset = offsets(iSeg - 1);
     end
-    
+
     y_tiled = [flipud(y); y; flipud(y)];
 
     a = .5;
     y_LP = filtfilt(a, [1 a - 1], y_tiled);
     y_LP = y_LP(length(y) + 1:length(y) * 2);
-    
+
     iR1 = find(abs((y - y_LP)) > angleThreshold);
     iR1 = iR1 + y_offset;
     iR1 = sub2ind(size(VM.x), iR1, ones(size(iR1)) * iCol);
@@ -153,34 +153,34 @@ magnDiffThreshold = 4;  % [degrees]
 %for iCol = 9:9
 for iCol = 1:size(VM.x, 2)
   y = VM.magn(:, iCol);
-  
+
   % Split vector according to nans
   cut = isnan(y);
   id = cumsum(cut) + 1;
   mask = cut==0;
   out = accumarray(id(mask), y(mask), [], @(x) {x});
   offsets = find(cut == 1);
-  
+
   for iSeg = 1:length(out)
     y = out{iSeg};
-    
+
     if length(y) < 5
       % Do not perform outlier detection when segment is too short
       continue
     end
-    
+
     if iSeg == 1
       y_offset = 0;
     else
       y_offset = offsets(iSeg - 1);
     end
-    
+
     y_tiled = [flipud(y); y; flipud(y)];
 
     a = .5;
     y_LP = filtfilt(a, [1 a - 1], y_tiled);
     y_LP = y_LP(length(y) + 1:length(y) * 2);
-    
+
     iR1 = find(abs((y - y_LP)) > magnDiffThreshold);
     iR1 = iR1 + y_offset;
     iR1 = sub2ind(size(VM.x), iR1, ones(size(iR1)) * iCol);

@@ -46,7 +46,7 @@ function [iBadVectorAngle, iBadVectorMagn] = detect_bad_vectors(VM, ...
       iR1 = find(abs((y - y_LP)) > angleDiffThreshold);
       iR1 = iR1 + y_offset;
       iR1 = sub2ind(size(VM.x), iR1, ones(size(iR1)) * iCol);
-      
+
       if fDEBUG && iCol == DEBUG.iCol
         figure(10); clf
         plot(y   , 'x-k', 'Linewidth', 2); hold on
@@ -58,7 +58,7 @@ function [iBadVectorAngle, iBadVectorMagn] = detect_bad_vectors(VM, ...
         drawnow
         pause
       end
-      
+
       iBadVectorAngle = [iBadVectorAngle; iR1];                               %#ok<*AGROW>
     end
   end
@@ -66,7 +66,7 @@ function [iBadVectorAngle, iBadVectorMagn] = detect_bad_vectors(VM, ...
   % ----------------------------------------------------------------------
   %  Detect bad vectors, LP filter magnitude
   % ----------------------------------------------------------------------
-  %magnDiffThreshold = 4; 
+  %magnDiffThreshold = 4;
 
   iBadVectorMagn = [];
   for iCol = 1:size(VM.x, 2)

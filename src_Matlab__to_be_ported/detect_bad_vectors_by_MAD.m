@@ -10,7 +10,7 @@ function VM_filt = detect_bad_vectors_by_MAD(VM, MAD_threshold)
   %
   % Dennis van Gils
   % 29-02-2016
-  
+
   c = (VM.magn(:) - nanmedian(VM.magn(:))) / mad(VM.magn(:));
   iReplaced = find(c > (nanmean(abs(c)) + ...
                         nanstd(abs(c)) * MAD_threshold));

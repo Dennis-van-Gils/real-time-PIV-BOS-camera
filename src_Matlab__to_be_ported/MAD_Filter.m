@@ -4,7 +4,7 @@ function output = MAD_Filter(pixelsInBlock)
   % Median Absolute Deviation
   %
   % Source: http://nl.mathworks.com/matlabcentral/answers/121247-how-can-i-detect-and-remove-outliers-from-a-large-dataset
-  
+
   global madRatioThreshold;
 
   % Get the median of those values.
@@ -25,7 +25,7 @@ function output = MAD_Filter(pixelsInBlock)
   if centralValue > madRatioThreshold * MAD_Value % && centralValue > 0
     itIsAnOutlier = true;
   else
-    itIsAnOutlier = false;			
+    itIsAnOutlier = false;
   end
 
   % Assign this to our output argument
