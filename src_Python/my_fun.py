@@ -128,3 +128,29 @@ class IW_Grid:
             )
             plt.legend()
             plt.show()
+
+
+def lookup_IW_Idx(IW_grid: IW_Grid, x_pixel, y_pixel):
+    """Lookup the index of the IW that has its center closest to the input
+    location [x_pixel, y_pixel].
+
+    Returns:
+        iIW: Linear index of the IW.
+    """
+
+    half_IW_size = IW_grid.IW_size // 2
+    iIW_x = int(
+        (x_pixel - half_IW_size - 1) / (IW_grid.IW_size * (1 - IW_grid.overlap))
+        + 1.5
+    )
+    iIW_y = int(
+        (y_pixel - half_IW_size - 1) / (IW_grid.IW_size * (1 - IW_grid.overlap))
+        + 1.5
+    )
+    iIW_x = min(iIW_x, IW_grid.nIWs_x)
+    iIW_y = min(iIW_y, IW_grid.nIWs_y)
+    iIW = np.ravel_multi_index(
+        (iIW_y, iIW_x), (IW_grid.nIWs_y, IW_grid.nIWs_x), order="F"
+    )
+
+    return iIW

@@ -26,7 +26,7 @@ import numpy as np
 
 from skimage.io import imread
 
-from my_fun import IW_Grid
+from my_fun import IW_Grid, lookup_IW_Idx
 
 import_file = "E:/Work/_GitHub_repo/2D-PIV-BOS/test_imgs/PIV_rising_vortex_plume/B00001.tif"
 
@@ -83,5 +83,62 @@ if __name__ == "__main__":
         # Already store IW_grid_A in the multigrid map for the first IW size
         if iIW_size == 1:
             IW_grid_As.append(IW_grid_A)
+
+        # -------------------------------------------------------------------
+        #   Walk over all IWs
+        # --------------------------------------------------------------------
+
+        for iIW in range(IW_grid_A.nIWs):
+            # print(f"iIW = {iIW}")
+
+            # -----------------------------------------------------------------
+            #   Calculate IW of frame B
+            #   Apply window shifting technique
+            # ------------------------------------------------------------------
+
+            if iIW_size == 0:
+                # First IW size, no pre-shift available
+                shift_x = 0  # [px]
+                shift_y = 0  # [px]
+            else:
+                # Pre-shift available
+                # Calculate corresponding index of the IW in the larger parent
+                # grid
+                iIW_parent = lookup_IW_Idx(
+                    IW_grid_As[iIW_size - 1], IW_grid_A.x[iIW], IW_grid_A.y[iIW]
+                )
+
+                """
+                % Retrieve the pre-shift
+                shift_x = round(VMs{iIW_size - 1}.dx(iIW_parent));    % [px]
+                shift_y = round(VMs{iIW_size - 1}.dy(iIW_parent));    % [px]
+                if isnan(shift_x); shift_x = 0; end
+                if isnan(shift_y); shift_y = 0; end
+
+                % Calculate new center and range of the shifted IW in frame B
+                IW_grid_B.x(iIW)          = IW_grid_B.x(iIW)          + shift_x;
+                IW_grid_B.y(iIW)          = IW_grid_B.y(iIW)          + shift_y;
+                IW_grid_B.x_range(iIW, :) = IW_grid_B.x_range(iIW, :) + shift_x;
+                IW_grid_B.y_range(iIW, :) = IW_grid_B.y_range(iIW, :) + shift_y;
+
+                % The IW should never be shifted outside of frame B.
+                % When it does, equally resize the IWs of both frames A and B such
+                % that the resized IW of frame B still fits in frame B
+                if IW_grid_B.x_range(iIW, 1) < 1
+                IW_grid_B.x_range(iIW, 1) = 1;
+                IW_grid_A.x_range(iIW, 1) = 1 - shift_x;
+                end
+                if IW_grid_B.y_range(iIW, 1) < 1
+                IW_grid_B.y_range(iIW, 1) = 1;
+                IW_grid_A.y_range(iIW, 1) = 1 - shift_y;
+                end
+                if IW_grid_B.x_range(iIW, 2) > img_w
+                IW_grid_B.x_range(iIW, 2) = img_w;
+                IW_grid_A.x_range(iIW, 2) = img_w - shift_x;
+                end
+                if IW_grid_B.y_range(iIW, 2) > img_h
+                IW_grid_B.y_range(iIW, 2) = img_h;
+                IW_grid_A.y_range(iIW, 2) = img_h - shift_y;
+                """
 
     print("The end")
