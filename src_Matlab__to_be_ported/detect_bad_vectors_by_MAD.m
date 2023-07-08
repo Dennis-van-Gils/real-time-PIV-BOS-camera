@@ -9,11 +9,11 @@ function VM_filt = detect_bad_vectors_by_MAD(VM, MAD_threshold)
   %     4       : is high, only the worst vectors are marked as bad
   %
   % Dennis van Gils
-  % 29-02-2016
+  % 08-07-2023
 
-  c = (VM.magn(:) - nanmedian(VM.magn(:))) / mad(VM.magn(:));
-  iReplaced = find(c > (nanmean(abs(c)) + ...
-                        nanstd(abs(c)) * MAD_threshold));
+  c = (VM.magn(:) - median(VM.magn(:), "omitnan")) / mad(VM.magn(:));
+  iReplaced = find(c > (mean(abs(c), "omitnan") + ...
+                        std(abs(c), "omitnan") * MAD_threshold));
   nReplaced = length(iReplaced);
 
   VM_filt = VM;
