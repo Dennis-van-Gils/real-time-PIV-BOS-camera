@@ -23,6 +23,8 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 import matplotlib
 import numpy as np
+from scipy.signal import correlate2d, convolve2d, fftconvolve
+import numba
 
 from skimage.io import imread
 
@@ -59,18 +61,18 @@ if __name__ == "__main__":
         plt.imshow(A, cmap="gray", interpolation="none")
         plt.show()
 
-    # ----------------------------------------------------------------------
+    # --------------------------------------------------------------------------
     #   Initialize
-    # ----------------------------------------------------------------------
+    # --------------------------------------------------------------------------
 
     # Allocate multigrid maps
     nIW_SIZES = len(IW_SIZES)
     IW_grid_As: list[IW_Grid] = []
     IW_grid_Bs: list[IW_Grid] = []
 
-    # ---------------------------------------------------------------------
+    # --------------------------------------------------------------------------
     #   Walk over all interrogation window sizes
-    # ----------------------------------------------------------------------
+    # --------------------------------------------------------------------------
 
     for iIW_size in range(nIW_SIZES):
         IW_size = IW_SIZES[iIW_size]
@@ -84,14 +86,14 @@ if __name__ == "__main__":
         if iIW_size == 1:
             IW_grid_As.append(IW_grid_A)
 
-        # -------------------------------------------------------------------
+        # ----------------------------------------------------------------------
         #   Walk over all IWs
-        # --------------------------------------------------------------------
+        # ----------------------------------------------------------------------
 
         for iIW in range(IW_grid_A.nIWs):
-            # print(f"iIW = {iIW}")
+            print(f"iIW = {iIW}")
 
-            # -----------------------------------------------------------------
+            # ------------------------------------------------------------------
             #   Calculate IW of frame B
             #   Apply window shifting technique
             # ------------------------------------------------------------------
@@ -111,6 +113,7 @@ if __name__ == "__main__":
                 )
 
                 """
+                # MATLAB equivalent:
                 % Retrieve the pre-shift
                 shift_x = round(VMs{iIW_size - 1}.dx(iIW_parent));    % [px]
                 shift_y = round(VMs{iIW_size - 1}.dy(iIW_parent));    % [px]
@@ -142,5 +145,40 @@ if __name__ == "__main__":
                 IW_grid_B.y_range(iIW, 2) = img_h;
                 IW_grid_A.y_range(iIW, 2) = img_h - shift_y;
                 """
+
+            # ------------------------------------------------------------------
+            #   Retrieve images of IW frame A and IW frame B
+            # ------------------------------------------------------------------
+
+            img_IW_A = A[
+                IW_grid_A.y_range[iIW, 0] : IW_grid_A.y_range[iIW, 1],
+                IW_grid_A.x_range[iIW, 0] : IW_grid_A.x_range[iIW, 1],
+            ]
+
+            img_IW_B = B[
+                IW_grid_B.y_range[iIW, 0] : IW_grid_B.y_range[iIW, 1],
+                IW_grid_B.x_range[iIW, 0] : IW_grid_B.x_range[iIW, 1],
+            ]
+
+            # ------------------------------------------------------------------
+            #   Perform cross-correlation
+            # ------------------------------------------------------------------
+
+            # MATLAB equivalent:
+            #  if isempty(img_IW_A(:)) || ...
+            #      max(img_IW_A(:)) == 0 || max(img_IW_B(:)) == 0
+            #      C = nan;                        % Save computation time
+            #  else
+            #      %C = xcorr2(double(img_IW_B), ...
+            #      %           double(img_IW_A));   % Slow but accurate
+            #      C = xcorr2(single(img_IW_B), ...
+            #              single(img_IW_A));   % Fast but slightly less accurate
+            #      C = C/max(C(:));                % Normalize
+            #  end
+
+            # C = convolve2d(img_IW_B, img_IW_A)
+            # C = correlate2d(img_IW_B, img_IW_A)
+            C = fftconvolve(img_IW_B, img_IW_A)
+            C = C / np.max(C)
 
     print("The end")
