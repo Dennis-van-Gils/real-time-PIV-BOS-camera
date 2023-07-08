@@ -463,7 +463,7 @@ for iFile = 1:1
 
   if 1
     h6 = figure(6); clf
-    set(gcf, 'Position', [2580, -225, 1280, 900])
+    set(gcf, 'Position', [0, 0, 1280, 900])
     imshow(imadjust(A), 'InitialMagnification', 'fit', ...
            'Colormap', bone(256));
     set(gca, 'Position', [0.06 0.05 .9 .91])
@@ -502,7 +502,7 @@ for iFile = 1:1
     img_blend = imfuse(img_magn, ind2rgb(imadjust(A), gray(256)), 'blend');
 
     h7 = figure(7); clf
-    set(gcf, 'Position', [2580, -225, 1280, 900])
+    set(gcf, 'Position', [0, 0, 1280, 900])
     imshow(img_blend, 'InitialMagnification', 'fit')
     set(gca, 'Position', [0.06 0.05 .9 .91])
     axis on; axis tight; hold on
@@ -587,7 +587,7 @@ for iFile = 1:1
   if 0
     % Show original full figure A
     h8 = figure(8); clf
-    set(gcf, 'Position', [60, 60, 500, 500])
+    set(gcf, 'Position', [0, 0, 500, 500])
     imshow(imadjust(A), 'InitialMagnification', 80, 'Colormap', bone(256));
     hold on
     tmp = get(gcf, 'Position');
