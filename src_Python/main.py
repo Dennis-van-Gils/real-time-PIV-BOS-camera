@@ -105,7 +105,9 @@ if __name__ == "__main__":
                 # Calculate corresponding index of the IW in the larger parent
                 # grid
                 iIW_parent = lookup_IW_Idx(
-                    IW_grid_As[iIW_size - 1], IW_grid_A.x[iIW], IW_grid_A.y[iIW]
+                    IW_grid_As[iIW_size - 1],
+                    IW_grid_A.x_1D[iIW],
+                    IW_grid_A.y_1D[iIW],
                 )
 
                 """
