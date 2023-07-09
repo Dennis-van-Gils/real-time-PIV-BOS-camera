@@ -22,7 +22,9 @@ from time import perf_counter
 
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
-import matplotlib
+import matplotlib as mpl
+
+mpl.rcParams["toolbar"] = "None"
 
 import numpy as np
 from scipy.signal import fftconvolve
@@ -93,7 +95,7 @@ if __name__ == "__main__":
         #   Walk over all IWs
         # ----------------------------------------------------------------------
 
-        for iIW in range(IW_grid_A.nIWs):
+        for iIW in range(18, IW_grid_A.nIWs):
             # print(f"iIW = {iIW}")
 
             # ------------------------------------------------------------------
@@ -181,6 +183,62 @@ if __name__ == "__main__":
 
             C = fftconvolve(img_IW_B, img_IW_A)
             C = C / np.max(C)
+
+            if 1:  # DEBUG flag: Show correlation map
+                if iIW == 0:
+                    plt.clf()
+                    imshow_obj = plt.imshow(
+                        C,
+                        cmap="gray",
+                        interpolation="none",
+                        vmin=0,
+                        vmax=1,
+                    )
+                else:
+                    # imshow_obj.set_data(C)
+                    plt.clf()
+                    imshow_obj = plt.imshow(
+                        C,
+                        cmap="gray",
+                        interpolation="none",
+                        vmin=0,
+                        vmax=1,
+                    )
+                plt.title(f"{iIW} of {IW_grid_A.nIWs}")
+                plt.draw()
+                plt.pause(0.0001)
+
+            # Find maximum correlation peak
+            #
+            # MATLAB equivalent:
+            #   if isnan(max(C(:)))
+            #     dx = nan; dy = nan;
+            #   else
+            #     [maxC, iMaxC] = max(C(:));
+            #     [peak_y, peak_x] = ind2sub(size(C), iMaxC);
+
+            #     % Sub-pixel resolution algorithm, 3-point Gaussian fit
+            #     [peak_x, peak_y] = subpx_3pgf_2D(C, peak_x, peak_y);
+
+            #     % Calculate displacement vector
+            #     dx = peak_x - floor(size(C, 2)/2 + 1) + shift_x;
+            #     dy = peak_y - floor(size(C, 1)/2 + 1) + shift_y;
+            #   end
+
+            iMaxC = np.argmax(C)
+            peak_y, peak_x = np.unravel_index(iMaxC, C.shape, order="C")
+
+            if 1:  # DEBUG flag: Show correlation peak
+                plt.plot(peak_x, peak_y, "xr")
+                plt.draw()
+                plt.pause(0.5)
+
+            # Sub-pixel resolution algorithm, 3-point Gaussian fit
+            # [peak_x, peak_y] = subpx_3pgf_2D(C, peak_x, peak_y);
+
+            # Calculate displacement vector
+            # dx = peak_x - floor(size(C, 2)/2 + 1) + shift_x;
+            # dy = peak_y - floor(size(C, 1)/2 + 1) + shift_y;
 
     duration = perf_counter() - t_0
     print(f"Finished in {duration:.3f} s")
