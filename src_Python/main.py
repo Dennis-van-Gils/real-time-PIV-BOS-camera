@@ -18,12 +18,14 @@ __version__ = "1.0"
 import os
 import sys
 import glob
+from time import perf_counter
 
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 import matplotlib
+
 import numpy as np
-from scipy.signal import correlate2d, convolve2d, fftconvolve
+from scipy.signal import fftconvolve
 import numba
 
 from skimage.io import imread
@@ -73,6 +75,7 @@ if __name__ == "__main__":
     # --------------------------------------------------------------------------
     #   Walk over all interrogation window sizes
     # --------------------------------------------------------------------------
+    t_0 = perf_counter()
 
     for iIW_size in range(nIW_SIZES):
         IW_size = IW_SIZES[iIW_size]
@@ -91,7 +94,7 @@ if __name__ == "__main__":
         # ----------------------------------------------------------------------
 
         for iIW in range(IW_grid_A.nIWs):
-            print(f"iIW = {iIW}")
+            # print(f"iIW = {iIW}")
 
             # ------------------------------------------------------------------
             #   Calculate IW of frame B
@@ -176,9 +179,9 @@ if __name__ == "__main__":
             #      C = C/max(C(:));                % Normalize
             #  end
 
-            # C = convolve2d(img_IW_B, img_IW_A)
-            # C = correlate2d(img_IW_B, img_IW_A)
             C = fftconvolve(img_IW_B, img_IW_A)
             C = C / np.max(C)
 
-    print("The end")
+    duration = perf_counter() - t_0
+    print(f"Finished in {duration:.3f} s")
+    # scipy.signal.fftconvolve takes ~1.24 s in alacritty without printing
