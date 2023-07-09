@@ -7,6 +7,7 @@ __date__ = "07-07-2023"
 __version__ = "1.0"
 
 import numpy as np
+from numba import njit
 
 from matplotlib import pyplot as plt
 from matplotlib.patches import Rectangle
@@ -136,7 +137,8 @@ class IW_Grid:
             plt.show()
 
 
-def lookup_IW_Idx(IW_grid: IW_Grid, x_pixel, y_pixel):
+# @njit() DOES NOT WORK WITH CLASSES, NOR AS CLASS METHOD
+def lookup_IW_Idx(IW_grid: IW_Grid, x_pixel: int, y_pixel: int):
     """Lookup the index of the IW that has its center closest to the input
     location [x_pixel, y_pixel].
 
@@ -171,9 +173,7 @@ def lookup_IW_Idx(IW_grid: IW_Grid, x_pixel, y_pixel):
     return iIW
 
 
-import numpy as np
-
-
+# @njit()
 def subpx_3pgf_2D(C: np.ndarray, px: int, py: int):
     """Perform a 3-point Gaussian fit to the point with index (py, px)
     inside of 2-D matrix 'C' along both the x and y direction.
