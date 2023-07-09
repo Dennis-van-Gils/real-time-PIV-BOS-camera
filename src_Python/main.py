@@ -24,7 +24,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 import matplotlib as mpl
 
-mpl.rcParams["toolbar"] = "None"
+# mpl.rcParams["toolbar"] = "None"
 
 import numpy as np
 from scipy.signal import fftconvolve
@@ -32,7 +32,7 @@ import numba
 
 from skimage.io import imread
 
-from my_fun import IW_Grid, lookup_IW_Idx
+from my_fun import IW_Grid, lookup_IW_Idx, subpx_3pgf_2D
 
 import_file = "E:/Work/_GitHub_repo/2D-PIV-BOS/test_imgs/PIV_rising_vortex_plume/B00001.tif"
 
@@ -184,7 +184,7 @@ if __name__ == "__main__":
             C = fftconvolve(img_IW_B, img_IW_A)
             C = C / np.max(C)
 
-            if 1:  # DEBUG flag: Show correlation map
+            if 0:  # DEBUG flag: Show correlation map
                 if iIW == 0:
                     plt.clf()
                     imshow_obj = plt.imshow(
@@ -209,7 +209,7 @@ if __name__ == "__main__":
                 plt.pause(0.0001)
 
             # Find maximum correlation peak
-            #
+
             # MATLAB equivalent:
             #   if isnan(max(C(:)))
             #     dx = nan; dy = nan;
@@ -227,18 +227,22 @@ if __name__ == "__main__":
 
             iMaxC = np.argmax(C)
             peak_y, peak_x = np.unravel_index(iMaxC, C.shape, order="C")
-
-            if 1:  # DEBUG flag: Show correlation peak
-                plt.plot(peak_x, peak_y, "xr")
-                plt.draw()
-                plt.pause(0.5)
+            peak_x = int(peak_x)
+            peak_y = int(peak_y)
 
             # Sub-pixel resolution algorithm, 3-point Gaussian fit
-            # [peak_x, peak_y] = subpx_3pgf_2D(C, peak_x, peak_y);
+            peak_x, peak_y = subpx_3pgf_2D(C, peak_x, peak_y)
+
+            if 0:  # DEBUG flag: Show correlation peak
+                plt.plot(peak_x, peak_y, "xr")
+                plt.plot(peak_x, peak_y, "og")
+                plt.draw()
+                # plt.pause(2)
+                plt.show()
 
             # Calculate displacement vector
-            # dx = peak_x - floor(size(C, 2)/2 + 1) + shift_x;
-            # dy = peak_y - floor(size(C, 1)/2 + 1) + shift_y;
+            dx = peak_x - C.shape[1] // 2 + 1  # + shift_x
+            dy = peak_y - C.shape[0] // 2 + 1  # + shift_y
 
     duration = perf_counter() - t_0
     print(f"Finished in {duration:.3f} s")

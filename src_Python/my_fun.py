@@ -169,3 +169,44 @@ def lookup_IW_Idx(IW_grid: IW_Grid, x_pixel, y_pixel):
     )
 
     return iIW
+
+
+import numpy as np
+
+
+def subpx_3pgf_2D(C: np.ndarray, px: int, py: int):
+    """Perform a 3-point Gaussian fit to the point with index (py, px)
+    inside of 2-D matrix 'C' along both the x and y direction.
+    """
+
+    # Along x
+    if px > 0 and px < C.shape[1] - 1:
+        # Fit possible
+        phi_m1 = max(C[py, px - 1], 1e-40)  # Prevent taking log of zero
+        phi_p1 = max(C[py, px + 1], 1e-40)  # Prevent taking log of zero
+        px_sub = (
+            px
+            + (np.log(phi_m1) - np.log(phi_p1))
+            / (np.log(phi_m1) + np.log(phi_p1) - 2 * np.log(C[py, px]))
+            / 2
+        )
+    else:
+        # No fit possible
+        px_sub = px
+
+    # Along y
+    if py > 0 and py < C.shape[0] - 1:
+        # Fit possible
+        phi_m1 = max(C[py - 1, px], 1e-40)  # Prevent taking log of zero
+        phi_p1 = max(C[py + 1, px], 1e-40)  # Prevent taking log of zero
+        py_sub = (
+            py
+            + (np.log(phi_m1) - np.log(phi_p1))
+            / (np.log(phi_m1) + np.log(phi_p1) - 2 * np.log(C[py, px]))
+            / 2
+        )
+    else:
+        # No fit possible
+        py_sub = py
+
+    return px_sub, py_sub
