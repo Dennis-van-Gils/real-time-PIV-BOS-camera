@@ -27,7 +27,7 @@ import matplotlib as mpl
 # mpl.rcParams["toolbar"] = "None"
 
 import numpy as np
-from scipy.signal import fftconvolve
+from scipy.signal import correlate2d, convolve2d, fftconvolve
 import numba
 
 from skimage.io import imread
@@ -41,9 +41,11 @@ import_file = "E:/Work/_GitHub_repo/2D-PIV-BOS/test_imgs/PIV_rising_vortex_plume
 # IW_SIZES   = [128 96 64 48 32];
 # IW_SIZES = [64, 32]
 IW_SIZES = [
-    32,
+    64,
 ]
 IW_OVERLAP = 0.5
+
+DEBUG = False
 
 # ------------------------------------------------------------------------------
 #   Main
@@ -56,12 +58,10 @@ if __name__ == "__main__":
     img_h = int(img_2h / 2)
     A = img[:img_h, :]
     B = img[img_h:, :]
-    print(f"Img A: {A.shape}")
-    print(f"Img B: {B.shape}")
 
     # Mean background removal
-    A = A - np.mean(A)
-    B = B - np.mean(B)
+    A = np.clip(A - np.mean(A), 0, None).astype(int)
+    B = np.clip(B - np.mean(B), 0, None).astype(int)
 
     if 0:  # DEBUG flag: Show image A
         fig = plt.figure()
@@ -109,10 +109,11 @@ if __name__ == "__main__":
         # ----------------------------------------------------------------------
 
         for iIW in range(IW_grid_A.nIWs):
-            # print(f"iIW = {iIW}")
+            if DEBUG:
+                print(f"{iIW + 1}")
 
             # Turn linear index into matrix indices
-            iIW_y, iIW_x = np.unravel_index(iIW, VM_dx.shape, order="C")
+            iIW_y, iIW_x = np.unravel_index(iIW, VM_dx.shape, order="F")
 
             # ------------------------------------------------------------------
             #   Calculate IW of frame B
@@ -142,7 +143,7 @@ if __name__ == "__main__":
                 #   if isnan(shift_y); shift_y = 0; end
 
                 iIW_parent_y, iIW_parent_x = np.unravel_index(
-                    iIW_parent, VMs_dx[-1].shape, order="C"
+                    iIW_parent, VMs_dx[-1].shape, order="F"
                 )
                 shift_x = np.round(VMs_dx[-1][iIW_parent_y, iIW_parent_x])
                 shift_y = np.round(VMs_dy[-1][iIW_parent_y, iIW_parent_x])
@@ -205,14 +206,22 @@ if __name__ == "__main__":
             # ------------------------------------------------------------------
 
             img_IW_A = A[
-                IW_grid_A.y_range[iIW, 0] : IW_grid_A.y_range[iIW, 1],
-                IW_grid_A.x_range[iIW, 0] : IW_grid_A.x_range[iIW, 1],
+                IW_grid_A.y_range[iIW, 0] : IW_grid_A.y_range[iIW, 1] + 1,
+                IW_grid_A.x_range[iIW, 0] : IW_grid_A.x_range[iIW, 1] + 1,
             ]
 
             img_IW_B = B[
-                IW_grid_B.y_range[iIW, 0] : IW_grid_B.y_range[iIW, 1],
-                IW_grid_B.x_range[iIW, 0] : IW_grid_B.x_range[iIW, 1],
+                IW_grid_B.y_range[iIW, 0] : IW_grid_B.y_range[iIW, 1] + 1,
+                IW_grid_B.x_range[iIW, 0] : IW_grid_B.x_range[iIW, 1] + 1,
             ]
+
+            if DEBUG:
+                print(
+                    f"     xrng {IW_grid_A.x_range[iIW, 0] + 1}, {IW_grid_A.x_range[iIW, 1] + 1}"
+                )
+                print(
+                    f"     yrng {IW_grid_A.y_range[iIW, 0] + 1}, {IW_grid_A.y_range[iIW, 1] + 1}"
+                )
 
             # ------------------------------------------------------------------
             #   Perform cross-correlation
@@ -230,35 +239,20 @@ if __name__ == "__main__":
             #      C = C/max(C(:));                % Normalize
             #  end
 
-            if img_IW_A.size == 0:
+            if (
+                img_IW_A.size == 0
+                or np.max(img_IW_A) == 0
+                or np.max(img_IW_B) == 0
+            ):
                 C = np.nan
             else:
-                C = fftconvolve(img_IW_B, img_IW_A)
+                # `fftconvolve()``: Fastest, but incorrect centering
+                # `convolve2d()`  : Slowest, and incorrect centering
+                # `correlate2d()` : Slowest, correct centering
+                # C = fftconvolve(img_IW_B, img_IW_A)
+                # C = convolve2d(img_IW_B, img_IW_A)
+                C = correlate2d(img_IW_B, img_IW_A)
                 C = C / np.max(C)
-
-            if 0:  # DEBUG flag: Show correlation map
-                if iIW == 0:
-                    plt.clf()
-                    imshow_obj = plt.imshow(
-                        C,
-                        cmap="gray",
-                        interpolation="none",
-                        vmin=0,
-                        vmax=1,
-                    )
-                else:
-                    # imshow_obj.set_data(C)
-                    plt.clf()
-                    imshow_obj = plt.imshow(
-                        C,
-                        cmap="gray",
-                        interpolation="none",
-                        vmin=0,
-                        vmax=1,
-                    )
-                plt.title(f"{iIW} of {IW_grid_A.nIWs}")
-                plt.draw()
-                plt.pause(0.0001)
 
             # Find maximum correlation peak
 
@@ -287,24 +281,46 @@ if __name__ == "__main__":
                 peak_y = int(peak_y)
 
                 # Sub-pixel resolution algorithm, 3-point Gaussian fit
-                peak_x, peak_y = subpx_3pgf_2D(C, peak_x, peak_y)
-
-                if 0:  # DEBUG flag: Show correlation peak
-                    plt.plot(peak_x, peak_y, "xr")
-                    plt.plot(peak_x, peak_y, "og")
-                    plt.draw()
-                    # plt.pause(2)
-                    plt.show()
+                peak_sub_x, peak_sub_y = subpx_3pgf_2D(C, peak_x, peak_y)
 
                 # Calculate displacement vector
-                dx = peak_x - C.shape[1] // 2 + shift_x
-                dy = peak_y - C.shape[0] // 2 + shift_y
+                dx = peak_sub_x - C.shape[1] // 2 + shift_x
+                dy = peak_sub_y - C.shape[0] // 2 + shift_y
+
+                if DEBUG:
+                    print(
+                        f"     peak   @ {peak_x + 1:+6.2f}, {peak_y + 1:+6.2f}"
+                    )
+                    print(
+                        f"     3pgf   @ {peak_sub_x + 1:+6.2f}, {peak_sub_y + 1:+6.2f}"
+                    )
+                    print(f"     dx, dy = {dx:+6.2f}, {dy:+6.2f}")
+
+                if 0:  # DEBUG flag: Show correlation map
+                    if not "h_imshow" in locals():
+                        h_imshow = plt.imshow(
+                            C,
+                            cmap="gray",
+                            interpolation="none",
+                            vmin=0,
+                            vmax=1,
+                        )
+                        (h_peak,) = plt.plot(peak_x, peak_y, "xr")
+                        (h_peak_sub,) = plt.plot(peak_sub_x, peak_sub_y, "xg")
+                        h_title = plt.title(f"{iIW} of {IW_grid_A.nIWs}")
+                    else:
+                        h_imshow.set_data(C)
+                        h_peak.set_data(peak_x, peak_y)
+                        h_peak_sub.set_data(peak_sub_x, peak_sub_y)
+                        h_title.set_text(f"{iIW} of {IW_grid_A.nIWs}")
+
+                    plt.draw()
+                    plt.pause(0.0001)
+                    # plt.show()
 
             # Store result in vector map
             VM_dx[iIW_y, iIW_x] = dx
             VM_dy[iIW_y, iIW_x] = dy
-
-            # print(f"{dx}, {dy}")
 
         # -----------------------------------------------------------------------
         #   Store multigrid maps
@@ -317,11 +333,16 @@ if __name__ == "__main__":
         VMs_dx.append(VM_dx)
         VMs_dy.append(VM_dy)
 
+    duration = perf_counter() - t_0
+    print(f"Finished in {duration:.3f} s")
+    # scipy.signal.fftconvolve takes ~0.31 s in alacritty without printing, wrong correlation centering
+    # scipy.signal.convolve2d  takes ~48   s in alacritty without printing, wrong correlation centering
+    # scipy.signal.correlate2d takes ~47   s in alacritty without printing
+
     # --------------------------------------------------------------------------
     #   Show original image A with unfiltered vector map on top
     # --------------------------------------------------------------------------
     quiverX = 3
-    quiverScale = 0
 
     if 1:
         fig = plt.figure()
@@ -331,12 +352,8 @@ if __name__ == "__main__":
             VMs_y[-1],
             VMs_dx[-1] * quiverX,
             VMs_dy[-1] * quiverX,
+            angles="xy",
             color="r",
             linewidths=2,
         )
-        # quiverScale, 'r', 'LineWidth', 2)
         plt.show()
-
-    duration = perf_counter() - t_0
-    print(f"Finished in {duration:.3f} s")
-    # scipy.signal.fftconvolve takes ~1.24 s in alacritty without printing

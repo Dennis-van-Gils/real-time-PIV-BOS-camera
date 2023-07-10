@@ -71,7 +71,8 @@ for iFile = 1:1
   % Set the IW sizes for multigrid analysis
   % Subsequent IW sizes should be the exact half of the prev IW size
   %IW_SIZES   = [128 96 64 48 32];
-  IW_SIZES   = [64 32];
+  %IW_SIZES   = [64 32];
+  IW_SIZES   = [64];
   IW_OVERLAP = .5;
 
   % Allocate memory for multigrid maps
@@ -114,7 +115,7 @@ for iFile = 1:1
     % --------------------------------------------------------------------
 
     for iIW = 1:IW_grid_A.nIWs
-      %fprintf('\niIW = %i\n', iIW)
+      fprintf('%i\n', iIW)
 
       %% -----------------------------------------------------------------
       %   Calculate IW of frame B
@@ -190,6 +191,9 @@ for iFile = 1:1
       img_IW_B = B(IW_grid_B.y_range(iIW, 1):IW_grid_B.y_range(iIW, 2), ...
                    IW_grid_B.x_range(iIW, 1):IW_grid_B.x_range(iIW, 2));
 
+      fprintf("     xrng %i, %i\n", IW_grid_A.x_range(iIW, 1), IW_grid_A.x_range(iIW, 2))
+      fprintf("     yrng %i, %i\n", IW_grid_A.y_range(iIW, 1), IW_grid_A.y_range(iIW, 2))
+
       %% -----------------------------------------------------------------
       %   Perform cross-correlation
       % ------------------------------------------------------------------
@@ -212,12 +216,18 @@ for iFile = 1:1
         [maxC, iMaxC] = max(C(:));
         [peak_y, peak_x] = ind2sub(size(C), iMaxC);
 
+        fprintf("     peak   @ %+6.2f, %+6.2f\n", peak_x, peak_y)
+
         % Sub-pixel resolution algorithm, 3-point Gaussian fit
         [peak_x, peak_y] = subpx_3pgf_2D(C, peak_x, peak_y);
+
+        fprintf("     3pgf   @ %+6.2f, %+6.2f\n", peak_x, peak_y)
 
         % Calculate displacement vector
         dx = peak_x - floor(size(C, 2)/2 + 1) + shift_x;
         dy = peak_y - floor(size(C, 1)/2 + 1) + shift_y;
+
+        fprintf("     dx, dy = %+6.2f, %+6.2f\n", dx, dy)
       end
 
       % Store result in vector map
@@ -281,148 +291,150 @@ for iFile = 1:1
     % Create a copy of the vector map to contain the filtered result
     VM_filt = VM;
 
-    % Detect bad vectors based on the median absolute deviation of the
-    % magnitude
-    if 1
-      MAD_threshold = 2.5;
-      VM_filt = detect_bad_vectors_by_MAD(VM_filt, MAD_threshold);
-
-      %%%%%%%%%%%% Replace bad vectors by nearest neighborhood
-      VM_filt = replace_bad_vectors_by_nn(VM_filt);
-
-      % Plot bad vector indicators
-      [i, j] = ind2sub(size(VM_filt.x), VM_filt.iReplaced);
-      plot(j, i, 'xw', 'MarkerSize', 6, 'LineWidth', 2)
-      fprintf('filtered vectors MAD: %i\n', VM_filt.nReplaced)
-    end
-
-    % Detect bad vectors based on LP filtering the vector angle and
-    % magnitude
-    if 1
-      if IW_size >= 128
-        angleDiffThreshold = 180;
-        magnDiffThreshold  = 10;
-      elseif IW_size >= 64
-        angleDiffThreshold = 40;
-        magnDiffThreshold  = 4;
-      elseif IW_size >= 32
-        angleDiffThreshold = 20;
-        magnDiffThreshold  = 4;
-      end
-
-      % LP filter vector angle
-      VM_filt = detect_bad_vectors_by_LP_filt(VM_filt, ...
-                  unwrap(VM.angle)/pi*180, ...
-                  angleDiffThreshold);
-
-      %%%%%%%%%%%% Replace bad vectors by nearest neighborhood
-      VM_filt = replace_bad_vectors_by_nn(VM_filt);
-
-      % Plot bad vector indicators
-      [i, j] = ind2sub(size(VM_filt.x), VM_filt.iReplaced);
-      plot(j, i, 'xr', 'MarkerSize', 6, 'LineWidth', 2)
-      fprintf('filtered vectors LP angle: %i\n', VM_filt.nReplaced)
-
-      % LP filter vector magnitude
-      VM_filt = detect_bad_vectors_by_LP_filt(VM_filt, ...
-                  VM.magn, ...
-                  magnDiffThreshold);
-
-      %%%%%%%%%%%% Replace bad vectors by nearest neighborhood
-      VM_filt = replace_bad_vectors_by_nn(VM_filt);
-
-      % Plot bad vector indicators
-      [i, j] = ind2sub(size(VM_filt.x), VM_filt.iReplaced);
-      plot(j, i, 'xk', 'MarkerSize', 6, 'LineWidth', 2)
-      fprintf('filtered vectors LP magn : %i\n', VM_filt.nReplaced)
-    end
-
-    if 1
-      % LP filter vector dx
-      VM_filt = detect_bad_vectors_by_LP_filt(VM_filt, ...
-                  VM.dx, ...
-                  2);
-
-      %%%%%%%%%%%% Replace bad vectors by nearest neighborhood
-      VM_filt = replace_bad_vectors_by_nn(VM_filt);
-
-      % Plot bad vector indicators
-      [i, j] = ind2sub(size(VM_filt.x), VM_filt.iReplaced);
-      plot(j, i, 'xy', 'MarkerSize', 6, 'LineWidth', 2)
-      fprintf('filtered vectors LP dx   : %i\n', VM_filt.nReplaced)
-
-      % LP filter vector dy
-      VM_filt = detect_bad_vectors_by_LP_filt(VM_filt, ...
-                  VM.dy, ...
-                  2);
-
-      %%%%%%%%%%%% Replace bad vectors by nearest neighborhood
-      VM_filt = replace_bad_vectors_by_nn(VM_filt);
-
-      % Plot bad vector indicators
-      [i, j] = ind2sub(size(VM_filt.x), VM_filt.iReplaced);
-      plot(j, i, 'xy', 'MarkerSize', 6, 'LineWidth', 2)
-      fprintf('filtered vectors LP dy   : %i\n', VM_filt.nReplaced)
-    end
-
-    %% -------------------------------------------------------------------
-    %   Revisit bad vectors and try the 2, 3 or 4th max correlation peak
-    % --------------------------------------------------------------------
-
     if 0
-    for iNr = 1:nRemove
-      iIW = iRemove(iNr);
-
-      img_IW_A = A(IW_grid_A.y_range(iIW, 1):IW_grid_A.y_range(iIW, 2), ...
-                   IW_grid_A.x_range(iIW, 1):IW_grid_A.x_range(iIW, 2));
-      img_IW_B = B(IW_grid_B.y_range(iIW, 1):IW_grid_B.y_range(iIW, 2), ...
-                   IW_grid_B.x_range(iIW, 1):IW_grid_B.x_range(iIW, 2));
-
-      C = xcorr2(single(img_IW_B), single(img_IW_A));
-      C = C/max(C(:));            % Normalize
-
-      [maxC, iMaxC] = max(C(:));
-      [peak_y, peak_x] = ind2sub(size(C), iMaxC);
-
-      % Sub-pixel resolution algorithm, 3-point Gaussian fit
-      [peak_x, peak_y] = subpx_3pgf_2D(C, peak_x, peak_y);
-
-      % Calculate displacement vector
-      dx = peak_x - floor(size(C, 2)/2 + 1) + shift_x;
-      dy = peak_y - floor(size(C, 1)/2 + 1) + shift_y;
-
-      % DEBUG: working out multipeak detection
-      figure(5); clf
-      C_BW = imextendedmax(C, .2, 8);
-      imagesc(C_BW)
-      axis square
-      h5_ax = gca;
-      local_peaks = regionprops(C_BW, 'PixelIdxList');
-      local_peak_intensity = zeros(length(local_peaks), 1);
-      for iPeak = 1:length(local_peaks)
-        local_peak_intensity(iPeak) = ...
-          max(C(local_peaks(iPeak).PixelIdxList));
-      end
-
-      % Show correlation map
-      figure(3); cla
-      imshow(double(C), 'InitialMagnification', 'fit', 'Colormap', jet(256))
-      hold on
-      plot([IW_size IW_size], [1 2*IW_size-1], '-k', 'LineWidth', 1.5)
-      plot([1 2*IW_size-1], [IW_size IW_size], '-k', 'LineWidth', 1.5)
-      plot(peak_x, peak_y, '+k', 'LineWidth', 2)
-      h3_ax = gca;
-      title(['iIW = ' num2str(iIW)])
-      xlabel('\delta_x [px]')
-      ylabel('\delta_y [px]')
-      axis on; axis tight
-
-      linkaxes([h3_ax h5_ax], 'xy')
-
-      drawnow
-      pause
+        % Detect bad vectors based on the median absolute deviation of the
+        % magnitude
+        if 1
+          MAD_threshold = 2.5;
+          VM_filt = detect_bad_vectors_by_MAD(VM_filt, MAD_threshold);
+    
+          %%%%%%%%%%%% Replace bad vectors by nearest neighborhood
+          VM_filt = replace_bad_vectors_by_nn(VM_filt);
+    
+          % Plot bad vector indicators
+          [i, j] = ind2sub(size(VM_filt.x), VM_filt.iReplaced);
+          plot(j, i, 'xw', 'MarkerSize', 6, 'LineWidth', 2)
+          fprintf('filtered vectors MAD: %i\n', VM_filt.nReplaced)
+        end
+    
+        % Detect bad vectors based on LP filtering the vector angle and
+        % magnitude
+        if 1
+          if IW_size >= 128
+            angleDiffThreshold = 180;
+            magnDiffThreshold  = 10;
+          elseif IW_size >= 64
+            angleDiffThreshold = 40;
+            magnDiffThreshold  = 4;
+          elseif IW_size >= 32
+            angleDiffThreshold = 20;
+            magnDiffThreshold  = 4;
+          end
+    
+          % LP filter vector angle
+          VM_filt = detect_bad_vectors_by_LP_filt(VM_filt, ...
+                      unwrap(VM.angle)/pi*180, ...
+                      angleDiffThreshold);
+    
+          %%%%%%%%%%%% Replace bad vectors by nearest neighborhood
+          VM_filt = replace_bad_vectors_by_nn(VM_filt);
+    
+          % Plot bad vector indicators
+          [i, j] = ind2sub(size(VM_filt.x), VM_filt.iReplaced);
+          plot(j, i, 'xr', 'MarkerSize', 6, 'LineWidth', 2)
+          fprintf('filtered vectors LP angle: %i\n', VM_filt.nReplaced)
+    
+          % LP filter vector magnitude
+          VM_filt = detect_bad_vectors_by_LP_filt(VM_filt, ...
+                      VM.magn, ...
+                      magnDiffThreshold);
+    
+          %%%%%%%%%%%% Replace bad vectors by nearest neighborhood
+          VM_filt = replace_bad_vectors_by_nn(VM_filt);
+    
+          % Plot bad vector indicators
+          [i, j] = ind2sub(size(VM_filt.x), VM_filt.iReplaced);
+          plot(j, i, 'xk', 'MarkerSize', 6, 'LineWidth', 2)
+          fprintf('filtered vectors LP magn : %i\n', VM_filt.nReplaced)
+        end
+    
+        if 1
+          % LP filter vector dx
+          VM_filt = detect_bad_vectors_by_LP_filt(VM_filt, ...
+                      VM.dx, ...
+                      2);
+    
+          %%%%%%%%%%%% Replace bad vectors by nearest neighborhood
+          VM_filt = replace_bad_vectors_by_nn(VM_filt);
+    
+          % Plot bad vector indicators
+          [i, j] = ind2sub(size(VM_filt.x), VM_filt.iReplaced);
+          plot(j, i, 'xy', 'MarkerSize', 6, 'LineWidth', 2)
+          fprintf('filtered vectors LP dx   : %i\n', VM_filt.nReplaced)
+    
+          % LP filter vector dy
+          VM_filt = detect_bad_vectors_by_LP_filt(VM_filt, ...
+                      VM.dy, ...
+                      2);
+    
+          %%%%%%%%%%%% Replace bad vectors by nearest neighborhood
+          VM_filt = replace_bad_vectors_by_nn(VM_filt);
+    
+          % Plot bad vector indicators
+          [i, j] = ind2sub(size(VM_filt.x), VM_filt.iReplaced);
+          plot(j, i, 'xy', 'MarkerSize', 6, 'LineWidth', 2)
+          fprintf('filtered vectors LP dy   : %i\n', VM_filt.nReplaced)
+        end
+    
+        %% -------------------------------------------------------------------
+        %   Revisit bad vectors and try the 2, 3 or 4th max correlation peak
+        % --------------------------------------------------------------------
+    
+        if 0
+        for iNr = 1:nRemove
+          iIW = iRemove(iNr);
+    
+          img_IW_A = A(IW_grid_A.y_range(iIW, 1):IW_grid_A.y_range(iIW, 2), ...
+                       IW_grid_A.x_range(iIW, 1):IW_grid_A.x_range(iIW, 2));
+          img_IW_B = B(IW_grid_B.y_range(iIW, 1):IW_grid_B.y_range(iIW, 2), ...
+                       IW_grid_B.x_range(iIW, 1):IW_grid_B.x_range(iIW, 2));
+    
+          C = xcorr2(single(img_IW_B), single(img_IW_A));
+          C = C/max(C(:));            % Normalize
+    
+          [maxC, iMaxC] = max(C(:));
+          [peak_y, peak_x] = ind2sub(size(C), iMaxC);
+    
+          % Sub-pixel resolution algorithm, 3-point Gaussian fit
+          [peak_x, peak_y] = subpx_3pgf_2D(C, peak_x, peak_y);
+    
+          % Calculate displacement vector
+          dx = peak_x - floor(size(C, 2)/2 + 1) + shift_x;
+          dy = peak_y - floor(size(C, 1)/2 + 1) + shift_y;
+    
+          % DEBUG: working out multipeak detection
+          figure(5); clf
+          C_BW = imextendedmax(C, .2, 8);
+          imagesc(C_BW)
+          axis square
+          h5_ax = gca;
+          local_peaks = regionprops(C_BW, 'PixelIdxList');
+          local_peak_intensity = zeros(length(local_peaks), 1);
+          for iPeak = 1:length(local_peaks)
+            local_peak_intensity(iPeak) = ...
+              max(C(local_peaks(iPeak).PixelIdxList));
+          end
+    
+          % Show correlation map
+          figure(3); cla
+          imshow(double(C), 'InitialMagnification', 'fit', 'Colormap', jet(256))
+          hold on
+          plot([IW_size IW_size], [1 2*IW_size-1], '-k', 'LineWidth', 1.5)
+          plot([1 2*IW_size-1], [IW_size IW_size], '-k', 'LineWidth', 1.5)
+          plot(peak_x, peak_y, '+k', 'LineWidth', 2)
+          h3_ax = gca;
+          title(['iIW = ' num2str(iIW)])
+          xlabel('\delta_x [px]')
+          ylabel('\delta_y [px]')
+          axis on; axis tight
+    
+          linkaxes([h3_ax h5_ax], 'xy')
+    
+          drawnow
+          pause
+        end
+        end % if 0
     end
-    end % if 0
 
 
     %% -------------------------------------------------------------------
@@ -481,7 +493,7 @@ for iFile = 1:1
   %   Show velocity magnitude color backdrop
   % ----------------------------------------------------------------------
 
-  if 1
+  if 0
     %thisVM = VM;
     thisVM = VM_filt;
 
@@ -608,7 +620,7 @@ for iFile = 1:1
   end
 
   %imwrite(img_blend, ['magn_' fn(1:end - 4) '_2.png']);
-  linkaxes([h6_ax h7_ax], 'xy')
+  %linkaxes([h6_ax h7_ax], 'xy')
   %xlim([950 1110]); ylim([306 426])
   drawnow
 end
