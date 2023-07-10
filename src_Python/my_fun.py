@@ -159,13 +159,13 @@ def lookup_IW_Idx(IW_grid: IW_Grid, x_pixel: int, y_pixel: int):
         (y_pixel - half_IW_size) / (IW_grid.IW_size * (1 - IW_grid.overlap))
         + 0.5
     ).astype(int)
-    iIW_x = min(iIW_x, IW_grid.nIWs_x - 1)
-    iIW_y = min(iIW_y, IW_grid.nIWs_y - 1)
+    iIW_x = np.minimum(iIW_x, IW_grid.nIWs_x - 1)
+    iIW_y = np.minimum(iIW_y, IW_grid.nIWs_y - 1)
 
     return iIW_x, iIW_y
 
 
-# @njit()
+@njit("(float64[:, :], uint16, uint16)")
 def subpx_3pgf_2D(C: np.ndarray, px: int, py: int):
     """Perform a 3-point Gaussian fit to the point with index (py, px)
     inside of 2-D matrix 'C' along both the x and y direction.
@@ -174,8 +174,8 @@ def subpx_3pgf_2D(C: np.ndarray, px: int, py: int):
     # Along x
     if px > 0 and px < C.shape[1] - 1:
         # Fit possible
-        phi_m1 = max(C[py, px - 1], 1e-40)  # Prevent taking log of zero
-        phi_p1 = max(C[py, px + 1], 1e-40)  # Prevent taking log of zero
+        phi_m1 = np.maximum(C[py, px - 1], 1e-40)  # Prevent taking log of zero
+        phi_p1 = np.maximum(C[py, px + 1], 1e-40)  # Prevent taking log of zero
         px_sub = (
             px
             + (np.log(phi_m1) - np.log(phi_p1))
@@ -189,8 +189,8 @@ def subpx_3pgf_2D(C: np.ndarray, px: int, py: int):
     # Along y
     if py > 0 and py < C.shape[0] - 1:
         # Fit possible
-        phi_m1 = max(C[py - 1, px], 1e-40)  # Prevent taking log of zero
-        phi_p1 = max(C[py + 1, px], 1e-40)  # Prevent taking log of zero
+        phi_m1 = np.maximum(C[py - 1, px], 1e-40)  # Prevent taking log of zero
+        phi_p1 = np.maximum(C[py + 1, px], 1e-40)  # Prevent taking log of zero
         py_sub = (
             py
             + (np.log(phi_m1) - np.log(phi_p1))
