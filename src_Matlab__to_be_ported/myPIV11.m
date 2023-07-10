@@ -1,5 +1,7 @@
 %clr
 
+diary debug_output_matlab.txt
+
 fPROFILER = 0;
 if fPROFILER
   profile clear                                                             %#ok<*UNRCH>
@@ -71,8 +73,8 @@ for iFile = 1:1
   % Set the IW sizes for multigrid analysis
   % Subsequent IW sizes should be the exact half of the prev IW size
   %IW_SIZES   = [128 96 64 48 32];
-  %IW_SIZES   = [64 32];
-  IW_SIZES   = [64];
+  IW_SIZES   = [64 32];
+  %IW_SIZES   = [64];
   IW_OVERLAP = .5;
 
   % Allocate memory for multigrid maps
@@ -129,13 +131,18 @@ for iFile = 1:1
       else
         % Pre-shift available
         % Calculate corresponding index of the IW in the larger parent grid
-        iIW_parent = lookup_IW_Idx(IW_grid_As{iIW_size - 1}, ...
-                                   IW_grid_A.x(iIW), IW_grid_A.y(iIW));
+        [iIW_parent, iIW_parent_x, iIW_parent_y] = ...
+            lookup_IW_Idx(IW_grid_As{iIW_size - 1}, ...
+            IW_grid_A.x(iIW), IW_grid_A.y(iIW));
+
         % Retrieve the pre-shift
         shift_x = round(VMs{iIW_size - 1}.dx(iIW_parent));    % [px]
         shift_y = round(VMs{iIW_size - 1}.dy(iIW_parent));    % [px]
         if isnan(shift_x); shift_x = 0; end
         if isnan(shift_y); shift_y = 0; end
+
+        fprintf("   parent %i, %i\n", iIW_parent_x, iIW_parent_y)
+        fprintf("   shift  %+6.2f, %+6.2f\n", shift_x, shift_y)
 
         % Calculate new center and range of the shifted IW in frame B
         IW_grid_B.x(iIW)          = IW_grid_B.x(iIW)          + shift_x;
@@ -186,13 +193,15 @@ for iFile = 1:1
       %   Retrieve images of IW frame A and IW frame B
       % ------------------------------------------------------------------
 
+      fprintf("   A_xrng %i, %i\n", IW_grid_A.x_range(iIW, 1), IW_grid_A.x_range(iIW, 2))
+      fprintf("   A_yrng %i, %i\n", IW_grid_A.y_range(iIW, 1), IW_grid_A.y_range(iIW, 2))
+      fprintf("   B_xrng %i, %i\n", IW_grid_B.x_range(iIW, 1), IW_grid_B.x_range(iIW, 2))
+      fprintf("   B_yrng %i, %i\n", IW_grid_B.y_range(iIW, 1), IW_grid_B.y_range(iIW, 2))
+      
       img_IW_A = A(IW_grid_A.y_range(iIW, 1):IW_grid_A.y_range(iIW, 2), ...
                    IW_grid_A.x_range(iIW, 1):IW_grid_A.x_range(iIW, 2));
       img_IW_B = B(IW_grid_B.y_range(iIW, 1):IW_grid_B.y_range(iIW, 2), ...
                    IW_grid_B.x_range(iIW, 1):IW_grid_B.x_range(iIW, 2));
-
-      fprintf("     xrng %i, %i\n", IW_grid_A.x_range(iIW, 1), IW_grid_A.x_range(iIW, 2))
-      fprintf("     yrng %i, %i\n", IW_grid_A.y_range(iIW, 1), IW_grid_A.y_range(iIW, 2))
 
       %% -----------------------------------------------------------------
       %   Perform cross-correlation
@@ -624,3 +633,5 @@ for iFile = 1:1
   %xlim([950 1110]); ylim([306 426])
   drawnow
 end
+
+diary off

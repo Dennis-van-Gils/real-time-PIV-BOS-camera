@@ -39,13 +39,11 @@ import_file = "E:/Work/_GitHub_repo/2D-PIV-BOS/test_imgs/PIV_rising_vortex_plume
 # Set the IW sizes for multigrid analysis
 # Subsequent IW sizes should be the exact half of the prev IW size
 # IW_SIZES   = [128 96 64 48 32];
-# IW_SIZES = [64, 32]
-IW_SIZES = [
-    64,
-]
+IW_SIZES = [64, 32]
+# IW_SIZES = [64]
 IW_OVERLAP = 0.5
 
-DEBUG = False
+DEBUG = True
 
 # ------------------------------------------------------------------------------
 #   Main
@@ -128,10 +126,10 @@ if __name__ == "__main__":
                 # Pre-shift available
                 # Calculate corresponding index of the IW in the larger parent
                 # grid
-                iIW_parent = lookup_IW_Idx(
+                iIW_parent_x, iIW_parent_y = lookup_IW_Idx(
                     IW_grid_As[iIW_size - 1],
-                    IW_grid_A.x_1D[iIW],
-                    IW_grid_A.y_1D[iIW],
+                    IW_grid_A.x[iIW_y, iIW_x],
+                    IW_grid_A.y[iIW_y, iIW_x],
                 )
 
                 # Retrieve the pre-shift
@@ -142,9 +140,6 @@ if __name__ == "__main__":
                 #   if isnan(shift_x); shift_x = 0; end
                 #   if isnan(shift_y); shift_y = 0; end
 
-                iIW_parent_y, iIW_parent_x = np.unravel_index(
-                    iIW_parent, VMs_dx[-1].shape, order="F"
-                )
                 shift_x = np.round(VMs_dx[-1][iIW_parent_y, iIW_parent_x])
                 shift_y = np.round(VMs_dy[-1][iIW_parent_y, iIW_parent_x])
 
@@ -152,6 +147,10 @@ if __name__ == "__main__":
                     shift_x = 0
                 if np.isnan(shift_y):
                     shift_y = 0
+
+                if DEBUG:
+                    print(f"   parent {iIW_parent_x + 1}, {iIW_parent_y + 1}")
+                    print(f"   shift  {shift_x:+6.2f}, {shift_y:+6.2f}")
 
                 # Calculate new center and range of the shifted IW in frame B
                 #
@@ -205,6 +204,20 @@ if __name__ == "__main__":
             #   Retrieve images of IW frame A and IW frame B
             # ------------------------------------------------------------------
 
+            if DEBUG:
+                print(
+                    f"   A_xrng {IW_grid_A.x_range[iIW, 0] + 1}, {IW_grid_A.x_range[iIW, 1] + 1}"
+                )
+                print(
+                    f"   A_yrng {IW_grid_A.y_range[iIW, 0] + 1}, {IW_grid_A.y_range[iIW, 1] + 1}"
+                )
+                print(
+                    f"   B_xrng {IW_grid_B.x_range[iIW, 0] + 1}, {IW_grid_B.x_range[iIW, 1] + 1}"
+                )
+                print(
+                    f"   B_yrng {IW_grid_B.y_range[iIW, 0] + 1}, {IW_grid_B.y_range[iIW, 1] + 1}"
+                )
+
             img_IW_A = A[
                 IW_grid_A.y_range[iIW, 0] : IW_grid_A.y_range[iIW, 1] + 1,
                 IW_grid_A.x_range[iIW, 0] : IW_grid_A.x_range[iIW, 1] + 1,
@@ -214,14 +227,6 @@ if __name__ == "__main__":
                 IW_grid_B.y_range[iIW, 0] : IW_grid_B.y_range[iIW, 1] + 1,
                 IW_grid_B.x_range[iIW, 0] : IW_grid_B.x_range[iIW, 1] + 1,
             ]
-
-            if DEBUG:
-                print(
-                    f"     xrng {IW_grid_A.x_range[iIW, 0] + 1}, {IW_grid_A.x_range[iIW, 1] + 1}"
-                )
-                print(
-                    f"     yrng {IW_grid_A.y_range[iIW, 0] + 1}, {IW_grid_A.y_range[iIW, 1] + 1}"
-                )
 
             # ------------------------------------------------------------------
             #   Perform cross-correlation
@@ -353,6 +358,8 @@ if __name__ == "__main__":
             VMs_dx[-1] * quiverX,
             VMs_dy[-1] * quiverX,
             angles="xy",
+            scale_units="xy",
+            scale=1,
             color="r",
             linewidths=2,
         )

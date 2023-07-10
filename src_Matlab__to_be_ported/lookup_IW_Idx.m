@@ -1,4 +1,4 @@
-function iIW = lookup_IW_Idx(IW_grid, x_pixel, y_pixel)
+function [iIW, iIW_x, iIW_y] = lookup_IW_Idx(IW_grid, x_pixel, y_pixel)
   % Lookup the index of the IW that has it's center closest to the input
   % location [x_pixel, y_pixel]
   %
