@@ -80,12 +80,6 @@ class IW_Grid:
         arr_y = np.asarray(arr_y, dtype=int)
         self.x, self.y = np.meshgrid(arr_x, arr_y)
 
-        # TODO: Rethink below '_1D' variants. They mimick Matlab's linear
-        # indexing of a matrix, which numpy does not support via simple
-        # indexing. Hence, we reshape the matrix to an linear array.
-        self.x_1D = np.reshape(self.x, -1)
-        self.y_1D = np.reshape(self.y, -1)
-
         # Calculate IW ranges
         # MATLAB equivalent:
         #   x_range = [arr_x - floor(IW_size/2); array_x + floor(IW_size/2) - 1]';
@@ -143,7 +137,8 @@ def lookup_IW_Idx(IW_grid: IW_Grid, x_pixel: int, y_pixel: int):
     location [x_pixel, y_pixel].
 
     Returns:
-        iIW: Linear index of the IW.
+        iIW_x: x-index of the IW.
+        iIW_y: y-index of the IW.
     """
 
     # MATLAB equivalent:
@@ -157,20 +152,17 @@ def lookup_IW_Idx(IW_grid: IW_Grid, x_pixel: int, y_pixel: int):
 
     half_IW_size = IW_grid.IW_size // 2
     iIW_x = (
-        (x_pixel - half_IW_size - 1) / (IW_grid.IW_size * (1 - IW_grid.overlap))
+        (x_pixel - half_IW_size) / (IW_grid.IW_size * (1 - IW_grid.overlap))
         + 0.5
     ).astype(int)
     iIW_y = (
-        (y_pixel - half_IW_size - 1) / (IW_grid.IW_size * (1 - IW_grid.overlap))
+        (y_pixel - half_IW_size) / (IW_grid.IW_size * (1 - IW_grid.overlap))
         + 0.5
     ).astype(int)
     iIW_x = min(iIW_x, IW_grid.nIWs_x - 1)
     iIW_y = min(iIW_y, IW_grid.nIWs_y - 1)
-    iIW = np.ravel_multi_index(
-        (iIW_y, iIW_x), (IW_grid.nIWs_y, IW_grid.nIWs_x), order="F"
-    )
 
-    return iIW
+    return iIW_x, iIW_y
 
 
 # @njit()
