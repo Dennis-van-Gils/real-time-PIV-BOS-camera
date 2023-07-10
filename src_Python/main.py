@@ -83,9 +83,10 @@ if __name__ == "__main__":
     # --------------------------------------------------------------------------
     t_0 = perf_counter()
 
-    for iIW_size in range(nIW_SIZES):
-        IW_size = IW_SIZES[iIW_size]
+    # for iIW_size in range(nIW_SIZES):
+    #     IW_size = IW_SIZES[iIW_size]
 
+    for iIW_size, IW_size in enumerate(IW_SIZES):
         # Create IW_grid for frame A
         # Create IW_grid for frame B
         IW_grid_A = IW_Grid(img_w, img_h, IW_size, IW_OVERLAP)
@@ -104,6 +105,9 @@ if __name__ == "__main__":
         # ----------------------------------------------------------------------
         #   Walk over all IWs
         # ----------------------------------------------------------------------
+
+        # TODO: Rethink `for` loop, using
+        #   for (iIW_x, iIW_y), element in np.ndenumerate(...):
 
         for iIW in range(IW_grid_A.nIWs):
             if DEBUG:
