@@ -11,13 +11,12 @@ VM: Displacement vector map
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "07-07-2023"
+__date__ = "10-07-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
 import os
 import sys
-import glob
 from time import perf_counter
 
 import matplotlib.pyplot as plt
@@ -27,7 +26,7 @@ import matplotlib as mpl
 # mpl.rcParams["toolbar"] = "None"
 
 import numpy as np
-from scipy.signal import correlate2d, convolve2d, fftconvolve
+from scipy.signal import correlate2d, fftconvolve
 import numba
 
 from skimage.io import imread
@@ -43,7 +42,7 @@ IW_SIZES = [64, 32]
 # IW_SIZES = [64]
 IW_OVERLAP = 0.5
 
-DEBUG = True
+DEBUG = False
 
 # ------------------------------------------------------------------------------
 #   Main
@@ -251,12 +250,12 @@ if __name__ == "__main__":
             ):
                 C = np.nan
             else:
-                # `fftconvolve()``: Fastest, but incorrect centering
-                # `convolve2d()`  : Slowest, and incorrect centering
-                # `correlate2d()` : Slowest, correct centering
-                # C = fftconvolve(img_IW_B, img_IW_A)
-                # C = convolve2d(img_IW_B, img_IW_A)
-                C = correlate2d(img_IW_B, img_IW_A)
+                # `fftconvolve()``: Fastest
+                # `correlate2d()` : Slowest
+                C = fftconvolve(
+                    img_IW_B, np.flipud(np.fliplr(img_IW_A)), mode="full"
+                )
+                # C = correlate2d(img_IW_B, img_IW_A)
                 C = C / np.max(C)
 
             # Find maximum correlation peak
@@ -320,7 +319,7 @@ if __name__ == "__main__":
                         h_title.set_text(f"{iIW} of {IW_grid_A.nIWs}")
 
                     plt.draw()
-                    plt.pause(0.0001)
+                    plt.pause(2)
                     # plt.show()
 
             # Store result in vector map
@@ -340,9 +339,8 @@ if __name__ == "__main__":
 
     duration = perf_counter() - t_0
     print(f"Finished in {duration:.3f} s")
-    # scipy.signal.fftconvolve takes ~0.31 s in alacritty without printing, wrong correlation centering
-    # scipy.signal.convolve2d  takes ~48   s in alacritty without printing, wrong correlation centering
-    # scipy.signal.correlate2d takes ~47   s in alacritty without printing
+    # scipy.signal.fftconvolve takes ~1.14 s in alacritty without printing
+    # scipy.signal.correlate2d takes ~59   s in alacritty without printing
 
     # --------------------------------------------------------------------------
     #   Show original image A with unfiltered vector map on top

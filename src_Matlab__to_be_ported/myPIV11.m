@@ -1,6 +1,7 @@
 %clr
 
-diary debug_output_matlab.txt
+% diary debug_output_matlab.txt
+diary off
 
 fPROFILER = 0;
 if fPROFILER
