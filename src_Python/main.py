@@ -132,13 +132,6 @@ if __name__ == "__main__":
                 )
 
                 # Retrieve the pre-shift
-                #
-                # MATLAB equivalent:
-                #   shift_x = round(VMs{iIW_size - 1}.dx(iIW_parent));    % [px]
-                #   shift_y = round(VMs{iIW_size - 1}.dy(iIW_parent));    % [px]
-                #   if isnan(shift_x); shift_x = 0; end
-                #   if isnan(shift_y); shift_y = 0; end
-
                 shift_x = np.round(VMs_dx[-1][iIW_parent_y, iIW_parent_x])
                 shift_y = np.round(VMs_dy[-1][iIW_parent_y, iIW_parent_x])
 
@@ -152,13 +145,6 @@ if __name__ == "__main__":
                     print(f"   shift  {shift_x:+6.2f}, {shift_y:+6.2f}")
 
                 # Calculate new center and range of the shifted IW in frame B
-                #
-                # MATLAB equivalent:
-                #   IW_grid_B.x(iIW)          = IW_grid_B.x(iIW)          + shift_x;
-                #   IW_grid_B.y(iIW)          = IW_grid_B.y(iIW)          + shift_y;
-                #   IW_grid_B.x_range(iIW, :) = IW_grid_B.x_range(iIW, :) + shift_x;
-                #   IW_grid_B.y_range(iIW, :) = IW_grid_B.y_range(iIW, :) + shift_y;
-
                 IW_grid_B.x[iIW_y, iIW_x] = IW_grid_B.x[iIW_y, iIW_x] + shift_x
                 IW_grid_B.y[iIW_y, iIW_x] = IW_grid_B.y[iIW_y, iIW_x] + shift_y
                 IW_grid_B.x_range[iIW, :] = IW_grid_B.x_range[iIW, :] + shift_x
@@ -167,25 +153,6 @@ if __name__ == "__main__":
                 # The IW should never be shifted outside of frame B.
                 # When it does, equally resize the IWs of both frames A and B
                 # such that the resized IW of frame B still fits in frame B
-                #
-                # MATLAB equivalent:
-                #   if IW_grid_B.x_range(iIW, 1) < 1
-                #     IW_grid_B.x_range(iIW, 1) = 1;
-                #     IW_grid_A.x_range(iIW, 1) = 1 - shift_x;
-                #   end
-                #   if IW_grid_B.y_range(iIW, 1) < 1
-                #     IW_grid_B.y_range(iIW, 1) = 1;
-                #     IW_grid_A.y_range(iIW, 1) = 1 - shift_y;
-                #   end
-                #   if IW_grid_B.x_range(iIW, 2) > img_w
-                #     IW_grid_B.x_range(iIW, 2) = img_w;
-                #     IW_grid_A.x_range(iIW, 2) = img_w - shift_x;
-                #   end
-                #   if IW_grid_B.y_range(iIW, 2) > img_h
-                #     IW_grid_B.y_range(iIW, 2) = img_h;
-                #     IW_grid_A.y_range(iIW, 2) = img_h - shift_y;
-                #   end
-
                 if IW_grid_B.x_range[iIW, 0] < 0:
                     IW_grid_B.x_range[iIW, 0] = 0
                     IW_grid_A.x_range[iIW, 0] = -shift_x
@@ -231,50 +198,19 @@ if __name__ == "__main__":
             #   Perform cross-correlation
             # ------------------------------------------------------------------
 
-            # MATLAB equivalent:
-            #  if isempty(img_IW_A(:)) || ...
-            #      max(img_IW_A(:)) == 0 || max(img_IW_B(:)) == 0
-            #      C = nan;                        % Save computation time
-            #  else
-            #      %C = xcorr2(double(img_IW_B), ...
-            #      %           double(img_IW_A));   % Slow but accurate
-            #      C = xcorr2(single(img_IW_B), ...
-            #              single(img_IW_A));   % Fast but slightly less accurate
-            #      C = C/max(C(:));                % Normalize
-            #  end
-
             if (
                 img_IW_A.size == 0
                 or np.max(img_IW_A) == 0
                 or np.max(img_IW_B) == 0
             ):
-                C = np.nan
+                C = np.nan  # Save computation time
             else:
-                # `fftconvolve()``: Fastest
-                # `correlate2d()` : Slowest
                 C = fftconvolve(
                     img_IW_B, np.flipud(np.fliplr(img_IW_A)), mode="full"
                 )
-                # C = correlate2d(img_IW_B, img_IW_A)
                 C = C / np.max(C)
 
             # Find maximum correlation peak
-
-            # MATLAB equivalent:
-            #   if isnan(max(C(:)))
-            #     dx = nan; dy = nan;
-            #   else
-            #     [maxC, iMaxC] = max(C(:));
-            #     [peak_y, peak_x] = ind2sub(size(C), iMaxC);
-
-            #     % Sub-pixel resolution algorithm, 3-point Gaussian fit
-            #     [peak_x, peak_y] = subpx_3pgf_2D(C, peak_x, peak_y);
-
-            #     % Calculate displacement vector
-            #     dx = peak_x - floor(size(C, 2)/2 + 1) + shift_x;
-            #     dy = peak_y - floor(size(C, 1)/2 + 1) + shift_y;
-            #   end
-
             if np.isnan(C).any():
                 dx = np.nan
                 dy = np.nan
@@ -301,7 +237,8 @@ if __name__ == "__main__":
                     print(f"     dx, dy = {dx:+6.2f}, {dy:+6.2f}")
 
                 if 0:  # DEBUG flag: Show correlation map
-                    if not "h_imshow" in locals():
+                    if (not "h_imshow" in locals()) or (iIW == 0):
+                        fig = plt.figure()
                         h_imshow = plt.imshow(
                             C,
                             cmap="gray",
@@ -319,7 +256,7 @@ if __name__ == "__main__":
                         h_title.set_text(f"{iIW} of {IW_grid_A.nIWs}")
 
                     plt.draw()
-                    plt.pause(2)
+                    plt.pause(0.0001)
                     # plt.show()
 
             # Store result in vector map
@@ -340,7 +277,6 @@ if __name__ == "__main__":
     duration = perf_counter() - t_0
     print(f"Finished in {duration:.3f} s")
     # scipy.signal.fftconvolve takes ~1.14 s in alacritty without printing
-    # scipy.signal.correlate2d takes ~59   s in alacritty without printing
 
     # --------------------------------------------------------------------------
     #   Show original image A with unfiltered vector map on top
