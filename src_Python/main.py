@@ -60,11 +60,6 @@ if __name__ == "__main__":
     A = np.clip(A - np.mean(A), 0, None).astype(int)
     B = np.clip(B - np.mean(B), 0, None).astype(int)
 
-    if 0:  # DEBUG flag: Show image A
-        fig = plt.figure()
-        plt.imshow(A, cmap="gray", interpolation="none")
-        plt.show()
-
     # --------------------------------------------------------------------------
     #   Initialize
     # --------------------------------------------------------------------------
@@ -82,9 +77,6 @@ if __name__ == "__main__":
     #   Walk over all interrogation window sizes
     # --------------------------------------------------------------------------
     t_0 = perf_counter()
-
-    # for iIW_size in range(nIW_SIZES):
-    #     IW_size = IW_SIZES[iIW_size]
 
     for iIW_size, IW_size in enumerate(IW_SIZES):
         # Create IW_grid for frame A
@@ -109,11 +101,12 @@ if __name__ == "__main__":
         for (iIW_y, iIW_x), IW_px_x in np.ndenumerate(IW_grid_A.x):
             # Flattened iter index
             iIW = np.ravel_multi_index((iIW_y, iIW_x), IW_grid_A.x.shape)
+            IW_px_y = IW_grid_A.y[iIW_y, iIW_x]
 
             if DEBUG:
                 print(
                     f"IW: {iIW} of {IW_grid_A.nIWs - 1} "
-                    f"@px {IW_px_x}, {IW_grid_A.y[iIW_y, iIW_x]}"
+                    f"@px {IW_px_x}, {IW_px_y}"
                 )
 
             # ------------------------------------------------------------------
@@ -131,8 +124,8 @@ if __name__ == "__main__":
                 # grid
                 iIW_parent_x, iIW_parent_y = lookup_IW_Idx(
                     IW_grid_As[iIW_size - 1],
-                    IW_grid_A.x[iIW_y, iIW_x],
-                    IW_grid_A.y[iIW_y, iIW_x],
+                    IW_px_x,
+                    IW_px_y,
                 )
 
                 # Retrieve the pre-shift
