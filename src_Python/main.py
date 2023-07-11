@@ -20,7 +20,6 @@ import sys
 from time import perf_counter
 
 import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle
 import matplotlib as mpl
 
 # mpl.rcParams["toolbar"] = "None"
@@ -224,18 +223,19 @@ if __name__ == "__main__":
                 or np.max(img_IW_A) == 0
                 or np.max(img_IW_B) == 0
             ):
-                C = np.nan  # Save computation time
+                # Save computation time
+                C = np.nan
+                dx = np.nan
+                dy = np.nan
+
             else:
+                # Perform 2D cross-correlation
                 C = fftconvolve(
                     img_IW_B, np.flipud(np.fliplr(img_IW_A)), mode="full"
                 )
                 C = C / np.max(C)
 
-            # Find maximum correlation peak
-            if np.isnan(C).any():
-                dx = np.nan
-                dy = np.nan
-            else:
+                # Find maximum correlation peak
                 iMaxC = np.argmax(C)
                 peak_y, peak_x = np.unravel_index(iMaxC, C.shape, order="C")
                 peak_x = int(peak_x)
@@ -302,7 +302,7 @@ if __name__ == "__main__":
     # --------------------------------------------------------------------------
     quiverX = 3
 
-    if 1:
+    if 0:
         fig = plt.figure()
         plt.imshow(A, cmap="gray", interpolation="none")
         plt.quiver(
