@@ -92,8 +92,10 @@ class IW_Grid:
         y_range = np.column_stack(
             (arr_y - half_IW_size, arr_y + half_IW_size - 1)
         )
-        self.x_range = np.repeat(x_range, self.nIWs_y, axis=0)
-        self.y_range = np.tile(y_range, (self.nIWs_x, 1))
+
+        # Order = C-style
+        self.x_range = np.tile(x_range, (self.nIWs_y, 1))
+        self.y_range = np.repeat(y_range, self.nIWs_x, axis=0)
 
         if 0:  # DEBUG flag: Examine IW_grid
             plt.figure()

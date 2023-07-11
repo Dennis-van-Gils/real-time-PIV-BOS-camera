@@ -99,8 +99,8 @@ if __name__ == "__main__":
         # Allocate memory for displacement vector map
         VM_x = IW_grid_A.x
         VM_y = IW_grid_A.y
-        VM_dx = np.zeros((IW_grid_A.nIWs_y, IW_grid_A.nIWs_x))
-        VM_dy = np.zeros((IW_grid_A.nIWs_y, IW_grid_A.nIWs_x))
+        VM_dx = np.zeros(IW_grid_A.x.shape)
+        VM_dy = np.zeros(IW_grid_A.x.shape)
 
         # ----------------------------------------------------------------------
         #   Walk over all IWs
@@ -114,7 +114,7 @@ if __name__ == "__main__":
                 print(f"{iIW + 1}")
 
             # Turn linear index into matrix indices
-            iIW_y, iIW_x = np.unravel_index(iIW, VM_dx.shape, order="F")
+            iIW_y, iIW_x = np.unravel_index(iIW, VM_dx.shape, order="C")
 
             # ------------------------------------------------------------------
             #   Calculate IW of frame B
