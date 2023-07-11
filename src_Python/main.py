@@ -152,14 +152,10 @@ if __name__ == "__main__":
                     print(f"   shift  {shift_x:+2d}, {shift_y:+2d}")
 
                 # Calculate new center and range of the shifted IW in frame B
-                IW_grid_B.x[iIW_y, iIW_x] = IW_grid_B.x[iIW_y, iIW_x] + shift_x
-                IW_grid_B.y[iIW_y, iIW_x] = IW_grid_B.y[iIW_y, iIW_x] + shift_y
-                IW_grid_B.x_range[iIW_y, iIW_x, :] = (
-                    IW_grid_B.x_range[iIW_y, iIW_x, :] + shift_x
-                )
-                IW_grid_B.y_range[iIW_y, iIW_x, :] = (
-                    IW_grid_B.y_range[iIW_y, iIW_x, :] + shift_y
-                )
+                IW_grid_B.x[iIW_y, iIW_x] += shift_x
+                IW_grid_B.y[iIW_y, iIW_x] += shift_y
+                IW_grid_B.x_range[iIW_y, iIW_x, :] += shift_x
+                IW_grid_B.y_range[iIW_y, iIW_x, :] += shift_y
 
                 # The IW should never be shifted outside of frame B.
                 # When it does, equally resize the IWs of both frames A and B
