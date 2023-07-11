@@ -167,7 +167,7 @@ def lookup_IW_Idx(IW_grid: IW_Grid, x_pixel: int, y_pixel: int):
     return iIW_x, iIW_y
 
 
-@njit("(float64[:, :], uint16, uint16)")
+@njit("(float64[:, :], uint16, uint16)", cache=True, nogil=True)
 def subpx_3pgf_2D(C: np.ndarray, px: int, py: int):
     """Perform a 3-point Gaussian fit to the point with index (py, px)
     inside of 2-D matrix 'C' along both the x and y direction.
