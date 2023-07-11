@@ -106,15 +106,15 @@ if __name__ == "__main__":
         #   Walk over all IWs
         # ----------------------------------------------------------------------
 
-        # TODO: Rethink `for` loop, using
-        #   for (iIW_x, iIW_y), element in np.ndenumerate(...):
+        for (iIW_y, iIW_x), IW_px_x in np.ndenumerate(IW_grid_A.x):
+            # Flattened iter index
+            iIW = np.ravel_multi_index((iIW_y, iIW_x), IW_grid_A.x.shape)
 
-        for iIW in range(IW_grid_A.nIWs):
             if DEBUG:
-                print(f"{iIW + 1}")
-
-            # Turn linear index into matrix indices
-            iIW_y, iIW_x = np.unravel_index(iIW, VM_dx.shape, order="C")
+                print(
+                    f"IW: {iIW} of {IW_grid_A.nIWs - 1} "
+                    f"@px {IW_px_x}, {IW_grid_A.y[iIW_y, iIW_x]}"
+                )
 
             # ------------------------------------------------------------------
             #   Calculate IW of frame B
@@ -136,39 +136,53 @@ if __name__ == "__main__":
                 )
 
                 # Retrieve the pre-shift
-                shift_x = np.round(VMs_dx[-1][iIW_parent_y, iIW_parent_x])
-                shift_y = np.round(VMs_dy[-1][iIW_parent_y, iIW_parent_x])
+                shift_x = VMs_dx[-1][iIW_parent_y, iIW_parent_x]
+                shift_y = VMs_dy[-1][iIW_parent_y, iIW_parent_x]
 
                 if np.isnan(shift_x):
                     shift_x = 0
+                else:
+                    shift_x = int(np.round(shift_x))
+
                 if np.isnan(shift_y):
                     shift_y = 0
+                else:
+                    shift_y = int(np.round(shift_y))
 
                 if DEBUG:
-                    print(f"   parent {iIW_parent_x + 1}, {iIW_parent_y + 1}")
-                    print(f"   shift  {shift_x:+6.2f}, {shift_y:+6.2f}")
+                    # Flattened iter index
+                    iIW_parent = np.ravel_multi_index(
+                        (iIW_parent_y, iIW_parent_x),
+                        IW_grid_As[iIW_size - 1].x.shape,
+                    )
+                    print(f"   parent IW {iIW_parent}")
+                    print(f"   shift  {shift_x:+2d}, {shift_y:+2d}")
 
                 # Calculate new center and range of the shifted IW in frame B
                 IW_grid_B.x[iIW_y, iIW_x] = IW_grid_B.x[iIW_y, iIW_x] + shift_x
                 IW_grid_B.y[iIW_y, iIW_x] = IW_grid_B.y[iIW_y, iIW_x] + shift_y
-                IW_grid_B.x_range[iIW, :] = IW_grid_B.x_range[iIW, :] + shift_x
-                IW_grid_B.y_range[iIW, :] = IW_grid_B.y_range[iIW, :] + shift_y
+                IW_grid_B.x_range[iIW_y, iIW_x, :] = (
+                    IW_grid_B.x_range[iIW_y, iIW_x, :] + shift_x
+                )
+                IW_grid_B.y_range[iIW_y, iIW_x, :] = (
+                    IW_grid_B.y_range[iIW_y, iIW_x, :] + shift_y
+                )
 
                 # The IW should never be shifted outside of frame B.
                 # When it does, equally resize the IWs of both frames A and B
                 # such that the resized IW of frame B still fits in frame B
-                if IW_grid_B.x_range[iIW, 0] < 0:
-                    IW_grid_B.x_range[iIW, 0] = 0
-                    IW_grid_A.x_range[iIW, 0] = -shift_x
-                if IW_grid_B.y_range[iIW, 0] < 0:
-                    IW_grid_B.y_range[iIW, 0] = 0
-                    IW_grid_A.y_range[iIW, 0] = -shift_y
-                if IW_grid_B.x_range[iIW, 1] > img_w - 1:
-                    IW_grid_B.x_range[iIW, 1] = img_w - 1
-                    IW_grid_A.x_range[iIW, 1] = img_w - 1 - shift_x
-                if IW_grid_B.y_range[iIW, 1] > img_h - 1:
-                    IW_grid_B.y_range[iIW, 1] = img_h - 1
-                    IW_grid_A.y_range[iIW, 1] = img_h - 1 - shift_y
+                if IW_grid_B.x_range[iIW_y, iIW_x, 0] < 0:
+                    IW_grid_B.x_range[iIW_y, iIW_x, 0] = 0
+                    IW_grid_A.x_range[iIW_y, iIW_x, 0] = -shift_x
+                if IW_grid_B.y_range[iIW_y, iIW_x, 0] < 0:
+                    IW_grid_B.y_range[iIW_y, iIW_x, 0] = 0
+                    IW_grid_A.y_range[iIW_y, iIW_x, 0] = -shift_y
+                if IW_grid_B.x_range[iIW_y, iIW_x, 1] > img_w - 1:
+                    IW_grid_B.x_range[iIW_y, iIW_x, 1] = img_w - 1
+                    IW_grid_A.x_range[iIW_y, iIW_x, 1] = img_w - 1 - shift_x
+                if IW_grid_B.y_range[iIW_y, iIW_x, 1] > img_h - 1:
+                    IW_grid_B.y_range[iIW_y, iIW_x, 1] = img_h - 1
+                    IW_grid_A.y_range[iIW_y, iIW_x, 1] = img_h - 1 - shift_y
 
             # ------------------------------------------------------------------
             #   Retrieve images of IW frame A and IW frame B
@@ -176,27 +190,41 @@ if __name__ == "__main__":
 
             if DEBUG:
                 print(
-                    f"   A_xrng {IW_grid_A.x_range[iIW, 0] + 1}, {IW_grid_A.x_range[iIW, 1] + 1}"
+                    "   A_xrng ["
+                    f"{IW_grid_A.x_range[iIW_y, iIW_x, 0]:4d}, "
+                    f"{IW_grid_A.x_range[iIW_y, iIW_x, 1]:4d}]"
                 )
                 print(
-                    f"   A_yrng {IW_grid_A.y_range[iIW, 0] + 1}, {IW_grid_A.y_range[iIW, 1] + 1}"
+                    "   A_yrng ["
+                    f"{IW_grid_A.y_range[iIW_y, iIW_x, 0]:4d}, "
+                    f"{IW_grid_A.y_range[iIW_y, iIW_x, 1]:4d}]"
                 )
                 print(
-                    f"   B_xrng {IW_grid_B.x_range[iIW, 0] + 1}, {IW_grid_B.x_range[iIW, 1] + 1}"
+                    "   B_xrng ["
+                    f"{IW_grid_B.x_range[iIW_y, iIW_x, 0]:4d}, "
+                    f"{IW_grid_B.x_range[iIW_y, iIW_x, 1]:4d}]"
                 )
                 print(
-                    f"   B_yrng {IW_grid_B.y_range[iIW, 0] + 1}, {IW_grid_B.y_range[iIW, 1] + 1}"
+                    "   B_yrng ["
+                    f"{IW_grid_B.y_range[iIW_y, iIW_x, 0]:4d}, "
+                    f"{IW_grid_B.y_range[iIW_y, iIW_x, 1]:4d}]"
                 )
 
+            # fmt: off
             img_IW_A = A[
-                IW_grid_A.y_range[iIW, 0] : IW_grid_A.y_range[iIW, 1] + 1,
-                IW_grid_A.x_range[iIW, 0] : IW_grid_A.x_range[iIW, 1] + 1,
+                IW_grid_A.y_range[iIW_y, iIW_x, 0] :
+                IW_grid_A.y_range[iIW_y, iIW_x, 1] + 1,
+                IW_grid_A.x_range[iIW_y, iIW_x, 0] :
+                IW_grid_A.x_range[iIW_y, iIW_x, 1]+ 1,
             ]
 
             img_IW_B = B[
-                IW_grid_B.y_range[iIW, 0] : IW_grid_B.y_range[iIW, 1] + 1,
-                IW_grid_B.x_range[iIW, 0] : IW_grid_B.x_range[iIW, 1] + 1,
+                IW_grid_B.y_range[iIW_y, iIW_x, 0] :
+                IW_grid_B.y_range[iIW_y, iIW_x, 1] + 1,
+                IW_grid_B.x_range[iIW_y, iIW_x, 0] :
+                IW_grid_B.x_range[iIW_y, iIW_x, 1] + 1,
             ]
+            # fmt: on
 
             # ------------------------------------------------------------------
             #   Perform cross-correlation
@@ -232,11 +260,9 @@ if __name__ == "__main__":
                 dy = peak_sub_y - C.shape[0] // 2 + shift_y
 
                 if DEBUG:
+                    print(f"     peak   @ {peak_x:+6.2f}, {peak_y:+6.2f}")
                     print(
-                        f"     peak   @ {peak_x + 1:+6.2f}, {peak_y + 1:+6.2f}"
-                    )
-                    print(
-                        f"     3pgf   @ {peak_sub_x + 1:+6.2f}, {peak_sub_y + 1:+6.2f}"
+                        f"     3pgf   @ {peak_sub_x:+6.2f}, {peak_sub_y:+6.2f}"
                     )
                     print(f"     dx, dy = {dx:+6.2f}, {dy:+6.2f}")
 
@@ -252,7 +278,7 @@ if __name__ == "__main__":
                         )
                         (h_peak,) = plt.plot(peak_x, peak_y, "xr")
                         (h_peak_sub,) = plt.plot(peak_sub_x, peak_sub_y, "xg")
-                        h_title = plt.title(f"{iIW} of {IW_grid_A.nIWs}")
+                        h_title = plt.title(f"{iIW} of {IW_grid_A.nIWs - 1}")
                     else:
                         h_imshow.set_data(C)
                         h_peak.set_data(peak_x, peak_y)

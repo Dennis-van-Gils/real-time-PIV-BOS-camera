@@ -53,10 +53,16 @@ class IW_Grid:
         x_range (``np.ndarray(int)``):
             Array (TODO: mention size of array) containing [min max] x-pos per
             IW [px].
+            3-D array (iIWs_y, iIWs_x, 2):
+              (:, :, 0): starting position
+              (:, :, 1): ending  position
 
         y_range (``np.ndarray(int)``):
             Array (TODO: mention size of array) containing [min max] y-pos per
             IW [px].
+            3-D array (iIWs_y, iIWs_x, 2):
+              (:, :, 0): starting position
+              (:, :, 1): ending  position
     """
 
     def __init__(self, img_w, img_h, IW_size, overlap):
@@ -80,12 +86,7 @@ class IW_Grid:
         arr_y = np.asarray(arr_y, dtype=int)
         self.x, self.y = np.meshgrid(arr_x, arr_y)
 
-        # Calculate IW ranges
-        # MATLAB equivalent:
-        #   x_range = [arr_x - floor(IW_size/2); array_x + floor(IW_size/2) - 1]';
-        #   y_range = [arr_y - floor(IW_size/2); array_y + floor(IW_size/2) - 1]';
-        #   IW_grid.x_range = sortrows(repmat(x_range, nIWs_y, 1));
-        #   IW_grid.y_range = repmat(y_range, nIWs_x, 1);
+        # Calculate IW pixel ranges
         x_range = np.column_stack(
             (arr_x - half_IW_size, arr_x + half_IW_size - 1)
         )
@@ -93,22 +94,21 @@ class IW_Grid:
             (arr_y - half_IW_size, arr_y + half_IW_size - 1)
         )
 
-        # Order = C-style
-        self.x_range = np.tile(x_range, (self.nIWs_y, 1))
-        self.y_range = np.repeat(y_range, self.nIWs_x, axis=0)
+        self.x_range = np.tile(x_range, (self.nIWs_y, 1, 1))
+        self.y_range = np.tile(y_range, (self.nIWs_x, 1, 1)).swapaxes(0, 1)
 
         if 0:  # DEBUG flag: Examine IW_grid
             plt.figure()
             plt.plot(
-                self.x_range[:, 0],
-                self.y_range[:, 0],
+                self.x_range[:, :, 0].reshape(-1),
+                self.y_range[:, :, 0].reshape(-1),
                 "xg",
                 linewidth=2,
                 label="IW starts",
             )
             plt.plot(
-                self.x_range[:, 1],
-                self.y_range[:, 1],
+                self.x_range[:, :, 1].reshape(-1),
+                self.y_range[:, :, 1].reshape(-1),
                 "xr",
                 linewidth=2,
                 label="IW endings",
