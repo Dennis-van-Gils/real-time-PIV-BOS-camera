@@ -19,29 +19,23 @@ import os
 import sys
 from time import perf_counter
 
-import matplotlib.pyplot as plt
-import matplotlib as mpl
-
-# mpl.rcParams["toolbar"] = "None"
-
 import numpy as np
 from scipy.signal import correlate2d, fftconvolve
 import numba
 
 from skimage.io import imread
+import matplotlib.pyplot as plt
 
 from my_fun import IW_Grid, lookup_IW_Idx, subpx_3pgf_2D
 
-import_file = "E:/Work/_GitHub_repo/2D-PIV-BOS/test_imgs/PIV_rising_vortex_plume/B00001.tif"
-
 # Set the IW sizes for multigrid analysis
 # Subsequent IW sizes should be the exact half of the prev IW size
-# IW_SIZES   = [128 96 64 48 32];
-IW_SIZES = [64, 32]
+IW_SIZES = [64, 32]  # Use powers of 2 [px]
 # IW_SIZES = [64]
-IW_OVERLAP = 0.5
+IW_OVERLAP = 0.5  # IW overlap fraction [0 - 1]
+DEBUG = False  # Print debug info to terminal?
 
-DEBUG = False
+import_file = "E:/Work/_GitHub_repo/2D-PIV-BOS/test_imgs/PIV_rising_vortex_plume/B00001.tif"
 
 # ------------------------------------------------------------------------------
 #   Main
@@ -93,6 +87,22 @@ if __name__ == "__main__":
         VM_dx = np.zeros(IW_grid_A.x.shape)
         VM_dy = np.zeros(IW_grid_A.x.shape)
 
+        # Reset any plot on the correlation map
+        if plt.fignum_exists(1):
+            plt.close(1)
+
+        fig = plt.figure(1)
+        h_imshow = plt.imshow(
+            np.zeros((IW_size * 2 - 1, IW_size * 2 - 1)),
+            cmap="gray",
+            interpolation="none",
+            vmin=0,
+            vmax=1,
+        )
+        (h_peak,) = plt.plot(IW_size, IW_size, "xr")
+        (h_peak_sub,) = plt.plot(IW_size, IW_size, "xg")
+        h_title = plt.title(f"")
+
         # ----------------------------------------------------------------------
         #   Walk over all IWs
         # ----------------------------------------------------------------------
@@ -102,11 +112,13 @@ if __name__ == "__main__":
             iIW = np.ravel_multi_index((iIW_y, iIW_x), IW_grid_A.x.shape)
             IW_px_y = IW_grid_A.y[iIW_y, iIW_x]
 
+            """
             if DEBUG:
                 print(
                     f"IW: {iIW} of {IW_grid_A.nIWs - 1} "
                     f"@px {IW_px_x}, {IW_px_y}"
                 )
+            """
 
             # ------------------------------------------------------------------
             #   Calculate IW of frame B
@@ -141,6 +153,7 @@ if __name__ == "__main__":
                 else:
                     shift_y = int(np.round(shift_y))
 
+                """
                 if DEBUG:
                     # Flattened iter index
                     iIW_parent = np.ravel_multi_index(
@@ -149,6 +162,7 @@ if __name__ == "__main__":
                     )
                     print(f"   parent IW {iIW_parent}")
                     print(f"   shift  {shift_x:+2d}, {shift_y:+2d}")
+                """
 
                 # Calculate new center and range of the shifted IW in frame B
                 IW_grid_B.x[iIW_y, iIW_x] += shift_x
@@ -176,6 +190,7 @@ if __name__ == "__main__":
             #   Retrieve images of IW frame A and IW frame B
             # ------------------------------------------------------------------
 
+            """
             if DEBUG:
                 print(
                     "   A_xrng ["
@@ -197,6 +212,7 @@ if __name__ == "__main__":
                     f"{IW_grid_B.y_range[iIW_y, iIW_x, 0]:4d}, "
                     f"{IW_grid_B.y_range[iIW_y, iIW_x, 1]:4d}]"
                 )
+            """
 
             # fmt: off
             img_IW_A = A[
@@ -248,16 +264,45 @@ if __name__ == "__main__":
                 dx = peak_sub_x - C.shape[1] // 2 + shift_x
                 dy = peak_sub_y - C.shape[0] // 2 + shift_y
 
+                """
                 if DEBUG:
                     print(f"     peak   @ {peak_x:+6.2f}, {peak_y:+6.2f}")
                     print(
                         f"     3pgf   @ {peak_sub_x:+6.2f}, {peak_sub_y:+6.2f}"
                     )
                     print(f"     dx, dy = {dx:+6.2f}, {dy:+6.2f}")
+                """
 
-                if 0:  # DEBUG flag: Show correlation map
-                    if (not "h_imshow" in locals()) or (iIW == 0):
-                        fig = plt.figure()
+                if (iIW > 1287 and iIW_size == 0) or iIW_size == 1:
+                    # if 1:  # DEBUG flag: Show correlation map
+                    if not (plt.fignum_exists(1)):
+                        fig = plt.figure(1)
+                        h_imshow = plt.imshow(
+                            np.zeros((IW_size * 2 - 1, IW_size * 2 - 1)),
+                            cmap="gray",
+                            interpolation="none",
+                            vmin=0,
+                            vmax=1,
+                        )
+                        (h_peak,) = plt.plot(IW_size, IW_size, "xr")
+                        (h_peak_sub,) = plt.plot(IW_size, IW_size, "xg")
+                        h_title = plt.title(f"")
+
+                    h_imshow.set_data(C)
+                    h_peak.set_data([peak_x], [peak_y])
+                    h_peak_sub.set_data([peak_sub_x], [peak_sub_y])
+                    h_title.set_text(
+                        f"{iIW} of {IW_grid_A.nIWs}\n{peak_x} {peak_y}"
+                    )
+
+                    # plt.show(block=False)
+                    # plt.pause(0.0001)
+                    # plt.waitforbuttonpress()
+                    # plt.draw()
+                    plt.show()
+
+                    if iIW == 29:
+                        fig = plt.figure(1)
                         h_imshow = plt.imshow(
                             C,
                             cmap="gray",
@@ -267,16 +312,8 @@ if __name__ == "__main__":
                         )
                         (h_peak,) = plt.plot(peak_x, peak_y, "xr")
                         (h_peak_sub,) = plt.plot(peak_sub_x, peak_sub_y, "xg")
-                        h_title = plt.title(f"{iIW} of {IW_grid_A.nIWs - 1}")
-                    else:
-                        h_imshow.set_data(C)
-                        h_peak.set_data(peak_x, peak_y)
-                        h_peak_sub.set_data(peak_sub_x, peak_sub_y)
-                        h_title.set_text(f"{iIW} of {IW_grid_A.nIWs}")
-
-                    plt.draw()
-                    plt.pause(0.0001)
-                    # plt.show()
+                        h_title = plt.title(f"")
+                        plt.show()
 
             # Store result in vector map
             VM_dx[iIW_y, iIW_x] = dx
@@ -302,7 +339,7 @@ if __name__ == "__main__":
     # --------------------------------------------------------------------------
     quiverX = 3
 
-    if 0:
+    if 1:
         fig = plt.figure()
         plt.imshow(A, cmap="gray", interpolation="none")
         plt.quiver(
