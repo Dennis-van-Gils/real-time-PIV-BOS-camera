@@ -19,29 +19,25 @@ import os
 import sys
 from time import perf_counter
 
-import matplotlib.pyplot as plt
-import matplotlib as mpl
-
-# mpl.rcParams["toolbar"] = "None"
-
 import numpy as np
 from scipy.signal import correlate2d, fftconvolve
 import numba
 
 from skimage.io import imread
+import matplotlib.pyplot as plt
 
 from my_fun import IW_Grid, lookup_IW_Idx, subpx_3pgf_2D
 
-import_file = "E:/Work/_GitHub_repo/2D-PIV-BOS/test_imgs/PIV_rising_vortex_plume/B00001.tif"
-
 # Set the IW sizes for multigrid analysis
 # Subsequent IW sizes should be the exact half of the prev IW size
-# IW_SIZES   = [128 96 64 48 32];
-IW_SIZES = [64, 32]
+IW_SIZES = [64, 32]  # Use powers of 2 [px]
 # IW_SIZES = [64]
-IW_OVERLAP = 0.5
+IW_OVERLAP = 0.5  # IW overlap fraction [0 - 1]
 
-DEBUG = False
+DEBUG = False  # Print debug info to terminal?
+SHOW_CORRELATION_MAP = False
+
+import_file = "E:/Work/_GitHub_repo/2D-PIV-BOS/test_imgs/PIV_rising_vortex_plume/B00001.tif"
 
 # ------------------------------------------------------------------------------
 #   Main
@@ -87,6 +83,10 @@ if __name__ == "__main__":
         if iIW_size == 1:
             IW_grid_As.append(IW_grid_A)
 
+        # Allocate IW images of frames A and B
+        img_IW_A = np.zeros((IW_size, IW_size), dtype=A.dtype)
+        img_IW_B = np.zeros((IW_size, IW_size), dtype=B.dtype)
+
         # Allocate memory for displacement vector map
         VM_x = IW_grid_A.x
         VM_y = IW_grid_A.y
@@ -107,6 +107,15 @@ if __name__ == "__main__":
                     f"IW: {iIW} of {IW_grid_A.nIWs - 1} "
                     f"@px {IW_px_x}, {IW_px_y}"
                 )
+
+            # Undo the shift again when the IW of frame B would leave the
+            # borders of frame B. If so, we will zero out the appropiate
+            # section of the IW of frame B that corresponds to `particles`
+            # that are definitely not present in the IW of frame A.
+            IW_B_needs_zeroing_out_L = 0  # left , x = 0
+            IW_B_needs_zeroing_out_R = 0  # right, x = IW_size - 1
+            IW_B_needs_zeroing_out_U = 0  # up   , y = 0
+            IW_B_needs_zeroing_out_D = 0  # down , y = IW_size - 1
 
             # ------------------------------------------------------------------
             #   Calculate IW of frame B
@@ -148,7 +157,7 @@ if __name__ == "__main__":
                         IW_grid_As[iIW_size - 1].x.shape,
                     )
                     print(f"   parent IW {iIW_parent}")
-                    print(f"   shift  {shift_x:+2d}, {shift_y:+2d}")
+                    print(f"   shift  {shift_x:+2d}, {shift_y:+2d}", end="")
 
                 # Calculate new center and range of the shifted IW in frame B
                 IW_grid_B.x[iIW_y, iIW_x] += shift_x
@@ -156,21 +165,49 @@ if __name__ == "__main__":
                 IW_grid_B.x_range[iIW_y, iIW_x, :] += shift_x
                 IW_grid_B.y_range[iIW_y, iIW_x, :] += shift_y
 
-                # The IW should never be shifted outside of frame B.
-                # When it does, equally resize the IWs of both frames A and B
-                # such that the resized IW of frame B still fits in frame B
+                # Undo the shift again when the IW of frame B would leave the
+                # borders of frame B. If so, we will zero out the appropiate
+                # section of the IW of frame B that corresponds to `particles`
+                # that are definitely not present in the IW of frame A.
+                IW_B_needs_zeroing_out_L = 0  # left , x = 0
+                IW_B_needs_zeroing_out_R = 0  # right, x = IW_size - 1
+                IW_B_needs_zeroing_out_U = 0  # up   , y = 0
+                IW_B_needs_zeroing_out_D = 0  # down , y = IW_size - 1
+
                 if IW_grid_B.x_range[iIW_y, iIW_x, 0] < 0:
-                    IW_grid_B.x_range[iIW_y, iIW_x, 0] = 0
-                    IW_grid_A.x_range[iIW_y, iIW_x, 0] = -shift_x
-                if IW_grid_B.y_range[iIW_y, iIW_x, 0] < 0:
-                    IW_grid_B.y_range[iIW_y, iIW_x, 0] = 0
-                    IW_grid_A.y_range[iIW_y, iIW_x, 0] = -shift_y
+                    IW_grid_B.x[iIW_y, iIW_x] -= shift_x
+                    IW_grid_B.x_range[iIW_y, iIW_x, :] -= shift_x
+                    IW_B_needs_zeroing_out_R = np.abs(shift_x)
+                    shift_x = 0
+
                 if IW_grid_B.x_range[iIW_y, iIW_x, 1] > img_w - 1:
-                    IW_grid_B.x_range[iIW_y, iIW_x, 1] = img_w - 1
-                    IW_grid_A.x_range[iIW_y, iIW_x, 1] = img_w - 1 - shift_x
+                    IW_grid_B.x[iIW_y, iIW_x] -= shift_x
+                    IW_grid_B.x_range[iIW_y, iIW_x, :] -= shift_x
+                    IW_B_needs_zeroing_out_L = np.abs(shift_x)
+                    shift_x = 0
+
+                if IW_grid_B.y_range[iIW_y, iIW_x, 0] < 0:
+                    IW_grid_B.y[iIW_y, iIW_x] -= shift_y
+                    IW_grid_B.y_range[iIW_y, iIW_x, :] -= shift_y
+                    IW_B_needs_zeroing_out_D = np.abs(shift_y)
+                    shift_y = 0
+
                 if IW_grid_B.y_range[iIW_y, iIW_x, 1] > img_h - 1:
-                    IW_grid_B.y_range[iIW_y, iIW_x, 1] = img_h - 1
-                    IW_grid_A.y_range[iIW_y, iIW_x, 1] = img_h - 1 - shift_y
+                    IW_grid_B.y[iIW_y, iIW_x] -= shift_y
+                    IW_grid_B.y_range[iIW_y, iIW_x, :] -= shift_y
+                    IW_B_needs_zeroing_out_U = np.abs(shift_y)
+                    shift_y = 0
+
+                if DEBUG:
+                    if (IW_B_needs_zeroing_out_L > 0) or (
+                        IW_B_needs_zeroing_out_R > 0
+                    ):
+                        print(" , undo x", end="")
+                    if (IW_B_needs_zeroing_out_U > 0) or (
+                        IW_B_needs_zeroing_out_D > 0
+                    ):
+                        print(" , undo y", end="")
+                    print("")
 
             # ------------------------------------------------------------------
             #   Retrieve images of IW frame A and IW frame B
@@ -199,20 +236,42 @@ if __name__ == "__main__":
                 )
 
             # fmt: off
-            img_IW_A = A[
-                IW_grid_A.y_range[iIW_y, iIW_x, 0] :
-                IW_grid_A.y_range[iIW_y, iIW_x, 1] + 1,
-                IW_grid_A.x_range[iIW_y, iIW_x, 0] :
-                IW_grid_A.x_range[iIW_y, iIW_x, 1]+ 1,
-            ]
+            # We need a copy, because otherwise the upcoming potential zeroing
+            # of the IW image borders will affect, by means of reference, the
+            # original image.
+            # We would need to copy anyhow when we will start using pyFFTW.
+            np.copyto(
+                img_IW_A,
+                A[IW_grid_A.y_range[iIW_y, iIW_x, 0] :
+                  IW_grid_A.y_range[iIW_y, iIW_x, 1] + 1,
+                  IW_grid_A.x_range[iIW_y, iIW_x, 0] :
+                  IW_grid_A.x_range[iIW_y, iIW_x, 1]+ 1]
+            )
 
-            img_IW_B = B[
-                IW_grid_B.y_range[iIW_y, iIW_x, 0] :
-                IW_grid_B.y_range[iIW_y, iIW_x, 1] + 1,
-                IW_grid_B.x_range[iIW_y, iIW_x, 0] :
-                IW_grid_B.x_range[iIW_y, iIW_x, 1] + 1,
-            ]
+            np.copyto(
+                img_IW_B,
+                B[IW_grid_B.y_range[iIW_y, iIW_x, 0] :
+                  IW_grid_B.y_range[iIW_y, iIW_x, 1] + 1,
+                  IW_grid_B.x_range[iIW_y, iIW_x, 0] :
+                  IW_grid_B.x_range[iIW_y, iIW_x, 1] + 1]
+            )
             # fmt: on
+
+            # Zero out the appropiate section of the IW of frame B that
+            # corresponds to `particles` that are definitely not present in the
+            # IW of frame A. Likewise, zero out the IW of frame A.
+            if IW_B_needs_zeroing_out_L > 0:
+                img_IW_B[:, :IW_B_needs_zeroing_out_L] = 0
+                img_IW_A[:, -IW_B_needs_zeroing_out_L:] = 0
+            if IW_B_needs_zeroing_out_R > 0:
+                img_IW_B[:, -IW_B_needs_zeroing_out_R:] = 0
+                img_IW_A[:, :IW_B_needs_zeroing_out_R] = 0
+            if IW_B_needs_zeroing_out_U > 0:
+                img_IW_B[:IW_B_needs_zeroing_out_U, :] = 0
+                img_IW_A[-IW_B_needs_zeroing_out_U:, :] = 0
+            if IW_B_needs_zeroing_out_D > 0:
+                img_IW_B[-IW_B_needs_zeroing_out_D:, :] = 0
+                img_IW_A[:IW_B_needs_zeroing_out_D, :] = 0
 
             # ------------------------------------------------------------------
             #   Perform cross-correlation
@@ -255,27 +314,29 @@ if __name__ == "__main__":
                     )
                     print(f"     dx, dy = {dx:+6.2f}, {dy:+6.2f}")
 
-                if 0:  # DEBUG flag: Show correlation map
-                    if (not "h_imshow" in locals()) or (iIW == 0):
-                        fig = plt.figure()
+                if SHOW_CORRELATION_MAP:
+                    if not (plt.fignum_exists("C_map")):
+                        fig = plt.figure("C_map")
                         h_imshow = plt.imshow(
-                            C,
+                            np.zeros((IW_size * 2 - 1, IW_size * 2 - 1)),
                             cmap="gray",
                             interpolation="none",
                             vmin=0,
                             vmax=1,
                         )
-                        (h_peak,) = plt.plot(peak_x, peak_y, "xr")
-                        (h_peak_sub,) = plt.plot(peak_sub_x, peak_sub_y, "xg")
-                        h_title = plt.title(f"{iIW} of {IW_grid_A.nIWs - 1}")
-                    else:
-                        h_imshow.set_data(C)
-                        h_peak.set_data(peak_x, peak_y)
-                        h_peak_sub.set_data(peak_sub_x, peak_sub_y)
-                        h_title.set_text(f"{iIW} of {IW_grid_A.nIWs}")
+                        (h_peak,) = plt.plot(IW_size, IW_size, "xr")
+                        (h_peak_sub,) = plt.plot(IW_size, IW_size, "xg")
+                        h_title = plt.title(f"")
+
+                    h_imshow.set_data(C)  # type: ignore
+                    h_peak.set_data([peak_x], [peak_y])  # type: ignore
+                    h_peak_sub.set_data([peak_sub_x], [peak_sub_y])  # type: ignore
+                    h_title.set_text(f"{iIW} of {IW_grid_A.nIWs}")  # type: ignore
 
                     plt.draw()
                     plt.pause(0.0001)
+                    # plt.waitforbuttonpress()
+                    # plt.show(block=False)
                     # plt.show()
 
             # Store result in vector map
@@ -302,7 +363,7 @@ if __name__ == "__main__":
     # --------------------------------------------------------------------------
     quiverX = 3
 
-    if 0:
+    if 1:
         fig = plt.figure()
         plt.imshow(A, cmap="gray", interpolation="none")
         plt.quiver(
