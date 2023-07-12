@@ -33,7 +33,9 @@ from my_fun import IW_Grid, lookup_IW_Idx, subpx_3pgf_2D
 IW_SIZES = [64, 32]  # Use powers of 2 [px]
 # IW_SIZES = [64]
 IW_OVERLAP = 0.5  # IW overlap fraction [0 - 1]
+
 DEBUG = False  # Print debug info to terminal?
+SHOW_CORRELATION_MAP = False
 
 import_file = "E:/Work/_GitHub_repo/2D-PIV-BOS/test_imgs/PIV_rising_vortex_plume/B00001.tif"
 
@@ -81,27 +83,15 @@ if __name__ == "__main__":
         if iIW_size == 1:
             IW_grid_As.append(IW_grid_A)
 
+        # Allocate IW images of frames A and B
+        img_IW_A = np.zeros((IW_size, IW_size), dtype=A.dtype)
+        img_IW_B = np.zeros((IW_size, IW_size), dtype=B.dtype)
+
         # Allocate memory for displacement vector map
         VM_x = IW_grid_A.x
         VM_y = IW_grid_A.y
         VM_dx = np.zeros(IW_grid_A.x.shape)
         VM_dy = np.zeros(IW_grid_A.x.shape)
-
-        # Reset any plot on the correlation map
-        if plt.fignum_exists(1):
-            plt.close(1)
-
-        fig = plt.figure(1)
-        h_imshow = plt.imshow(
-            np.zeros((IW_size * 2 - 1, IW_size * 2 - 1)),
-            cmap="gray",
-            interpolation="none",
-            vmin=0,
-            vmax=1,
-        )
-        (h_peak,) = plt.plot(IW_size, IW_size, "xr")
-        (h_peak_sub,) = plt.plot(IW_size, IW_size, "xg")
-        h_title = plt.title(f"")
 
         # ----------------------------------------------------------------------
         #   Walk over all IWs
@@ -112,13 +102,20 @@ if __name__ == "__main__":
             iIW = np.ravel_multi_index((iIW_y, iIW_x), IW_grid_A.x.shape)
             IW_px_y = IW_grid_A.y[iIW_y, iIW_x]
 
-            """
             if DEBUG:
                 print(
                     f"IW: {iIW} of {IW_grid_A.nIWs - 1} "
                     f"@px {IW_px_x}, {IW_px_y}"
                 )
-            """
+
+            # Undo the shift again when the IW of frame B would leave the
+            # borders of frame B. If so, we will zero out the appropiate
+            # section of the IW of frame B that corresponds to `particles`
+            # that are definitely not present in the IW of frame A.
+            IW_B_needs_zeroing_out_L = 0  # left , x = 0
+            IW_B_needs_zeroing_out_R = 0  # right, x = IW_size - 1
+            IW_B_needs_zeroing_out_U = 0  # up   , y = 0
+            IW_B_needs_zeroing_out_D = 0  # down , y = IW_size - 1
 
             # ------------------------------------------------------------------
             #   Calculate IW of frame B
@@ -153,7 +150,6 @@ if __name__ == "__main__":
                 else:
                     shift_y = int(np.round(shift_y))
 
-                """
                 if DEBUG:
                     # Flattened iter index
                     iIW_parent = np.ravel_multi_index(
@@ -161,8 +157,7 @@ if __name__ == "__main__":
                         IW_grid_As[iIW_size - 1].x.shape,
                     )
                     print(f"   parent IW {iIW_parent}")
-                    print(f"   shift  {shift_x:+2d}, {shift_y:+2d}")
-                """
+                    print(f"   shift  {shift_x:+2d}, {shift_y:+2d}", end="")
 
                 # Calculate new center and range of the shifted IW in frame B
                 IW_grid_B.x[iIW_y, iIW_x] += shift_x
@@ -170,27 +165,54 @@ if __name__ == "__main__":
                 IW_grid_B.x_range[iIW_y, iIW_x, :] += shift_x
                 IW_grid_B.y_range[iIW_y, iIW_x, :] += shift_y
 
-                # The IW should never be shifted outside of frame B.
-                # When it does, equally resize the IWs of both frames A and B
-                # such that the resized IW of frame B still fits in frame B
+                # Undo the shift again when the IW of frame B would leave the
+                # borders of frame B. If so, we will zero out the appropiate
+                # section of the IW of frame B that corresponds to `particles`
+                # that are definitely not present in the IW of frame A.
+                IW_B_needs_zeroing_out_L = 0  # left , x = 0
+                IW_B_needs_zeroing_out_R = 0  # right, x = IW_size - 1
+                IW_B_needs_zeroing_out_U = 0  # up   , y = 0
+                IW_B_needs_zeroing_out_D = 0  # down , y = IW_size - 1
+
                 if IW_grid_B.x_range[iIW_y, iIW_x, 0] < 0:
-                    IW_grid_B.x_range[iIW_y, iIW_x, 0] = 0
-                    IW_grid_A.x_range[iIW_y, iIW_x, 0] = -shift_x
-                if IW_grid_B.y_range[iIW_y, iIW_x, 0] < 0:
-                    IW_grid_B.y_range[iIW_y, iIW_x, 0] = 0
-                    IW_grid_A.y_range[iIW_y, iIW_x, 0] = -shift_y
+                    IW_grid_B.x[iIW_y, iIW_x] -= shift_x
+                    IW_grid_B.x_range[iIW_y, iIW_x, :] -= shift_x
+                    IW_B_needs_zeroing_out_R = np.abs(shift_x)
+                    shift_x = 0
+
                 if IW_grid_B.x_range[iIW_y, iIW_x, 1] > img_w - 1:
-                    IW_grid_B.x_range[iIW_y, iIW_x, 1] = img_w - 1
-                    IW_grid_A.x_range[iIW_y, iIW_x, 1] = img_w - 1 - shift_x
+                    IW_grid_B.x[iIW_y, iIW_x] -= shift_x
+                    IW_grid_B.x_range[iIW_y, iIW_x, :] -= shift_x
+                    IW_B_needs_zeroing_out_L = np.abs(shift_x)
+                    shift_x = 0
+
+                if IW_grid_B.y_range[iIW_y, iIW_x, 0] < 0:
+                    IW_grid_B.y[iIW_y, iIW_x] -= shift_y
+                    IW_grid_B.y_range[iIW_y, iIW_x, :] -= shift_y
+                    IW_B_needs_zeroing_out_D = np.abs(shift_y)
+                    shift_y = 0
+
                 if IW_grid_B.y_range[iIW_y, iIW_x, 1] > img_h - 1:
-                    IW_grid_B.y_range[iIW_y, iIW_x, 1] = img_h - 1
-                    IW_grid_A.y_range[iIW_y, iIW_x, 1] = img_h - 1 - shift_y
+                    IW_grid_B.y[iIW_y, iIW_x] -= shift_y
+                    IW_grid_B.y_range[iIW_y, iIW_x, :] -= shift_y
+                    IW_B_needs_zeroing_out_U = np.abs(shift_y)
+                    shift_y = 0
+
+                if DEBUG:
+                    if (IW_B_needs_zeroing_out_L > 0) or (
+                        IW_B_needs_zeroing_out_R > 0
+                    ):
+                        print(" , undo x", end="")
+                    if (IW_B_needs_zeroing_out_U > 0) or (
+                        IW_B_needs_zeroing_out_D > 0
+                    ):
+                        print(" , undo y", end="")
+                    print("")
 
             # ------------------------------------------------------------------
             #   Retrieve images of IW frame A and IW frame B
             # ------------------------------------------------------------------
 
-            """
             if DEBUG:
                 print(
                     "   A_xrng ["
@@ -212,23 +234,44 @@ if __name__ == "__main__":
                     f"{IW_grid_B.y_range[iIW_y, iIW_x, 0]:4d}, "
                     f"{IW_grid_B.y_range[iIW_y, iIW_x, 1]:4d}]"
                 )
-            """
 
             # fmt: off
-            img_IW_A = A[
-                IW_grid_A.y_range[iIW_y, iIW_x, 0] :
-                IW_grid_A.y_range[iIW_y, iIW_x, 1] + 1,
-                IW_grid_A.x_range[iIW_y, iIW_x, 0] :
-                IW_grid_A.x_range[iIW_y, iIW_x, 1]+ 1,
-            ]
+            # We need a copy, because otherwise the upcoming potential zeroing
+            # of the IW image borders will affect, by means of reference, the
+            # original image.
+            # We would need to copy anyhow when we will start using pyFFTW.
+            np.copyto(
+                img_IW_A,
+                A[IW_grid_A.y_range[iIW_y, iIW_x, 0] :
+                  IW_grid_A.y_range[iIW_y, iIW_x, 1] + 1,
+                  IW_grid_A.x_range[iIW_y, iIW_x, 0] :
+                  IW_grid_A.x_range[iIW_y, iIW_x, 1]+ 1]
+            )
 
-            img_IW_B = B[
-                IW_grid_B.y_range[iIW_y, iIW_x, 0] :
-                IW_grid_B.y_range[iIW_y, iIW_x, 1] + 1,
-                IW_grid_B.x_range[iIW_y, iIW_x, 0] :
-                IW_grid_B.x_range[iIW_y, iIW_x, 1] + 1,
-            ]
+            np.copyto(
+                img_IW_B,
+                B[IW_grid_B.y_range[iIW_y, iIW_x, 0] :
+                  IW_grid_B.y_range[iIW_y, iIW_x, 1] + 1,
+                  IW_grid_B.x_range[iIW_y, iIW_x, 0] :
+                  IW_grid_B.x_range[iIW_y, iIW_x, 1] + 1]
+            )
             # fmt: on
+
+            # Zero out the appropiate section of the IW of frame B that
+            # corresponds to `particles` that are definitely not present in the
+            # IW of frame A. Likewise, zero out the IW of frame A.
+            if IW_B_needs_zeroing_out_L > 0:
+                img_IW_B[:, :IW_B_needs_zeroing_out_L] = 0
+                img_IW_A[:, -IW_B_needs_zeroing_out_L:] = 0
+            if IW_B_needs_zeroing_out_R > 0:
+                img_IW_B[:, -IW_B_needs_zeroing_out_R:] = 0
+                img_IW_A[:, :IW_B_needs_zeroing_out_R] = 0
+            if IW_B_needs_zeroing_out_U > 0:
+                img_IW_B[:IW_B_needs_zeroing_out_U, :] = 0
+                img_IW_A[-IW_B_needs_zeroing_out_U:, :] = 0
+            if IW_B_needs_zeroing_out_D > 0:
+                img_IW_B[-IW_B_needs_zeroing_out_D:, :] = 0
+                img_IW_A[:IW_B_needs_zeroing_out_D, :] = 0
 
             # ------------------------------------------------------------------
             #   Perform cross-correlation
@@ -264,19 +307,16 @@ if __name__ == "__main__":
                 dx = peak_sub_x - C.shape[1] // 2 + shift_x
                 dy = peak_sub_y - C.shape[0] // 2 + shift_y
 
-                """
                 if DEBUG:
                     print(f"     peak   @ {peak_x:+6.2f}, {peak_y:+6.2f}")
                     print(
                         f"     3pgf   @ {peak_sub_x:+6.2f}, {peak_sub_y:+6.2f}"
                     )
                     print(f"     dx, dy = {dx:+6.2f}, {dy:+6.2f}")
-                """
 
-                if (iIW > 1287 and iIW_size == 0) or iIW_size == 1:
-                    # if 1:  # DEBUG flag: Show correlation map
-                    if not (plt.fignum_exists(1)):
-                        fig = plt.figure(1)
+                if SHOW_CORRELATION_MAP:
+                    if not (plt.fignum_exists("C_map")):
+                        fig = plt.figure("C_map")
                         h_imshow = plt.imshow(
                             np.zeros((IW_size * 2 - 1, IW_size * 2 - 1)),
                             cmap="gray",
@@ -288,32 +328,16 @@ if __name__ == "__main__":
                         (h_peak_sub,) = plt.plot(IW_size, IW_size, "xg")
                         h_title = plt.title(f"")
 
-                    h_imshow.set_data(C)
-                    h_peak.set_data([peak_x], [peak_y])
-                    h_peak_sub.set_data([peak_sub_x], [peak_sub_y])
-                    h_title.set_text(
-                        f"{iIW} of {IW_grid_A.nIWs}\n{peak_x} {peak_y}"
-                    )
+                    h_imshow.set_data(C)  # type: ignore
+                    h_peak.set_data([peak_x], [peak_y])  # type: ignore
+                    h_peak_sub.set_data([peak_sub_x], [peak_sub_y])  # type: ignore
+                    h_title.set_text(f"{iIW} of {IW_grid_A.nIWs}")  # type: ignore
 
-                    # plt.show(block=False)
-                    # plt.pause(0.0001)
+                    plt.draw()
+                    plt.pause(0.0001)
                     # plt.waitforbuttonpress()
-                    # plt.draw()
-                    plt.show()
-
-                    if iIW == 29:
-                        fig = plt.figure(1)
-                        h_imshow = plt.imshow(
-                            C,
-                            cmap="gray",
-                            interpolation="none",
-                            vmin=0,
-                            vmax=1,
-                        )
-                        (h_peak,) = plt.plot(peak_x, peak_y, "xr")
-                        (h_peak_sub,) = plt.plot(peak_sub_x, peak_sub_y, "xg")
-                        h_title = plt.title(f"")
-                        plt.show()
+                    # plt.show(block=False)
+                    # plt.show()
 
             # Store result in vector map
             VM_dx[iIW_y, iIW_x] = dx
