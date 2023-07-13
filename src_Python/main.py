@@ -28,7 +28,12 @@ from skimage.io import imread
 from matplotlib import pyplot as plt
 from matplotlib.patches import Rectangle
 
-from my_fun import create_IW_grid, lookup_iIW, subpx_3pgf_2D
+from my_fun import (
+    remove_mean_background,
+    create_IW_grid,
+    lookup_iIW,
+    subpx_3pgf_2D,
+)
 
 # Set the IW sizes for multigrid analysis
 # Subsequent IW sizes should be the exact half of the prev IW size
@@ -54,8 +59,8 @@ if __name__ == "__main__":
     B = img[img_h:, :]
 
     # Mean background removal
-    A = np.clip(A - np.mean(A), 0, None).astype(int)
-    B = np.clip(B - np.mean(B), 0, None).astype(int)
+    A = remove_mean_background(A)
+    B = remove_mean_background(B)
 
     # --------------------------------------------------------------------------
     #   Initialize
@@ -415,7 +420,6 @@ if __name__ == "__main__":
 
     duration = perf_counter() - t_0
     print(f"Finished in {duration:.3f} s")
-    # scipy.signal.fftconvolve takes ~1.14 s in alacritty without printing
 
     # --------------------------------------------------------------------------
     #   Show original image A with unfiltered vector map on top

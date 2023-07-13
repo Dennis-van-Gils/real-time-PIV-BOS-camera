@@ -7,7 +7,49 @@ __date__ = "13-07-2023"
 __version__ = "1.0"
 
 import numpy as np
-from numba import njit
+from numba import jit, njit, prange
+
+# ------------------------------------------------------------------------------
+#   remove_mean_background
+# ------------------------------------------------------------------------------
+
+
+@njit(
+    parallel=True,
+    cache=True,
+    nogil=True,
+)
+def remove_mean_background(img):
+    """
+    Many times faster with numba than vanilla numpy.
+
+    Vanilla numpy:
+      img = np.clip(img - np.mean(img), 0, None).astype(img.dtype)
+
+    BENCHMARK on computer `Onera`:
+        4096 x 4096 @ 16 bit:
+            vanilla numpy    : 112   ms per iter
+            numba no parallel:  14   ms per iter
+            numba parallel   :   2.5 ms per iter
+
+        1024 x 1024 @ 16 bit:
+            vanilla numpy    :   6   ms per iter
+            numba no parallel:   0.8 ms per iter
+            numba parallel   :   0.2 ms per iter
+    """
+
+    # We are expecting at max a 16-bit grayscale image
+    mu = np.asarray(np.ceil(np.mean(img)), dtype=np.uint16)
+
+    for y in prange(img.shape[0]):
+        for x in prange(img.shape[1]):
+            if img[y, x] < mu:
+                img[y, x] = 0
+            else:
+                img[y, x] = img[y, x] - mu
+
+    return img
+
 
 # ------------------------------------------------------------------------------
 #   create_IW_grid
@@ -201,6 +243,19 @@ if __name__ == "__main__":
     print("------")
 
     if 1:
+        # img = np.random.randint(0, 255, (1024, 1024), dtype=np.uint8)
+        img = np.random.randint(0, 255, (4096, 4096), dtype=np.uint16)
+
+        loop = int(1e2)
+        result = timeit.timeit(
+            "remove_mean_background(img)",
+            setup=lambda: remove_mean_background(img),
+            globals=globals(),
+            number=loop,
+        )
+        print(f"remove_mean_background: {result / loop * 1000:.5f} ms per iter")
+
+    if 0:
         loop = int(1e3)
         result = timeit.timeit(
             "create_IW_grid(1024, 1024, 64, 0.5)",
@@ -210,7 +265,7 @@ if __name__ == "__main__":
         )
         print(f"create_IW_grid: {result / loop * 1000:.5f} ms per iter")
 
-    if 1:
+    if 0:
         IW_params = (64, 0.5, 60, 60)
 
         loop = int(1e6)
@@ -222,7 +277,7 @@ if __name__ == "__main__":
         )
         print(f"lookup_iIW    : {result / loop * 1000:.5f} ms per iter")
 
-    if 1:
+    if 0:
         test_shape = (32, 32)
         A = np.random.randn(*test_shape)
         B = np.random.randn(*test_shape)
