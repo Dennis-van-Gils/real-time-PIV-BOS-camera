@@ -32,6 +32,7 @@ from my_fun import (
     remove_mean_background,
     create_IW_grid,
     lookup_iIW,
+    fliplrud,
     subpx_3pgf_2D,
 )
 
@@ -355,10 +356,9 @@ if __name__ == "__main__":
 
             else:
                 # Perform 2D cross-correlation
-                C = fftconvolve(
-                    img_IW_B, np.flipud(np.fliplr(img_IW_A)), mode="full"
-                )
-                C = C / np.max(C)
+                C = fftconvolve(img_IW_B, fliplrud(img_IW_A), mode="full")
+                np.divide(C, np.max(C), out=C)
+                # C = C / np.max(C)
 
                 # Find maximum correlation peak
                 iMaxC = np.argmax(C)

@@ -192,6 +192,27 @@ def lookup_iIW(
 
 
 # ------------------------------------------------------------------------------
+#   fliplrud
+# ------------------------------------------------------------------------------
+
+
+@njit(
+    cache=True,
+    nogil=True,
+)
+def fliplrud(img):
+    """Flip the passed image left-to-right and up-to-down, necessary to use an
+    FFT convolution as a 2D-correlation.
+    """
+    # Vanilla numpy:
+    #   return np.flipud(np.fliplr(img))
+    img = img[:, ::-1]  # fliplr
+    img = img[::-1, ...]  # flipud
+
+    return img
+
+
+# ------------------------------------------------------------------------------
 #   subpx_3pgf_2D
 # ------------------------------------------------------------------------------
 
@@ -242,7 +263,7 @@ if __name__ == "__main__":
     print("timeit")
     print("------")
 
-    if 1:
+    if 0:
         # img = np.random.randint(0, 255, (1024, 1024), dtype=np.uint8)
         img = np.random.randint(0, 255, (4096, 4096), dtype=np.uint16)
 
@@ -276,6 +297,18 @@ if __name__ == "__main__":
             number=loop,
         )
         print(f"lookup_iIW    : {result / loop * 1000:.5f} ms per iter")
+
+    if 1:
+        img = np.random.randint(0, 255, (128, 128), dtype=np.uint16)
+
+        loop = int(1e6)
+        result = timeit.timeit(
+            "fliplrud(img)",
+            setup=lambda: fliplrud(img),
+            globals=globals(),
+            number=loop,
+        )
+        print(f"fliplrud      : {result / loop * 1000:.5f} ms per iter")
 
     if 0:
         test_shape = (32, 32)
