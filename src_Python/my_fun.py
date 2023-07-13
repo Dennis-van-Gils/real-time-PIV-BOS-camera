@@ -3,204 +3,237 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "10-07-2023"
+__date__ = "13-07-2023"
 __version__ = "1.0"
 
 import numpy as np
 from numba import njit
 
-from matplotlib import pyplot as plt
-from matplotlib.patches import Rectangle
+# ------------------------------------------------------------------------------
+#   create_IW_grid
+# ------------------------------------------------------------------------------
 
 
-class IW_Grid:
-    """
+@njit(
+    cache=True,
+    nogil=True,
+)
+def meshgrid_numba(x, y):
+    """Numba-accelerated version of `np.meshgrid()` using `xy` indexing."""
+    n = len(x)
+    m = len(y)
+    xx = np.empty((m, n), dtype=x.dtype)
+    yy = np.empty((m, n), dtype=y.dtype)
+    for i in range(n):
+        xx[:, i] = x[i]
+    for j in range(m):
+        yy[j, :] = y[j]
+
+    return xx, yy
+
+
+# Can't `@njit`, because `np.tile()`, `np.repeat(..., axis=0)` and
+# `np.swapaxes()` are not supported.
+def create_IW_grid(
+    img_w: int, img_h: int, IW_size: int, IW_overlap: float
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, int, int, int]:
+    """Divide up the source image area given by `img_w` and `img_h` into square
+    interrogation windows (IW) each of size `IW_size`.
+
     Args:
         img_w (``int``):
-            Width of source image [px].
+            Width of the source image [px].
 
         img_h (``int``):
-            Height of source image [px].
+            Height of the source image [px].
 
         IW_size (``int``):
-            Interrogation window size [px].
+            Square interrogation window size [px].
 
-        overlap (``float``, optional):
+        IW_overlap (``float``, optional):
             Window overlap fraction [0 - 1].
             0  : no window overlap
             0.5: 50% window overlap
 
             Default: 0.5
 
-    Attributes:
+    Returns (``tuple``):
+        grid_x (``np.ndarray(int)``):
+            2D meshgrid containing the x-pixel positions of the IW centers [px].
+            Array shape: [nIWs_y, nIWs_x]
+
+        grid_y (``np.ndarray(int)``):
+            2D meshgrid containing the y-pixel positions of the IW centers [px].
+            Array shape: [nIWs_y, nIWs_x]
+
+        xlims (``np.ndarray(int)``):
+            3D array containing the x-pixel limits of each IW [px].
+            (:, :, 0): limit start
+            (:, :, 1): limit end
+            Array shape: [nIWs_y, nIWs_x, 2]
+
+        ylims (``np.ndarray(int)``):
+            3D array containing the y-pixel limits of each IW [px].
+            (:, :, 0): limit start
+            (:, :, 1): limit end
+            Array shape: [nIWs_y, nIWs_x, 2]
+
         nIWs_x (``int``):
-            Number of interrogation windows along the x direction.
+            Obtained number of interrogation windows along the x-axis.
 
         nIWs_y (``int``):
-            Number of interrogation windows along the y direction.
+            Obtained number of interrogation windows along the y-axis.
 
         nIWs (``int``):
-            Total number of interrogation windows.
-
-        x (``np.ndarray(int)``):
-            Meshgrid (TODO: mention size of array) of the x-positions of the IW
-            centers [px].
-
-        y (``np.ndarray(int)``):
-            Meshgrid (TODO: mention size of array) of the y-positions of the IW
-            centers [px].
-
-        x_range (``np.ndarray(int)``):
-            Array (TODO: mention size of array) containing [min max] x-pos per
-            IW [px].
-            3-D array (iIWs_y, iIWs_x, 2):
-              (:, :, 0): starting position
-              (:, :, 1): ending  position
-
-        y_range (``np.ndarray(int)``):
-            Array (TODO: mention size of array) containing [min max] y-pos per
-            IW [px].
-            3-D array (iIWs_y, iIWs_x, 2):
-              (:, :, 0): starting position
-              (:, :, 1): ending  position
+            Total obtained number of interrogation windows.
     """
 
-    def __init__(self, img_w, img_h, IW_size, overlap):
-        self.IW_size = IW_size
-        self.overlap = overlap
+    # Number of IWs that will fit in the source image
+    nIWs_x = int((img_w - IW_size) // (IW_size * (1 - IW_overlap))) + 1
+    nIWs_y = int((img_h - IW_size) // (IW_size * (1 - IW_overlap))) + 1
+    nIWs = nIWs_x * nIWs_y
 
-        # Calculate number of IWs that will fit in the source image
-        self.nIWs_x = int((img_w - IW_size) // (IW_size * (1 - overlap))) + 1
-        self.nIWs_y = int((img_h - IW_size) // (IW_size * (1 - overlap))) + 1
-        self.nIWs = self.nIWs_x * self.nIWs_y
+    # IW center positions
+    half_IW_size = IW_size // 2
+    arr_x = np.arange(nIWs_x) * (1 - IW_overlap) * IW_size + half_IW_size
+    arr_y = np.arange(nIWs_y) * (1 - IW_overlap) * IW_size + half_IW_size
+    arr_x = np.asarray(arr_x, dtype=int)
+    arr_y = np.asarray(arr_y, dtype=int)
 
-        # Calculate IW positions
-        # MATLAB equivalent:
-        #   arr_x = np.round((0:nIWs_x - 1) * (1 - overlap) * IW_size + np.floor(IW_size/2) + 1)
-        #   arr_y = np.round((0:nIWs_y - 1) * (1 - overlap) * IW_size + np.floor(IW_size/2) + 1)
-        #   [IW_grid.x, IW_grid.y] = meshgrid(arr_x, arr_y);
-        half_IW_size = IW_size // 2
-        arr_x = np.arange(self.nIWs_x) * (1 - overlap) * IW_size + half_IW_size
-        arr_y = np.arange(self.nIWs_y) * (1 - overlap) * IW_size + half_IW_size
-        arr_x = np.asarray(arr_x, dtype=int)
-        arr_y = np.asarray(arr_y, dtype=int)
-        self.x, self.y = np.meshgrid(arr_x, arr_y)
+    if 1:
+        # Numba accelerated, faster than `np.meshgrid()`
+        grid_x, grid_y = meshgrid_numba(arr_x, arr_y)
+    else:
+        # Native numpy
+        grid_x, grid_y = np.meshgrid(arr_x, arr_y)
 
-        # Calculate IW pixel ranges
-        x_range = np.column_stack(
-            (arr_x - half_IW_size, arr_x + half_IW_size - 1)
-        )
-        y_range = np.column_stack(
-            (arr_y - half_IW_size, arr_y + half_IW_size - 1)
-        )
+    # IW limits
+    xlims = np.column_stack((arr_x - half_IW_size, arr_x + half_IW_size - 1))
+    ylims = np.column_stack((arr_y - half_IW_size, arr_y + half_IW_size - 1))
+    xlims = np.tile(xlims, (nIWs_y, 1, 1))
+    ylims = np.tile(ylims, (nIWs_x, 1, 1)).swapaxes(0, 1)
 
-        self.x_range = np.tile(x_range, (self.nIWs_y, 1, 1))
-        self.y_range = np.tile(y_range, (self.nIWs_x, 1, 1)).swapaxes(0, 1)
-
-        if 0:  # DEBUG flag: Examine IW_grid
-            plt.figure()
-            plt.plot(
-                self.x_range[:, :, 0].reshape(-1),
-                self.y_range[:, :, 0].reshape(-1),
-                "xg",
-                linewidth=2,
-                label="IW starts",
-            )
-            plt.plot(
-                self.x_range[:, :, 1].reshape(-1),
-                self.y_range[:, :, 1].reshape(-1),
-                "xr",
-                linewidth=2,
-                label="IW endings",
-            )
-
-            # Plot IW centers, but not all. Just the bottom and left chords.
-            plt.plot(self.x[:, 0], self.y[:, 0], "ok", label="IW centers")
-            plt.plot(self.x[0, :], self.y[0, :], "ok", label="_nolegend_")
-
-            # Plot image bounding box
-            plt.gca().add_patch(
-                Rectangle(
-                    (0, 0),
-                    img_w - 1,
-                    img_h - 1,
-                    edgecolor="k",
-                    fill=None,
-                    lw=1,
-                )
-            )
-            plt.legend()
-            plt.show()
+    return grid_x, grid_y, xlims, ylims, nIWs_x, nIWs_y, nIWs
 
 
-# @njit() DOES NOT WORK WITH CLASSES, NOR AS CLASS METHOD
-def lookup_IW_Idx(IW_grid: IW_Grid, x_pixel: int, y_pixel: int):
-    """Lookup the index of the IW that has its center closest to the input
-    location [x_pixel, y_pixel].
+# ------------------------------------------------------------------------------
+#   lookup_iIW
+# ------------------------------------------------------------------------------
 
-    Returns:
-        iIW_x: x-index of the IW.
-        iIW_y: y-index of the IW.
+
+@njit(
+    "Tuple((uint32, uint32))(uint32, uint32, Tuple((uint32, float64, uint32, uint32)))",
+    cache=True,
+    nogil=True,
+)
+def lookup_iIW(
+    px_x: int, px_y: int, IW_params: tuple[int, float, int, int]
+) -> tuple[int, int]:
+    """Look up the index of the IW, as generated by the parameters passed by
+    `IW_params`, that has its center closest to the passed pixel position
+    [`px_x`, `px_y`].
+
+    Returns (``tuple``):
+        iIW_x (``int``):
+            Index of the IW along the x-axis.
+
+        iIW_y (``int``):
+            Index of the IW along the y-axis.
     """
-
-    # MATLAB equivalent:
-    #  iIW_x = floor((x_pixel - floor(IW_grid.IW_size/2) - 1) / ...
-    #              (IW_grid.IW_size*(1 - IW_grid.overlap)) + 1.5);
-    #  iIW_y = floor((y_pixel - floor(IW_grid.IW_size/2) - 1) / ...
-    #              (IW_grid.IW_size*(1 - IW_grid.overlap)) + 1.5);
-    #  iIW_x = min(iIW_x, IW_grid.nIWs_x);
-    #  iIW_y = min(iIW_y, IW_grid.nIWs_y);
-    #  iIW   = sub2ind([IW_grid.nIWs_y IW_grid.nIWs_x], iIW_y, iIW_x);
-
-    half_IW_size = IW_grid.IW_size // 2
-    iIW_x = (
-        (x_pixel - half_IW_size) / (IW_grid.IW_size * (1 - IW_grid.overlap))
-        + 0.5
-    ).astype(int)
-    iIW_y = (
-        (y_pixel - half_IW_size) / (IW_grid.IW_size * (1 - IW_grid.overlap))
-        + 0.5
-    ).astype(int)
-    iIW_x = np.minimum(iIW_x, IW_grid.nIWs_x - 1)
-    iIW_y = np.minimum(iIW_y, IW_grid.nIWs_y - 1)
+    (IW_size, IW_overlap, nIWs_x, nIWs_y) = IW_params
+    iIW_x = int((px_x - IW_size // 2) / (IW_size * (1 - IW_overlap)) + 0.5)
+    iIW_y = int((px_y - IW_size // 2) / (IW_size * (1 - IW_overlap)) + 0.5)
+    iIW_x = np.minimum(iIW_x, nIWs_x - 1)
+    iIW_y = np.minimum(iIW_y, nIWs_y - 1)
 
     return iIW_x, iIW_y
 
 
-@njit("(float64[:, :], uint16, uint16)", cache=True, nogil=True)
-def subpx_3pgf_2D(C: np.ndarray, px: int, py: int):
-    """Perform a 3-point Gaussian fit to the point with index (py, px)
-    inside of 2-D matrix 'C' along both the x and y direction.
+# ------------------------------------------------------------------------------
+#   subpx_3pgf_2D
+# ------------------------------------------------------------------------------
+
+
+@njit(
+    "Tuple((float64, float64))(float64[:, :], uint32, uint32)",
+    cache=True,
+    nogil=True,
+)
+def subpx_3pgf_2D(C: np.ndarray, px_x: int, px_y: int) -> tuple[float, float]:
+    """Achieve sub-pixel resolution by employing a 3-point Gaussian fit to the
+    point with index `(px_y, px_x)` inside of 2D matrix `C` along both the x and
+    y axes.
+
+    Returns (``tuple``):
+        sub_px_x (``float``):
+            Sub-pixel position along the x-axis [px].
+
+        sub_px_y (``float``):
+            Sub-pixel position along the y-axis [px].
     """
 
-    # Along x
-    if px > 0 and px < C.shape[1] - 1:
-        # Fit possible
-        phi_m1 = np.maximum(C[py, px - 1], 1e-40)  # Prevent taking log of zero
-        phi_p1 = np.maximum(C[py, px + 1], 1e-40)  # Prevent taking log of zero
-        px_sub = (
-            px
-            + (np.log(phi_m1) - np.log(phi_p1))
-            / (np.log(phi_m1) + np.log(phi_p1) - 2 * np.log(C[py, px]))
-            / 2
-        )
+    if px_x > 0 and px_x < C.shape[1] - 1:
+        m = np.log(np.maximum(C[px_y, px_x - 1], 1e-40))  # Prevent log of zero
+        p = np.log(np.maximum(C[px_y, px_x + 1], 1e-40))  # Prevent log of zero
+        sub_px_x = px_x + (m - p) / (m + p - 2 * np.log(C[px_y, px_x])) / 2
     else:
-        # No fit possible
-        px_sub = px
+        sub_px_x = float(px_x)
 
-    # Along y
-    if py > 0 and py < C.shape[0] - 1:
-        # Fit possible
-        phi_m1 = np.maximum(C[py - 1, px], 1e-40)  # Prevent taking log of zero
-        phi_p1 = np.maximum(C[py + 1, px], 1e-40)  # Prevent taking log of zero
-        py_sub = (
-            py
-            + (np.log(phi_m1) - np.log(phi_p1))
-            / (np.log(phi_m1) + np.log(phi_p1) - 2 * np.log(C[py, px]))
-            / 2
-        )
+    if px_y > 0 and px_y < C.shape[0] - 1:
+        m = np.log(np.maximum(C[px_y - 1, px_x], 1e-40))  # Prevent log of zero
+        p = np.log(np.maximum(C[px_y + 1, px_x], 1e-40))  # Prevent log of zero
+        sub_px_y = px_y + (m - p) / (m + p - 2 * np.log(C[px_y, px_x])) / 2
     else:
-        # No fit possible
-        py_sub = py
+        sub_px_y = float(px_y)
 
-    return px_sub, py_sub
+    return sub_px_x, sub_px_y
+
+
+# ------------------------------------------------------------------------------
+#   main
+# ------------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    import timeit
+    from scipy.signal import fftconvolve
+
+    print("timeit")
+    print("------")
+
+    if 1:
+        loop = int(1e3)
+        result = timeit.timeit(
+            "create_IW_grid(1024, 1024, 64, 0.5)",
+            setup=lambda: create_IW_grid(1024, 1024, 64, 0.5),
+            globals=globals(),
+            number=loop,
+        )
+        print(f"create_IW_grid: {result / loop * 1000:.5f} ms per iter")
+
+    if 1:
+        IW_params = (64, 0.5, 60, 60)
+
+        loop = int(1e6)
+        result = timeit.timeit(
+            "lookup_iIW(1024, 1024, IW_params)",
+            setup=lambda: lookup_iIW(1024, 1024, IW_params),
+            globals=globals(),
+            number=loop,
+        )
+        print(f"lookup_iIW    : {result / loop * 1000:.5f} ms per iter")
+
+    if 1:
+        test_shape = (32, 32)
+        A = np.random.randn(*test_shape)
+        B = np.random.randn(*test_shape)
+        C = fftconvolve(B, A, mode="full")
+        C = C / np.max(C)
+
+        loop = int(1e6)
+        result = timeit.timeit(
+            "subpx_3pgf_2D(C, 32, 32)",
+            setup=lambda: subpx_3pgf_2D(C, 32, 32),
+            globals=globals(),
+            number=loop,
+        )
+        print(f"subpx_3pgf_2D : {result / loop * 1000:.5f} ms per iter")
