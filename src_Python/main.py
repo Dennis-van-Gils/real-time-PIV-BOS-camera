@@ -35,6 +35,7 @@ from my_fun import (
     fliplrud,
     subpx_3pgf_2D,
 )
+from convolve2d__my_code import FFTW_Convolver_Full2D
 
 # Set the IW sizes for multigrid analysis
 # Subsequent IW sizes should be the exact half of the prev IW size
@@ -83,6 +84,15 @@ if __name__ == "__main__":
     VMs_grid_y: list[np.ndarray] = []
     VMs_dx: list[np.ndarray] = []
     VMs_dy: list[np.ndarray] = []
+
+    # Plan pyFFTW ahead of time
+    fftws = []
+    for iIW_size, IW_size in enumerate(IW_SIZES):
+        fftws.append(
+            FFTW_Convolver_Full2D(
+                (IW_size, IW_size), (IW_size, IW_size), fftw_threads=1
+            )
+        )
 
     # --------------------------------------------------------------------------
     #   Walk over all interrogation window sizes
@@ -356,7 +366,9 @@ if __name__ == "__main__":
 
             else:
                 # Perform 2D cross-correlation
-                C = fftconvolve(img_IW_B, fliplrud(img_IW_A), mode="full")
+                # C = fftconvolve(img_IW_B, fliplrud(img_IW_A), mode="full")
+                # C = fftw_1.convolve(img_IW_B, fliplrud(img_IW_A))
+                C = fftws[iIW_size].convolve(img_IW_B, fliplrud(img_IW_A))
                 np.divide(C, np.max(C), out=C)
                 # C = C / np.max(C)
 

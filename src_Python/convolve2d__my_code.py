@@ -4,7 +4,7 @@
 import sys
 import numpy as np
 import pyfftw
-from numba import njit
+from numba import njit, jit, prange
 
 
 @njit(
@@ -14,6 +14,19 @@ from numba import njit
 )
 def fast_multiply(in1: np.ndarray, in2: np.ndarray) -> np.ndarray:
     return np.multiply(in1, in2)
+
+
+@njit(
+    # parallel=True,
+    nogil=True,
+    cache=True,
+)
+def fast_zero_pad_2D(arr_in, arr_zeros):
+    for i in prange(arr_in.shape[0]):
+        for j in prange(arr_in.shape[1]):
+            arr_zeros[i, j] = arr_in[i, j]
+
+    return arr_zeros
 
 
 class FFTW_Convolver_Full2D:
@@ -26,11 +39,11 @@ class FFTW_Convolver_Full2D:
     convolution operation, an array full of `numpy.nan`s is returned.
 
     Args:
-        shape1 (tuple):
+        s1 (tuple):
             Shape of the upcoming input array `in1` passed to method
             `convolve()`.
 
-        shape2 (tuple):
+        s2 (tuple):
             Shape of the upcoming input array `in2` passed to method
             `convolve()`.
 
@@ -41,23 +54,41 @@ class FFTW_Convolver_Full2D:
             Default: 5
     """
 
-    def __init__(self, shape1: tuple, shape2: tuple, fftw_threads: int = 5):
-        self.shape1 = shape1
-        self.shape2 = shape2
+    def __init__(self, s1: tuple, s2: tuple, fftw_threads: int = 5):
+        self.s1 = s1
+        self.s2 = s2
 
-        shape1_in = shape1
-        shape1_out = (shape1[0], shape1[1] // 2 + 1)
-        shape2_in = shape2
-        shape2_out = (shape2[0], shape2[1] // 2 + 1)
+        axes = (0, 1)
+        shape = [
+            max((s1[i], s2[i])) if i not in axes else s1[i] + s2[i] - 1
+            for i in range(2)
+        ]
+        # shape = (127, 127)
+
+        # Speed up FFT by padding to optimal size.
+        self.fshape = [pyfftw.next_fast_len(shape[a]) for a in axes]
+        # fshape = (128, 128)
+
+        # Predefined zero-padding
+        self.zero_padding_1 = np.zeros(self.fshape)
+        self.zero_padding_2 = np.zeros(self.fshape)
+
+        fshape_out = [self.fshape[0], self.fshape[1] // 2 + 1]
+
+        # if calc_fast_len:
+        if True:
+            self.fslice = tuple([slice(sz) for sz in shape])
 
         # Create the FFTW plans
         # fmt: off
-        self._rfft_in1  = pyfftw.empty_aligned(shape1_in , dtype="float64")
-        self._rfft_in2  = pyfftw.empty_aligned(shape2_in , dtype="float64")
-        self._rfft_out1 = pyfftw.empty_aligned(shape1_out, dtype="complex128")
-        self._rfft_out2 = pyfftw.empty_aligned(shape2_out, dtype="complex128")
-        self._irfft_in  = pyfftw.empty_aligned(shape1_out, dtype="complex128")
-        self._irfft_out = pyfftw.empty_aligned(shape1_in, dtype="float64")
+        self._rfft_in1  = pyfftw.empty_aligned(self.fshape, dtype="float64")
+        self._rfft_in2  = pyfftw.empty_aligned(self.fshape, dtype="float64")
+
+        self._rfft_out1 = pyfftw.empty_aligned(fshape_out, dtype="complex128")
+        self._rfft_out2 = pyfftw.empty_aligned(fshape_out, dtype="complex128")
+
+        self._irfft_in  = pyfftw.empty_aligned(fshape_out, dtype="complex128")
+        self._irfft_out = pyfftw.empty_aligned(self.fshape, dtype="float64")
         # fmt: on
 
         print("Creating FFTW plans for convolution...", end="")
@@ -113,8 +144,14 @@ class FFTW_Convolver_Full2D:
         # Perform FFT convolution
         # -----------------------
         # Zero padding and forwards Fourier transformation
-        self._rfft_in1[:] = in1
-        self._rfft_in2[:] = in2
+        # self._rfft_in1[:] = np.pad(
+        #     in1, [(0, p) for p in np.subtract(self.fshape, self.s1)]
+        # )
+        self._rfft_in1[:] = fast_zero_pad_2D(in1, self.zero_padding_1)
+        # self._rfft_in2[:] = np.pad(
+        #     in2, [(0, p) for p in np.subtract(self.fshape, self.s2)]
+        # )
+        self._rfft_in2[:] = fast_zero_pad_2D(in2, self.zero_padding_2)
         self._fftw_rfft1()
         self._fftw_rfft2()
 
@@ -124,7 +161,7 @@ class FFTW_Convolver_Full2D:
 
         # Return the 'full' elements
         # return result[self.valid_slice]
-        return result
+        return result[self.fslice]
 
 
 if __name__ == "__main__":
@@ -132,6 +169,10 @@ if __name__ == "__main__":
     # https://www.appsloveworld.com/numpy/100/83/how-to-do-100000-times-2d-fft-in-a-faster-way-using-python
 
     from scipy.signal import windows
+    from scipy.signal import _signaltools
+    from scipy import fft as sp_fft
+    import matplotlib.pyplot as plt
+    import pyfftw
 
     def gaussian_kernel(n, std, normalised=False):
         """
@@ -144,10 +185,42 @@ if __name__ == "__main__":
             gaussian2D /= 2 * np.pi * (std**2)
         return gaussian2D
 
-    size_A = 512
+    size_A = 64
     A = gaussian_kernel(size_A, size_A / 8)
     B = gaussian_kernel(size_A, size_A / 2)
+
+    # in1, in2, axes = _signaltools._init_freq_conv_axes(
+    #     A, B, mode="full", axes=None, sorted_axes=False
+    # )
+    in1 = A
+    in2 = B
+    s1 = A.shape
+    s2 = B.shape
+    axes = (0, 1)
+    shape = [
+        max((s1[i], s2[i])) if i not in axes else s1[i] + s2[i] - 1
+        for i in range(in1.ndim)
+    ]
+    # shape = (127, 127)
+
+    # Speed up FFT by padding to optimal size.
+    # fshape = [sp_fft.next_fast_len(shape[a], not complex_result) for a in axes]
+    fshape = [pyfftw.next_fast_len(shape[a]) for a in axes]
+    # fshape = (128, 128)
+    # sp1 = sp_fft.rfftn(in1, fshape, axes=axes)
+    # sp2 = sp_fft.rfftn(in2, fshape, axes=axes)
+    # sp1.shape = (128, 65)
+    # sp1.shape = (128, 65)
 
     fftw_1 = FFTW_Convolver_Full2D(A.shape, B.shape, fftw_threads=1)
 
     C = fftw_1.convolve(A, B)
+
+    plt.figure(1)
+    plt.imshow(A)
+    plt.figure(2)
+    plt.imshow(B)
+    plt.figure(3)
+    plt.imshow(C)
+
+    plt.show()
