@@ -4,7 +4,7 @@
 import sys
 import numpy as np
 import pyfftw
-from numba import njit, jit, prange
+from numba import njit
 
 
 @njit(
@@ -14,22 +14,6 @@ from numba import njit, jit, prange
 )
 def fast_multiply(in1: np.ndarray, in2: np.ndarray) -> np.ndarray:
     return np.multiply(in1, in2)
-
-
-@njit(
-    # parallel=True, # detrimental to performance
-    nogil=True,
-    cache=True,
-)
-def fast_zero_pad_2D(arr_in, arr_zeros):
-    """
-    for i in range(arr_in.shape[0]):
-        for j in range(arr_in.shape[1]):
-            arr_zeros[i, j] = arr_in[i, j]
-    """
-    arr_zeros[: arr_in.shape[0], : arr_in.shape[1]] = arr_in
-
-    return arr_zeros
 
 
 class FFTW_Convolver_Full2D:
@@ -60,6 +44,8 @@ class FFTW_Convolver_Full2D:
     def __init__(self, s1: tuple, s2: tuple, fftw_threads: int = 5):
         self.s1 = s1
         self.s2 = s2
+        # s1.shape = (64, 64)
+        # s2.shape = (64, 64)
 
         axes = (0, 1)
         shape = [
@@ -70,13 +56,9 @@ class FFTW_Convolver_Full2D:
 
         # Speed up FFT by padding to optimal size.
         self.fshape = [pyfftw.next_fast_len(shape[a]) for a in axes]
-        # fshape = (128, 128)
-
-        # Predefined zero-padding
-        self.zero_padding_1 = np.zeros(self.fshape)
-        self.zero_padding_2 = np.zeros(self.fshape)
-
         fshape_out = [self.fshape[0], self.fshape[1] // 2 + 1]
+        # fshape = (128, 128)
+        # fshape_out = (128, 65)
 
         # if calc_fast_len:
         if True:
@@ -84,8 +66,8 @@ class FFTW_Convolver_Full2D:
 
         # Create the FFTW plans
         # fmt: off
-        self._rfft_in1  = pyfftw.empty_aligned(self.fshape, dtype="float64")
-        self._rfft_in2  = pyfftw.empty_aligned(self.fshape, dtype="float64")
+        self._rfft_in1  = pyfftw.zeros_aligned(self.fshape, dtype="float64")
+        self._rfft_in2  = pyfftw.zeros_aligned(self.fshape, dtype="float64")
 
         self._rfft_out1 = pyfftw.empty_aligned(fshape_out, dtype="complex128")
         self._rfft_out2 = pyfftw.empty_aligned(fshape_out, dtype="complex128")
@@ -132,29 +114,13 @@ class FFTW_Convolver_Full2D:
         in1 = np.asarray(in1)
         in2 = np.asarray(in2)
 
-        """
-        # Return np.nans when the input arrays are not fully populated yet
-        if in1.shape != self.shape1 or in2.shape != self.shape2:
-            return np.full(self.valid_shape, np.nan)
-        """
-
-        """
-        # Check that input shapes are compatible with 'valid' mode
-        if self.switch_inputs:
-            in1, in2 = in2, in1
-        """
-
         # Perform FFT convolution
         # -----------------------
         # Zero padding and forwards Fourier transformation
-        # self._rfft_in1[:] = np.pad(
-        #     in1, [(0, p) for p in np.subtract(self.fshape, self.s1)]
-        # )
-        self._rfft_in1[:] = fast_zero_pad_2D(in1, self.zero_padding_1)
-        # self._rfft_in2[:] = np.pad(
-        #     in2, [(0, p) for p in np.subtract(self.fshape, self.s2)]
-        # )
-        self._rfft_in2[:] = fast_zero_pad_2D(in2, self.zero_padding_2)
+        # self._rfft_in1[:] = fast_zero_pad_2D(in1, self._rfft_in1)
+        self._rfft_in1[: in1.shape[0], : in1.shape[1]] = in1
+        # self._rfft_in2[:] = fast_zero_pad_2D(in2, self._rfft_in2)
+        self._rfft_in2[: in2.shape[0], : in2.shape[1]] = in2
         self._fftw_rfft1()
         self._fftw_rfft2()
 
@@ -163,7 +129,6 @@ class FFTW_Convolver_Full2D:
         result = self._fftw_irfft()
 
         # Return the 'full' elements
-        # return result[self.valid_slice]
         return result[self.fslice]
 
 
