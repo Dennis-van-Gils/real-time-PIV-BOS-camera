@@ -2,5 +2,6 @@ numpy
 numba
 scipy
 matplotlib
+pyfftw
 scikit-image
 imagecodecs 
