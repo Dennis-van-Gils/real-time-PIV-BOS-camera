@@ -27,6 +27,9 @@ import numba
 from skimage.io import imread
 from matplotlib import pyplot as plt
 from matplotlib.patches import Rectangle
+import matplotlib as mpl
+
+mpl.use("TkAgg")
 
 from my_fun import (
     remove_mean_background,
