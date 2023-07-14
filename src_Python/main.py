@@ -25,11 +25,14 @@ from scipy.signal import fftconvolve
 import numba
 
 from skimage.io import imread
-from matplotlib import pyplot as plt
-from matplotlib.patches import Rectangle
-import matplotlib as mpl
 
-mpl.use("TkAgg")
+LOAD_MPL = False
+if LOAD_MPL:
+    from matplotlib import pyplot as plt
+    from matplotlib.patches import Rectangle
+    import matplotlib as mpl
+
+    mpl.use("TkAgg")
 
 from my_fun import (
     remove_mean_background,
@@ -178,6 +181,9 @@ if __name__ == "__main__":
         # ----------------------------------------------------------------------
         #   Walk over all IWs
         # ----------------------------------------------------------------------
+
+        if iIW_size == 0:
+            t_0 = perf_counter()
 
         for (iIW_y, iIW_x), IW_px_x in np.ndenumerate(A_IW_grid_x):
             # Flattened iter index
@@ -441,7 +447,7 @@ if __name__ == "__main__":
     # --------------------------------------------------------------------------
     quiverX = 3
 
-    if 1:
+    if 0:
         fig = plt.figure()
         plt.imshow(A, cmap="gray", interpolation="none")
         plt.quiver(
