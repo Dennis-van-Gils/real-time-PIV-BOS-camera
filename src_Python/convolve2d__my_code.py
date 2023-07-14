@@ -17,14 +17,17 @@ def fast_multiply(in1: np.ndarray, in2: np.ndarray) -> np.ndarray:
 
 
 @njit(
-    # parallel=True,
+    # parallel=True, # detrimental to performance
     nogil=True,
     cache=True,
 )
 def fast_zero_pad_2D(arr_in, arr_zeros):
-    for i in prange(arr_in.shape[0]):
-        for j in prange(arr_in.shape[1]):
+    """
+    for i in range(arr_in.shape[0]):
+        for j in range(arr_in.shape[1]):
             arr_zeros[i, j] = arr_in[i, j]
+    """
+    arr_zeros[: arr_in.shape[0], : arr_in.shape[1]] = arr_in
 
     return arr_zeros
 
