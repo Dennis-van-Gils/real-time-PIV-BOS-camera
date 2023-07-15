@@ -265,16 +265,8 @@ if __name__ == "__main__":
                 # Retrieve the pre-shift
                 shift_x = lVM_dx[-2][parent_IW_idx_y, parent_IW_idx_x]
                 shift_y = lVM_dy[-2][parent_IW_idx_y, parent_IW_idx_x]
-
-                if np.isnan(shift_x):
-                    shift_x = 0
-                else:
-                    shift_x = int(np.round(shift_x))
-
-                if np.isnan(shift_y):
-                    shift_y = 0
-                else:
-                    shift_y = int(np.round(shift_y))
+                shift_x = 0 if np.isnan(shift_x) else int(shift_x)
+                shift_y = 0 if np.isnan(shift_y) else int(shift_y)
 
                 if DEBUG:
                     # Flattened iter index
@@ -423,19 +415,17 @@ if __name__ == "__main__":
                 peak_x = int(peak_x)
                 peak_y = int(peak_y)
 
-                # Sub-pixel resolution algorithm, 3-point Gaussian fit
-                peak_sub_x, peak_sub_y = subpx_3pgf_2D(C, peak_x, peak_y)
+                if stage_idx == N_stages - 1:
+                    # Sub-pixel resolution algorithm, 3-point Gaussian fit
+                    peak_x, peak_y = subpx_3pgf_2D(C, peak_x, peak_y)
 
                 # Calculate displacement vector
-                dx = peak_sub_x - C.shape[1] // 2 + shift_x
-                dy = peak_sub_y - C.shape[0] // 2 + shift_y
+                dx = peak_x - C.shape[1] // 2 + shift_x
+                dy = peak_y - C.shape[0] // 2 + shift_y
 
                 if DEBUG:
-                    print(f"     peak   @ {peak_x:+6.2f}, {peak_y:+6.2f}")
-                    print(
-                        f"     3pgf   @ {peak_sub_x:+6.2f}, {peak_sub_y:+6.2f}"
-                    )
-                    print(f"     dx, dy = {dx:+6.2f}, {dy:+6.2f}")
+                    print(f"     peak   @ {peak_x:+5.1f}, {peak_y:+5.1f}")
+                    print(f"     dx, dy = {dx:+5.1f}, {dy:+5.1f}")
 
                 if SHOW_CORRELATION_MAP:
                     if not (plt.fignum_exists("C_map")):
@@ -448,12 +438,10 @@ if __name__ == "__main__":
                             vmax=1,
                         )
                         (h_peak,) = plt.plot(IW_size, IW_size, "xr")
-                        (h_peak_sub,) = plt.plot(IW_size, IW_size, "xg")
                         h_title = plt.title(f"")
 
                     h_imshow.set_data(C)  # type: ignore
                     h_peak.set_data([peak_x], [peak_y])  # type: ignore
-                    h_peak_sub.set_data([peak_sub_x], [peak_sub_y])  # type: ignore
                     h_title.set_text(f"{IW_idx} of {N_IWs}")  # type: ignore
 
                     plt.draw()
@@ -462,7 +450,7 @@ if __name__ == "__main__":
                     # plt.show(block=False)
                     # plt.show()
 
-            # Store result in vector map
+            # Store result in displacement vector map
             VM_dx[IW_idx_y, IW_idx_x] = dx
             VM_dy[IW_idx_y, IW_idx_x] = dy
 
