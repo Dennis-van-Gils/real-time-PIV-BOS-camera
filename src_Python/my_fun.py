@@ -78,7 +78,7 @@ def meshgrid_numba(x, y):
 # `np.swapaxes()` are not supported.
 def create_IW_grid(
     img_w: int, img_h: int, IW_size: int, IW_overlap: float
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, int, int, int]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, int, int]:
     """Divide up the source image area given by `img_w` and `img_h` into square
     interrogation windows (IW) each of size `IW_size`.
 
@@ -108,13 +108,13 @@ def create_IW_grid(
             2D meshgrid containing the y-pixel positions of the IW centers [px].
             Array shape: [N_IWs_y, N_IWs_x]
 
-        xlims (``np.ndarray(int)``):
+        lims_x (``np.ndarray(int)``):
             3D array containing the x-pixel limits of each IW [px].
             (:, :, 0): limit start
             (:, :, 1): limit end
             Array shape: [N_IWs_y, N_IWs_x, 2]
 
-        ylims (``np.ndarray(int)``):
+        lims_y (``np.ndarray(int)``):
             3D array containing the y-pixel limits of each IW [px].
             (:, :, 0): limit start
             (:, :, 1): limit end
@@ -125,15 +125,11 @@ def create_IW_grid(
 
         N_IWs_y (``int``):
             Obtained number of interrogation windows along the y-axis.
-
-        N_IWs (``int``):
-            Total obtained number of interrogation windows.
     """
 
     # Number of IWs that will fit in the source image
     N_IWs_x = int((img_w - IW_size) // (IW_size * (1 - IW_overlap))) + 1
     N_IWs_y = int((img_h - IW_size) // (IW_size * (1 - IW_overlap))) + 1
-    N_IWs = N_IWs_x * N_IWs_y
 
     # IW center positions
     half_IW_size = IW_size // 2
@@ -150,12 +146,12 @@ def create_IW_grid(
         grid_x, grid_y = np.meshgrid(arr_x, arr_y)
 
     # IW limits
-    xlims = np.column_stack((arr_x - half_IW_size, arr_x + half_IW_size - 1))
-    ylims = np.column_stack((arr_y - half_IW_size, arr_y + half_IW_size - 1))
-    xlims = np.tile(xlims, (N_IWs_y, 1, 1))
-    ylims = np.tile(ylims, (N_IWs_x, 1, 1)).swapaxes(0, 1)
+    lims_x = np.column_stack((arr_x - half_IW_size, arr_x + half_IW_size - 1))
+    lims_y = np.column_stack((arr_y - half_IW_size, arr_y + half_IW_size - 1))
+    lims_x = np.tile(lims_x, (N_IWs_y, 1, 1))
+    lims_y = np.tile(lims_y, (N_IWs_x, 1, 1)).swapaxes(0, 1)
 
-    return grid_x, grid_y, xlims, ylims, N_IWs_x, N_IWs_y, N_IWs
+    return grid_x, grid_y, lims_x, lims_y, N_IWs_x, N_IWs_y
 
 
 # ------------------------------------------------------------------------------

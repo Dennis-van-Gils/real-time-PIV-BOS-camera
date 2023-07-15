@@ -5,8 +5,8 @@ Background Oriented Schlieren (BOS)
 
 Used abbrevations
 -----------------
-IW   : Interrogation window
-VM   : Displacement vector map
+IW: Interrogation window
+VM: Displacement vector map
 """
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
@@ -43,13 +43,13 @@ IW_OVERLAP = 0.5  # IW overlap fraction [0 - 1]
 
 DEBUG = False  # Print debug info to terminal?
 SHOW_CORRELATION_MAP = False
-LOAD_MPL = True
-if LOAD_MPL:
-    from matplotlib import pyplot as plt
-    from matplotlib.patches import Rectangle
-    import matplotlib as mpl
+LOAD_MPL = False
+# if LOAD_MPL:
+from matplotlib import pyplot as plt
+from matplotlib.patches import Rectangle
+import matplotlib as mpl
 
-    mpl.use("TkAgg")
+mpl.use("TkAgg")
 
 import_file = "E:/Work/_GitHub_repo/2D-PIV-BOS/test_imgs/PIV_rising_vortex_plume/B00001.tif"
 
@@ -72,97 +72,97 @@ if __name__ == "__main__":
     # --------------------------------------------------------------------------
     #   Initialize
     # --------------------------------------------------------------------------
+    # Preallocate and populate lists for the upcoming multigrid analysis.
+    # stage: Current multigrid stage from the largest IW size to the smallest.
+    # Prefix 'l' denotes 'list' with index `stage_idx`.
+    N_stages = len(IW_SIZES)
 
-    # IW parameters per stage of the multigrid.
-    # Will hold a list of tuples:
-    #   list  [stage number (``int``)]
+    # List of IW parameters per stage of the multigrid
     #   tuple [IW_size (``int``)     ,
     #          IW_overlap (``float``),
-    #          N_IWs_x (``int``)      ,
+    #          N_IWs_x (``int``)     ,
     #          N_IWs_y (``int``)]
-    IW_params: list[tuple[int, float, int, int]] = []
+    lIW_params: list[tuple[int, float, int, int]] = []
 
-    # Allocate vector maps per stage of the multigrid.
-    # Each will hold a list of numpy.ndarrays.
-    VMs_grid_x: list[np.ndarray] = []
-    VMs_grid_y: list[np.ndarray] = []
-    VMs_dx: list[np.ndarray] = []
-    VMs_dy: list[np.ndarray] = []
+    # fmt: off
+    # List of IW meshgrids and limits per stage of the multigrid
+    lA_IW_grid_x: list[np.ndarray] = []  # np.ndarray[N_IWs_y, N_IWs_x]
+    lA_IW_grid_y: list[np.ndarray] = []  # np.ndarray[N_IWs_y, N_IWs_x]
+    lA_IW_lims_x: list[np.ndarray] = []  # np.ndarray[N_IWs_y, N_IWs_x, 2]
+    lA_IW_lims_y: list[np.ndarray] = []  # np.ndarray[N_IWs_y, N_IWs_x, 2]
 
-    # Pre-allocate and populate structures for the upcoming multigrid analysis
-    # stage: Current multigrid stage from the largest IW size to the smallest
+    lB_IW_grid_x: list[np.ndarray] = []  # np.ndarray[N_IWs_y, N_IWs_x]
+    lB_IW_grid_y: list[np.ndarray] = []  # np.ndarray[N_IWs_y, N_IWs_x]
+    lB_IW_lims_x: list[np.ndarray] = []  # np.ndarray[N_IWs_y, N_IWs_x, 2]
+    lB_IW_lims_y: list[np.ndarray] = []  # np.ndarray[N_IWs_y, N_IWs_x, 2]
 
-    N_stages = len(IW_SIZES)
-    fftws = []  # List of pyFFTW calculation objects
+    # List of computed displacement vector maps per stage of the multigrid
+    lVM_grid_x: list[np.ndarray] = []    # np.ndarray[N_IWs_y, N_IWs_x]
+    lVM_grid_y: list[np.ndarray] = []    # np.ndarray[N_IWs_y, N_IWs_x]
+    lVM_dx: list[np.ndarray] = []        # np.ndarray[N_IWs_y, N_IWs_x]
+    lVM_dy: list[np.ndarray] = []        # np.ndarray[N_IWs_y, N_IWs_x]
+    # fmt: on
 
-    for stage_idx, IW_size in enumerate(IW_SIZES):
-        # Plan pyFFTW ahead of time
-        fftws.append(
-            FFTW_Convolver_Full2D(
-                (IW_size, IW_size), (IW_size, IW_size), fftw_threads=1
-            )
-        )
-
-    # --------------------------------------------------------------------------
-    #   Walk over all interrogation window sizes
-    # --------------------------------------------------------------------------
-    t_0 = perf_counter()
+    # List of pyFFTW calculation objects per stage of the multigrid
+    lfftw: list[FFTW_Convolver_Full2D] = []
 
     for stage_idx, IW_size in enumerate(IW_SIZES):
         # Create interrogation windows
         (
-            A_IW_grid_x,
-            A_IW_grid_y,
-            A_IW_xlims,
-            A_IW_ylims,
+            IW_grid_x,
+            IW_grid_y,
+            IW_lims_x,
+            IW_lims_y,
             N_IWs_x,
             N_IWs_y,
-            N_IWs,
         ) = create_IW_grid(img_w, img_h, IW_size, IW_OVERLAP)
 
-        B_IW_grid_x = np.copy(A_IW_grid_x)
-        B_IW_grid_y = np.copy(A_IW_grid_y)
-        B_IW_xlims = np.copy(A_IW_xlims)
-        B_IW_ylims = np.copy(A_IW_ylims)
+        # Store in list
+        lIW_params.append((IW_size, IW_OVERLAP, N_IWs_x, N_IWs_y))
 
-        # Store IW parameters in list
-        IW_params.append((IW_size, IW_OVERLAP, N_IWs_x, N_IWs_y))
+        lA_IW_grid_x.append(np.copy(IW_grid_x))
+        lA_IW_grid_y.append(np.copy(IW_grid_y))
+        lA_IW_lims_x.append(np.copy(IW_lims_x))
+        lA_IW_lims_y.append(np.copy(IW_lims_y))
 
-        # Allocate IW image subset of frames A and B
-        img_IW_A = np.zeros((IW_size, IW_size), dtype=A.dtype)
-        img_IW_B = np.zeros((IW_size, IW_size), dtype=B.dtype)
+        lB_IW_grid_x.append(np.copy(IW_grid_x))
+        lB_IW_grid_y.append(np.copy(IW_grid_y))
+        lB_IW_lims_x.append(np.copy(IW_lims_x))
+        lB_IW_lims_y.append(np.copy(IW_lims_y))
 
-        # Allocate memory for displacement vector map
-        VM_grid_x = np.copy(A_IW_grid_x)
-        VM_grid_y = np.copy(A_IW_grid_y)
-        VM_dx = np.zeros(A_IW_grid_x.shape)
-        VM_dy = np.zeros(A_IW_grid_x.shape)
+        lVM_grid_x.append(np.copy(IW_grid_x))
+        lVM_grid_y.append(np.copy(IW_grid_y))
+        lVM_dx.append(np.zeros(IW_grid_x.shape))
+        lVM_dy.append(np.zeros(IW_grid_x.shape))
 
-        # ----------------------------------------------------------------------
-        #   Debug plots
-        # ----------------------------------------------------------------------
+        # Create pyFFTW calculation objects
+        lfftw.append(
+            FFTW_Convolver_Full2D(
+                (IW_size, IW_size), (IW_size, IW_size), fftw_threads=1
+            )
+        )
 
         if 0:  # DEBUG flag: Examine IW meshgrid
             # fmt: off
             p = {"fillstyle": "none", "markersize": 6, "linewidth": 2}
             plt.figure()
             plt.plot(
-                A_IW_xlims[:, :, 0].reshape(-1),
-                A_IW_ylims[:, :, 0].reshape(-1),
+                IW_lims_x[:, :, 0].reshape(-1),
+                IW_lims_y[:, :, 0].reshape(-1),
                 "xg", label="IW starts", **p)
             plt.plot(
-                A_IW_xlims[:, :, 1].reshape(-1),
-                A_IW_ylims[:, :, 1].reshape(-1),
+                IW_lims_x[:, :, 1].reshape(-1),
+                IW_lims_y[:, :, 1].reshape(-1),
                 "xr", label="IW ends", **p)
 
             # Plot IW centers, but not all. Just the bottom and left chords.
             plt.plot(
-                A_IW_grid_x[:, 0],
-                A_IW_grid_y[:, 0],
+                IW_grid_x[:, 0],
+                IW_grid_y[:, 0],
                 "ok", label="IW centers", **p)
             plt.plot(
-                A_IW_grid_x[0, :],
-                A_IW_grid_y[0, :],
+                IW_grid_x[0, :],
+                IW_grid_y[0, :],
                 "ok", label="_nolegend_", **p)
 
             # Plot image bounding box
@@ -175,6 +175,39 @@ if __name__ == "__main__":
             plt.legend()
             plt.show()
 
+    # --------------------------------------------------------------------------
+    #   Walk over all multigrid stages
+    # --------------------------------------------------------------------------
+    t_0 = perf_counter()
+
+    for stage_idx, IW_size in enumerate(IW_SIZES):
+        IW_params = lIW_params[stage_idx]
+        N_IWs_x = IW_params[2]
+        N_IWs_y = IW_params[3]
+        N_IWs = N_IWs_x * N_IWs_y
+
+        A_IW_grid_x = lA_IW_grid_x[stage_idx]
+        A_IW_grid_y = lA_IW_grid_y[stage_idx]
+        A_IW_lims_x = lA_IW_lims_x[stage_idx]
+        A_IW_lims_y = lA_IW_lims_y[stage_idx]
+
+        B_IW_grid_x = lB_IW_grid_x[stage_idx]
+        B_IW_grid_y = lB_IW_grid_y[stage_idx]
+        B_IW_lims_x = lB_IW_lims_x[stage_idx]
+        B_IW_lims_y = lB_IW_lims_y[stage_idx]
+
+        VM_grid_x = lVM_grid_x[stage_idx]
+        VM_grid_y = lVM_grid_y[stage_idx]
+        VM_dx = lVM_dx[stage_idx]
+        VM_dy = lVM_dy[stage_idx]
+
+        fftw = lfftw[stage_idx]
+
+        # Preallocate IW image subset of frames A and B
+        img_IW_shape = (IW_size, IW_size)
+        img_IW_A = np.zeros(img_IW_shape, dtype=A.dtype)
+        img_IW_B = np.zeros(img_IW_shape, dtype=B.dtype)
+
         if SHOW_CORRELATION_MAP:
             # Reset any existing plot of the correlation map, because the IW
             # size has changed and plotting on top of imshow needs a rescale.
@@ -182,21 +215,23 @@ if __name__ == "__main__":
                 plt.close("C_map")
 
         # ----------------------------------------------------------------------
-        #   Walk over all IWs
+        #   Walk over all interrogation windows
         # ----------------------------------------------------------------------
-
-        if stage_idx == 0:
-            t_0 = perf_counter()
 
         for (IW_idx_y, IW_idx_x), IW_px_x in np.ndenumerate(A_IW_grid_x):
             # Flattened iter index
-            iIW = np.ravel_multi_index((IW_idx_y, IW_idx_x), A_IW_grid_x.shape)
+            IW_idx = np.ravel_multi_index(
+                (IW_idx_y, IW_idx_x),
+                A_IW_grid_x.shape,
+            )
 
             # y-pixel position of the current IW center
             IW_px_y = A_IW_grid_y[IW_idx_y, IW_idx_x]
 
             if DEBUG:
-                print(f"IW: {iIW} of {N_IWs - 1} " f"@px {IW_px_x}, {IW_px_y}")
+                print(
+                    f"IW: {IW_idx} of {N_IWs - 1} " f"@px {IW_px_x}, {IW_px_y}"
+                )
 
             # Undo the shift again when the IW of frame B would leave the
             # borders of frame B. If so, we will zero out the appropiate
@@ -219,15 +254,15 @@ if __name__ == "__main__":
             else:
                 # Pre-shift available: Look up corresponding index of the IW in
                 # the larger parent grid
-                iIW_parent_x, iIW_parent_y = lookup_IW_idx(
+                parent_IW_idx_x, parent_IW_idx_y = lookup_IW_idx(
                     IW_px_x,
                     IW_px_y,
-                    IW_params[-2],
+                    lIW_params[-2],
                 )
 
                 # Retrieve the pre-shift
-                shift_x = VMs_dx[-1][iIW_parent_y, iIW_parent_x]
-                shift_y = VMs_dy[-1][iIW_parent_y, iIW_parent_x]
+                shift_x = lVM_dx[-2][parent_IW_idx_y, parent_IW_idx_x]
+                shift_y = lVM_dy[-2][parent_IW_idx_y, parent_IW_idx_x]
 
                 if np.isnan(shift_x):
                     shift_x = 0
@@ -241,18 +276,18 @@ if __name__ == "__main__":
 
                 if DEBUG:
                     # Flattened iter index
-                    iIW_parent = np.ravel_multi_index(
-                        (iIW_parent_y, iIW_parent_x),
-                        (IW_params[-2][3], IW_params[-2][2]),
+                    parent_IW_idx = np.ravel_multi_index(
+                        (parent_IW_idx_y, parent_IW_idx_x),
+                        (lIW_params[-2][3], lIW_params[-2][2]),
                     )
-                    print(f"   parent IW {iIW_parent}")
+                    print(f"   parent IW {parent_IW_idx}")
                     print(f"   shift  {shift_x:+2d}, {shift_y:+2d}", end="")
 
                 # Calculate new center and limits of the shifted IW in frame B
                 B_IW_grid_x[IW_idx_y, IW_idx_x] += shift_x
                 B_IW_grid_y[IW_idx_y, IW_idx_x] += shift_y
-                B_IW_xlims[IW_idx_y, IW_idx_x, :] += shift_x
-                B_IW_ylims[IW_idx_y, IW_idx_x, :] += shift_y
+                B_IW_lims_x[IW_idx_y, IW_idx_x, :] += shift_x
+                B_IW_lims_y[IW_idx_y, IW_idx_x, :] += shift_y
 
                 # Undo the shift again when the IW of frame B would leave the
                 # borders of frame B. If so, we will zero out the appropiate
@@ -263,27 +298,27 @@ if __name__ == "__main__":
                 IW_B_needs_zeroing_out_U = 0  # up   , y = 0
                 IW_B_needs_zeroing_out_D = 0  # down , y = IW_size - 1
 
-                if B_IW_xlims[IW_idx_y, IW_idx_x, 0] < 0:
+                if B_IW_lims_x[IW_idx_y, IW_idx_x, 0] < 0:
                     B_IW_grid_x[IW_idx_y, IW_idx_x] -= shift_x
-                    B_IW_xlims[IW_idx_y, IW_idx_x, :] -= shift_x
+                    B_IW_lims_x[IW_idx_y, IW_idx_x, :] -= shift_x
                     IW_B_needs_zeroing_out_R = np.abs(shift_x)
                     shift_x = 0
 
-                if B_IW_xlims[IW_idx_y, IW_idx_x, 1] > img_w - 1:
+                if B_IW_lims_x[IW_idx_y, IW_idx_x, 1] > img_w - 1:
                     B_IW_grid_x[IW_idx_y, IW_idx_x] -= shift_x
-                    B_IW_xlims[IW_idx_y, IW_idx_x, :] -= shift_x
+                    B_IW_lims_x[IW_idx_y, IW_idx_x, :] -= shift_x
                     IW_B_needs_zeroing_out_L = np.abs(shift_x)
                     shift_x = 0
 
-                if B_IW_ylims[IW_idx_y, IW_idx_x, 0] < 0:
+                if B_IW_lims_y[IW_idx_y, IW_idx_x, 0] < 0:
                     B_IW_grid_y[IW_idx_y, IW_idx_x] -= shift_y
-                    B_IW_ylims[IW_idx_y, IW_idx_x, :] -= shift_y
+                    B_IW_lims_y[IW_idx_y, IW_idx_x, :] -= shift_y
                     IW_B_needs_zeroing_out_D = np.abs(shift_y)
                     shift_y = 0
 
-                if B_IW_ylims[IW_idx_y, IW_idx_x, 1] > img_h - 1:
+                if B_IW_lims_y[IW_idx_y, IW_idx_x, 1] > img_h - 1:
                     B_IW_grid_y[IW_idx_y, IW_idx_x] -= shift_y
-                    B_IW_ylims[IW_idx_y, IW_idx_x, :] -= shift_y
+                    B_IW_lims_y[IW_idx_y, IW_idx_x, :] -= shift_y
                     IW_B_needs_zeroing_out_U = np.abs(shift_y)
                     shift_y = 0
 
@@ -305,23 +340,23 @@ if __name__ == "__main__":
             if DEBUG:
                 print(
                     "   A_xlim ["
-                    f"{A_IW_xlims[IW_idx_y, IW_idx_x, 0]:4d}, "
-                    f"{A_IW_xlims[IW_idx_y, IW_idx_x, 1]:4d}]"
+                    f"{A_IW_lims_x[IW_idx_y, IW_idx_x, 0]:4d}, "
+                    f"{A_IW_lims_x[IW_idx_y, IW_idx_x, 1]:4d}]"
                 )
                 print(
                     "   A_ylim ["
-                    f"{A_IW_ylims[IW_idx_y, IW_idx_x, 0]:4d}, "
-                    f"{A_IW_ylims[IW_idx_y, IW_idx_x, 1]:4d}]"
+                    f"{A_IW_lims_y[IW_idx_y, IW_idx_x, 0]:4d}, "
+                    f"{A_IW_lims_y[IW_idx_y, IW_idx_x, 1]:4d}]"
                 )
                 print(
                     "   B_xlim ["
-                    f"{B_IW_xlims[IW_idx_y, IW_idx_x, 0]:4d}, "
-                    f"{B_IW_xlims[IW_idx_y, IW_idx_x, 1]:4d}]"
+                    f"{B_IW_lims_x[IW_idx_y, IW_idx_x, 0]:4d}, "
+                    f"{B_IW_lims_x[IW_idx_y, IW_idx_x, 1]:4d}]"
                 )
                 print(
                     "   B_ylim ["
-                    f"{B_IW_ylims[IW_idx_y, IW_idx_x, 0]:4d}, "
-                    f"{B_IW_ylims[IW_idx_y, IW_idx_x, 1]:4d}]"
+                    f"{B_IW_lims_y[IW_idx_y, IW_idx_x, 0]:4d}, "
+                    f"{B_IW_lims_y[IW_idx_y, IW_idx_x, 1]:4d}]"
                 )
 
             # fmt: off
@@ -331,18 +366,18 @@ if __name__ == "__main__":
             # We would need to copy anyhow when we will start using pyFFTW.
             np.copyto(
                 img_IW_A,
-                A[A_IW_ylims[IW_idx_y, IW_idx_x, 0] :
-                  A_IW_ylims[IW_idx_y, IW_idx_x, 1] + 1,
-                  A_IW_xlims[IW_idx_y, IW_idx_x, 0] :
-                  A_IW_xlims[IW_idx_y, IW_idx_x, 1]+ 1]
+                A[A_IW_lims_y[IW_idx_y, IW_idx_x, 0] :
+                  A_IW_lims_y[IW_idx_y, IW_idx_x, 1] + 1,
+                  A_IW_lims_x[IW_idx_y, IW_idx_x, 0] :
+                  A_IW_lims_x[IW_idx_y, IW_idx_x, 1]+ 1]
             )
 
             np.copyto(
                 img_IW_B,
-                B[B_IW_ylims[IW_idx_y, IW_idx_x, 0] :
-                  B_IW_ylims[IW_idx_y, IW_idx_x, 1] + 1,
-                  B_IW_xlims[IW_idx_y, IW_idx_x, 0] :
-                  B_IW_xlims[IW_idx_y, IW_idx_x, 1] + 1]
+                B[B_IW_lims_y[IW_idx_y, IW_idx_x, 0] :
+                  B_IW_lims_y[IW_idx_y, IW_idx_x, 1] + 1,
+                  B_IW_lims_x[IW_idx_y, IW_idx_x, 0] :
+                  B_IW_lims_x[IW_idx_y, IW_idx_x, 1] + 1]
             )
             # fmt: on
 
@@ -380,7 +415,7 @@ if __name__ == "__main__":
                 # Perform 2D cross-correlation
                 # C = fftconvolve(img_IW_B, fliplrud(img_IW_A), mode="full")
                 # C = fftw_1.convolve(img_IW_B, fliplrud(img_IW_A))
-                C = fftws[stage_idx].convolve(img_IW_B, fliplrud(img_IW_A))
+                C = fftw.convolve(img_IW_B, fliplrud(img_IW_A))
                 np.divide(C, np.max(C), out=C)
                 # C = C / np.max(C)
 
@@ -421,7 +456,7 @@ if __name__ == "__main__":
                     h_imshow.set_data(C)  # type: ignore
                     h_peak.set_data([peak_x], [peak_y])  # type: ignore
                     h_peak_sub.set_data([peak_sub_x], [peak_sub_y])  # type: ignore
-                    h_title.set_text(f"{iIW} of {N_IWs}")  # type: ignore
+                    h_title.set_text(f"{IW_idx} of {N_IWs}")  # type: ignore
 
                     plt.draw()
                     plt.pause(0.0001)
@@ -432,15 +467,6 @@ if __name__ == "__main__":
             # Store result in vector map
             VM_dx[IW_idx_y, IW_idx_x] = dx
             VM_dy[IW_idx_y, IW_idx_x] = dy
-
-        # -----------------------------------------------------------------------
-        #   Store multigrid maps
-        # ----------------------------------------------------------------------
-
-        VMs_grid_x.append(VM_grid_x)
-        VMs_grid_y.append(VM_grid_y)
-        VMs_dx.append(VM_dx)
-        VMs_dy.append(VM_dy)
 
     duration = perf_counter() - t_0
     print(f"Finished in {duration:.3f} s")
@@ -454,10 +480,10 @@ if __name__ == "__main__":
         fig = plt.figure()
         plt.imshow(A, cmap="gray", interpolation="none")
         plt.quiver(
-            VMs_grid_x[-1],
-            VMs_grid_y[-1],
-            VMs_dx[-1] * quiverX,
-            VMs_dy[-1] * quiverX,
+            lVM_grid_x[-1],
+            lVM_grid_y[-1],
+            lVM_dx[-1] * quiverX,
+            lVM_dy[-1] * quiverX,
             angles="xy",
             scale_units="xy",
             scale=1,
