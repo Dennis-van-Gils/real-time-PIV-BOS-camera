@@ -181,6 +181,7 @@ if __name__ == "__main__":
     t_0 = perf_counter()
 
     for stage_idx, IW_size in enumerate(IW_SIZES):
+        pstage_idx = stage_idx - 1  # Previous/parent stage index
         IW_params = lIW_params[stage_idx]
         N_IWs_x = IW_params[2]
         N_IWs_y = IW_params[3]
@@ -259,12 +260,12 @@ if __name__ == "__main__":
                 parent_IW_idx_x, parent_IW_idx_y = lookup_IW_idx(
                     IW_px_x,
                     IW_px_y,
-                    lIW_params[-2],
+                    lIW_params[pstage_idx],
                 )
 
                 # Retrieve the pre-shift
-                shift_x = lVM_dx[-2][parent_IW_idx_y, parent_IW_idx_x]
-                shift_y = lVM_dy[-2][parent_IW_idx_y, parent_IW_idx_x]
+                shift_x = lVM_dx[pstage_idx][parent_IW_idx_y, parent_IW_idx_x]
+                shift_y = lVM_dy[pstage_idx][parent_IW_idx_y, parent_IW_idx_x]
                 shift_x = 0 if np.isnan(shift_x) else int(shift_x)
                 shift_y = 0 if np.isnan(shift_y) else int(shift_y)
 
@@ -272,7 +273,7 @@ if __name__ == "__main__":
                     # Flattened iter index
                     parent_IW_idx = np.ravel_multi_index(
                         (parent_IW_idx_y, parent_IW_idx_x),
-                        (lIW_params[-2][3], lIW_params[-2][2]),
+                        (lIW_params[pstage_idx][3], lIW_params[pstage_idx][2]),
                     )
                     print(f"   parent IW {parent_IW_idx}")
                     print(f"   shift  {shift_x:+2d}, {shift_y:+2d}", end="")

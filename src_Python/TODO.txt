@@ -14,4 +14,5 @@ DONE
 
 5) Flip complete second image left-to-right and up-to-down (fliplrud) ahead of time. Then takes subsets out of this.
 
-6) fix incorrect [-2] indexing with (stage_idx - 1)
+x 6) Fix incorrect [-2] indexing with (stage_idx - 1)
+DONE
