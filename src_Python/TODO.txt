@@ -4,6 +4,11 @@ TODO
 ----
 
 1) Collect all correlation maps `C` into pre-allocated matrix for later sub-pixel fitting.
+
 2) Sub-pixel fitting only makes sense at last `iIW_size` step (lowest IW size).
+
 3) Sub-pixel fitting can now run fully jitted and parallel
+
 4) DITCH ALL list append. Turn them into a pre-allocated list of numpy arrays where we will write directly into.
+
+5) Flip complete second image left-to-right and up-to-down (fliplrud) ahead of time. Then takes subsets out of this.
