@@ -43,7 +43,7 @@ IW_OVERLAP = 0.5  # IW overlap fraction [0 - 1]
 
 DEBUG = False  # Print debug info to terminal?
 SHOW_CORRELATION_MAP = False
-LOAD_MPL = False
+LOAD_MPL = True
 # if LOAD_MPL:
 from matplotlib import pyplot as plt
 from matplotlib.patches import Rectangle
