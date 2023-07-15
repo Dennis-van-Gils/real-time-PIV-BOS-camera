@@ -236,11 +236,13 @@ if __name__ == "__main__":
             # Undo the shift again when the IW of frame B would leave the
             # borders of frame B. If so, we will zero out the appropiate
             # section of the IW of frame B that corresponds to `particles`
-            # that are definitely not present in the IW of frame A.
-            IW_B_needs_zeroing_out_L = 0  # left , x = 0
-            IW_B_needs_zeroing_out_R = 0  # right, x = IW_size - 1
-            IW_B_needs_zeroing_out_U = 0  # up   , y = 0
-            IW_B_needs_zeroing_out_D = 0  # down , y = IW_size - 1
+            # that are definitely not present in the IW of frame A, later
+            # on. Likewise, we will zero out pixels in frame A that are not
+            # present in frame B.
+            zero_out_L = 0  # left of B , x = 0
+            zero_out_R = 0  # right of B, x = IW_size - 1
+            zero_out_U = 0  # up of B   , y = 0
+            zero_out_D = 0  # down of B , y = IW_size - 1
 
             # ------------------------------------------------------------------
             #   Calculate IW of frame B
@@ -248,7 +250,7 @@ if __name__ == "__main__":
             # ------------------------------------------------------------------
 
             if stage_idx == 0:
-                # First IW size, no pre-shift available
+                # First stage, no pre-shift available
                 shift_x = 0  # [px]
                 shift_y = 0  # [px]
             else:
@@ -289,47 +291,45 @@ if __name__ == "__main__":
                 B_IW_lims_x[IW_idx_y, IW_idx_x, :] += shift_x
                 B_IW_lims_y[IW_idx_y, IW_idx_x, :] += shift_y
 
-                # Undo the shift again when the IW of frame B would leave the
-                # borders of frame B. If so, we will zero out the appropiate
-                # section of the IW of frame B that corresponds to `particles`
-                # that are definitely not present in the IW of frame A.
-                IW_B_needs_zeroing_out_L = 0  # left , x = 0
-                IW_B_needs_zeroing_out_R = 0  # right, x = IW_size - 1
-                IW_B_needs_zeroing_out_U = 0  # up   , y = 0
-                IW_B_needs_zeroing_out_D = 0  # down , y = IW_size - 1
-
+                # Check and prevent the shift of IW B from moving outside of the
+                # source image B. When so, we will zero out part of the IW
+                # images that have moved out-of-frame, later on.
                 if B_IW_lims_x[IW_idx_y, IW_idx_x, 0] < 0:
+                    zero_out_R = np.abs(shift_x)
                     B_IW_grid_x[IW_idx_y, IW_idx_x] -= shift_x
                     B_IW_lims_x[IW_idx_y, IW_idx_x, :] -= shift_x
-                    IW_B_needs_zeroing_out_R = np.abs(shift_x)
                     shift_x = 0
+                else:
+                    zero_out_R = 0
 
                 if B_IW_lims_x[IW_idx_y, IW_idx_x, 1] > img_w - 1:
+                    zero_out_L = np.abs(shift_x)
                     B_IW_grid_x[IW_idx_y, IW_idx_x] -= shift_x
                     B_IW_lims_x[IW_idx_y, IW_idx_x, :] -= shift_x
-                    IW_B_needs_zeroing_out_L = np.abs(shift_x)
                     shift_x = 0
+                else:
+                    zero_out_L = 0
 
                 if B_IW_lims_y[IW_idx_y, IW_idx_x, 0] < 0:
+                    zero_out_D = np.abs(shift_y)
                     B_IW_grid_y[IW_idx_y, IW_idx_x] -= shift_y
                     B_IW_lims_y[IW_idx_y, IW_idx_x, :] -= shift_y
-                    IW_B_needs_zeroing_out_D = np.abs(shift_y)
                     shift_y = 0
+                else:
+                    zero_out_D = 0
 
                 if B_IW_lims_y[IW_idx_y, IW_idx_x, 1] > img_h - 1:
+                    zero_out_U = np.abs(shift_y)
                     B_IW_grid_y[IW_idx_y, IW_idx_x] -= shift_y
                     B_IW_lims_y[IW_idx_y, IW_idx_x, :] -= shift_y
-                    IW_B_needs_zeroing_out_U = np.abs(shift_y)
                     shift_y = 0
+                else:
+                    zero_out_U = 0
 
                 if DEBUG:
-                    if (IW_B_needs_zeroing_out_L > 0) or (
-                        IW_B_needs_zeroing_out_R > 0
-                    ):
+                    if (zero_out_L > 0) or (zero_out_R > 0):
                         print(" , undo x", end="")
-                    if (IW_B_needs_zeroing_out_U > 0) or (
-                        IW_B_needs_zeroing_out_D > 0
-                    ):
+                    if (zero_out_U > 0) or (zero_out_D > 0):
                         print(" , undo y", end="")
                     print("")
 
@@ -363,7 +363,6 @@ if __name__ == "__main__":
             # We need a copy, because otherwise the upcoming potential zeroing
             # of the IW image borders will affect, by means of reference, the
             # original image.
-            # We would need to copy anyhow when we will start using pyFFTW.
             np.copyto(
                 img_IW_A,
                 A[A_IW_lims_y[IW_idx_y, IW_idx_x, 0] :
@@ -384,18 +383,18 @@ if __name__ == "__main__":
             # Zero out the appropiate section of the IW of frame B that
             # corresponds to `particles` that are definitely not present in the
             # IW of frame A. Likewise, zero out the IW of frame A.
-            if IW_B_needs_zeroing_out_L > 0:
-                img_IW_B[:, :IW_B_needs_zeroing_out_L] = 0
-                img_IW_A[:, -IW_B_needs_zeroing_out_L:] = 0
-            if IW_B_needs_zeroing_out_R > 0:
-                img_IW_B[:, -IW_B_needs_zeroing_out_R:] = 0
-                img_IW_A[:, :IW_B_needs_zeroing_out_R] = 0
-            if IW_B_needs_zeroing_out_U > 0:
-                img_IW_B[:IW_B_needs_zeroing_out_U, :] = 0
-                img_IW_A[-IW_B_needs_zeroing_out_U:, :] = 0
-            if IW_B_needs_zeroing_out_D > 0:
-                img_IW_B[-IW_B_needs_zeroing_out_D:, :] = 0
-                img_IW_A[:IW_B_needs_zeroing_out_D, :] = 0
+            if zero_out_L > 0:
+                img_IW_B[:, :zero_out_L] = 0
+                img_IW_A[:, -zero_out_L:] = 0
+            if zero_out_R > 0:
+                img_IW_B[:, -zero_out_R:] = 0
+                img_IW_A[:, :zero_out_R] = 0
+            if zero_out_U > 0:
+                img_IW_B[:zero_out_U, :] = 0
+                img_IW_A[-zero_out_U:, :] = 0
+            if zero_out_D > 0:
+                img_IW_B[-zero_out_D:, :] = 0
+                img_IW_A[:zero_out_D, :] = 0
 
             # ------------------------------------------------------------------
             #   Perform cross-correlation
@@ -414,7 +413,6 @@ if __name__ == "__main__":
             else:
                 # Perform 2D cross-correlation
                 # C = fftconvolve(img_IW_B, fliplrud(img_IW_A), mode="full")
-                # C = fftw_1.convolve(img_IW_B, fliplrud(img_IW_A))
                 C = fftw.convolve(img_IW_B, fliplrud(img_IW_A))
                 np.divide(C, np.max(C), out=C)
                 # C = C / np.max(C)
