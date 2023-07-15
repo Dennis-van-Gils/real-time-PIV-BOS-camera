@@ -32,6 +32,7 @@ from my_fun import (
     lookup_IW_idx,
     fliplrud,
     subpx_3pgf_2D,
+    compute_displacement_vectors_from_C_maps,
 )
 from convolve2d__my_code import FFTW_Convolver_Full2D
 
@@ -417,6 +418,20 @@ if __name__ == "__main__":
                     img_IW_B, fliplrud(img_IW_A)
                 )
 
+        compute_displacement_vectors_from_C_maps(
+            stage_idx,
+            lIW_params[pstage_idx],
+            lC[stage_idx],
+            A_IW_grid_x,
+            A_IW_grid_y,
+            lVM_dx[pstage_idx],
+            lVM_dy[pstage_idx],
+            N_stages,
+            VM_dx,
+            VM_dy,
+        )
+
+        """
         # for (IW_idx_y, IW_idx_x), IW_px_x in np.ndenumerate(A_IW_grid_x):
         for IW_idx_y in range(N_IWs_y):
             for IW_idx_x in range(N_IWs_x):
@@ -497,6 +512,7 @@ if __name__ == "__main__":
                 # Store result in displacement vector map
                 VM_dx[IW_idx_y, IW_idx_x] = dx
                 VM_dy[IW_idx_y, IW_idx_x] = dy
+        """
 
     duration = perf_counter() - t_0
     print(f"Finished in {duration:.3f} s")

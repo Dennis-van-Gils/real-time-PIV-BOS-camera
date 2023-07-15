@@ -249,6 +249,81 @@ def subpx_3pgf_2D(C: np.ndarray, px_x: int, px_y: int) -> tuple[float, float]:
 
 
 # ------------------------------------------------------------------------------
+#   compute_displacement_vectors_from_C_maps
+# ------------------------------------------------------------------------------
+
+
+@njit(
+    parallel=True,
+    cache=True,
+    nogil=True,
+)
+def compute_displacement_vectors_from_C_maps(
+    stage_idx,
+    parent_IW_params,
+    C_maps,
+    A_IW_grid_x,
+    A_IW_grid_y,
+    parent_VM_x,
+    parent_VM_y,
+    N_stages,
+    VM_dx,
+    VM_dy,
+):
+    for IW_idx_y in prange(C_maps.shape[0]):
+        for IW_idx_x in prange(C_maps.shape[1]):
+            IW_px_x = A_IW_grid_x[IW_idx_y, IW_idx_x]
+            IW_px_y = A_IW_grid_y[IW_idx_y, IW_idx_x]
+
+            if stage_idx == 0:
+                # First stage, no pre-shift available
+                shift_x = 0  # [px]
+                shift_y = 0  # [px]
+            else:
+                # Pre-shift available: Look up corresponding index of the IW in
+                # the larger parent grid
+                parent_IW_idx_x, parent_IW_idx_y = lookup_IW_idx(
+                    IW_px_x,
+                    IW_px_y,
+                    parent_IW_params,
+                )
+
+                # Retrieve the pre-shift
+                shift_x = parent_VM_x[parent_IW_idx_y, parent_IW_idx_x]
+                shift_y = parent_VM_y[parent_IW_idx_y, parent_IW_idx_x]
+                shift_x = 0 if np.isnan(shift_x) else int(shift_x)
+                shift_y = 0 if np.isnan(shift_y) else int(shift_y)
+
+            C = C_maps[IW_idx_y, IW_idx_x, :, :]
+            if np.isnan(C[0, 0]):
+                dx = np.nan
+                dy = np.nan
+            else:
+                C = C / np.max(C)
+                # np.divide(C, np.max(C), out=C)
+
+                # Find maximum correlation peak
+                iMaxC = np.argmax(C)
+                # peak_y, peak_x = np.unravel_index(iMaxC, C.shape, order="C")
+                peak_x = iMaxC % C.shape[1]
+                peak_y = iMaxC // C.shape[1]
+                peak_x = int(peak_x)
+                peak_y = int(peak_y)
+
+                if stage_idx == N_stages - 1:
+                    # Sub-pixel resolution algorithm, 3-point Gaussian fit
+                    peak_x, peak_y = subpx_3pgf_2D(C, peak_x, peak_y)
+
+                # Calculate displacement vector
+                dx = peak_x - C.shape[1] // 2 + shift_x
+                dy = peak_y - C.shape[0] // 2 + shift_y
+
+            # Store result in displacement vector map
+            VM_dx[IW_idx_y, IW_idx_x] = dx
+            VM_dy[IW_idx_y, IW_idx_x] = dy
+
+
+# ------------------------------------------------------------------------------
 #   main
 # ------------------------------------------------------------------------------
 
