@@ -6,6 +6,7 @@ TODO
 1) Collect all correlation maps `C` into pre-allocated matrix for later sub-pixel fitting.
 
 2) Sub-pixel fitting only makes sense at last `iIW_size` step (lowest IW size).
+DONE
 
 3) Sub-pixel fitting can now run fully jitted and parallel
 
