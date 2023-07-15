@@ -96,6 +96,10 @@ if __name__ == "__main__":
     lB_IW_lims_x: list[np.ndarray] = []  # np.ndarray[N_IWs_y, N_IWs_x, 2]
     lB_IW_lims_y: list[np.ndarray] = []  # np.ndarray[N_IWs_y, N_IWs_x, 2]
 
+    # List of computed correlations maps per stage of the multigrid
+    #   np.ndarray[N_IWs_y, N_IWs_x, IW_size / 2 + 1, IW_size / 2 + 1]
+    lC: list[np.ndarray] = []
+
     # List of computed displacement vector maps per stage of the multigrid
     lVM_grid_x: list[np.ndarray] = []    # np.ndarray[N_IWs_y, N_IWs_x]
     lVM_grid_y: list[np.ndarray] = []    # np.ndarray[N_IWs_y, N_IWs_x]
@@ -117,7 +121,7 @@ if __name__ == "__main__":
             N_IWs_y,
         ) = create_IW_grid(img_w, img_h, IW_size, IW_OVERLAP)
 
-        # Store in list
+        # Populate lists
         lIW_params.append((IW_size, IW_OVERLAP, N_IWs_x, N_IWs_y))
 
         lA_IW_grid_x.append(np.copy(IW_grid_x))
@@ -129,6 +133,10 @@ if __name__ == "__main__":
         lB_IW_grid_y.append(np.copy(IW_grid_y))
         lB_IW_lims_x.append(np.copy(IW_lims_x))
         lB_IW_lims_y.append(np.copy(IW_lims_y))
+
+        C = np.zeros((N_IWs_y, N_IWs_x, IW_size * 2 - 1, IW_size * 2 - 1))
+        C[:] = np.nan
+        lC.append(C)
 
         lVM_grid_x.append(np.copy(IW_grid_x))
         lVM_grid_y.append(np.copy(IW_grid_y))
@@ -196,6 +204,8 @@ if __name__ == "__main__":
         B_IW_grid_y = lB_IW_grid_y[stage_idx]
         B_IW_lims_x = lB_IW_lims_x[stage_idx]
         B_IW_lims_y = lB_IW_lims_y[stage_idx]
+
+        C = lC[stage_idx]
 
         VM_grid_x = lVM_grid_x[stage_idx]
         VM_grid_y = lVM_grid_y[stage_idx]
@@ -396,61 +406,97 @@ if __name__ == "__main__":
                 or np.max(img_IW_B) == 0
             ):
                 # Save computation time
-                C = np.nan
-                dx = np.nan
-                dy = np.nan
+                C[IW_idx_y, IW_idx_x, 0, 0] = np.nan
 
             else:
                 # Perform 2D cross-correlation
-                # C = fftconvolve(img_IW_B, fliplrud(img_IW_A), mode="full")
-                C = fftw.convolve(img_IW_B, fliplrud(img_IW_A))
-                np.divide(C, np.max(C), out=C)
-                # C = C / np.max(C)
+                # C[IW_idx_y, IW_idx_x, :, :] = fftconvolve(
+                #     img_IW_B, fliplrud(img_IW_A), mode="full"
+                # )
+                C[IW_idx_y, IW_idx_x, :, :] = fftw.convolve(
+                    img_IW_B, fliplrud(img_IW_A)
+                )
 
-                # Find maximum correlation peak
-                iMaxC = np.argmax(C)
-                peak_y, peak_x = np.unravel_index(iMaxC, C.shape, order="C")
-                peak_x = int(peak_x)
-                peak_y = int(peak_y)
+        # for (IW_idx_y, IW_idx_x), IW_px_x in np.ndenumerate(A_IW_grid_x):
+        for IW_idx_y in range(N_IWs_y):
+            for IW_idx_x in range(N_IWs_x):
+                IW_px_x = A_IW_grid_x[IW_idx_y, IW_idx_x]
+                IW_px_y = A_IW_grid_y[IW_idx_y, IW_idx_x]
 
-                if stage_idx == N_stages - 1:
-                    # Sub-pixel resolution algorithm, 3-point Gaussian fit
-                    peak_x, peak_y = subpx_3pgf_2D(C, peak_x, peak_y)
+                if stage_idx == 0:
+                    # First stage, no pre-shift available
+                    shift_x = 0  # [px]
+                    shift_y = 0  # [px]
+                else:
+                    # Pre-shift available: Look up corresponding index of the IW in
+                    # the larger parent grid
+                    parent_IW_idx_x, parent_IW_idx_y = lookup_IW_idx(
+                        IW_px_x,
+                        IW_px_y,
+                        lIW_params[pstage_idx],
+                    )
 
-                # Calculate displacement vector
-                dx = peak_x - C.shape[1] // 2 + shift_x
-                dy = peak_y - C.shape[0] // 2 + shift_y
+                    # Retrieve the pre-shift
+                    shift_x = lVM_dx[pstage_idx][
+                        parent_IW_idx_y, parent_IW_idx_x
+                    ]
+                    shift_y = lVM_dy[pstage_idx][
+                        parent_IW_idx_y, parent_IW_idx_x
+                    ]
+                    shift_x = 0 if np.isnan(shift_x) else int(shift_x)
+                    shift_y = 0 if np.isnan(shift_y) else int(shift_y)
 
-                if DEBUG:
-                    print(f"     peak   @ {peak_x:+5.1f}, {peak_y:+5.1f}")
-                    print(f"     dx, dy = {dx:+5.1f}, {dy:+5.1f}")
+                C = lC[stage_idx][IW_idx_y, IW_idx_x, :, :]
+                if np.isnan(C[0, 0]):
+                    dx = np.nan
+                    dy = np.nan
+                else:
+                    np.divide(C, np.max(C), out=C)  # C = C / np.max(C)
 
-                if SHOW_CORRELATION_MAP:
-                    if not (plt.fignum_exists("C_map")):
-                        fig = plt.figure("C_map")
-                        h_imshow = plt.imshow(
-                            np.zeros((IW_size * 2 - 1, IW_size * 2 - 1)),
-                            cmap="gray",
-                            interpolation="none",
-                            vmin=0,
-                            vmax=1,
-                        )
-                        (h_peak,) = plt.plot(IW_size, IW_size, "xr")
-                        h_title = plt.title(f"")
+                    # Find maximum correlation peak
+                    iMaxC = np.argmax(C)
+                    peak_y, peak_x = np.unravel_index(iMaxC, C.shape, order="C")
+                    peak_x = int(peak_x)
+                    peak_y = int(peak_y)
 
-                    h_imshow.set_data(C)  # type: ignore
-                    h_peak.set_data([peak_x], [peak_y])  # type: ignore
-                    h_title.set_text(f"{IW_idx} of {N_IWs}")  # type: ignore
+                    if stage_idx == N_stages - 1:
+                        # Sub-pixel resolution algorithm, 3-point Gaussian fit
+                        peak_x, peak_y = subpx_3pgf_2D(C, peak_x, peak_y)
 
-                    plt.draw()
-                    plt.pause(0.0001)
-                    # plt.waitforbuttonpress()
-                    # plt.show(block=False)
-                    # plt.show()
+                    # Calculate displacement vector
+                    dx = peak_x - C.shape[1] // 2 + shift_x
+                    dy = peak_y - C.shape[0] // 2 + shift_y
 
-            # Store result in displacement vector map
-            VM_dx[IW_idx_y, IW_idx_x] = dx
-            VM_dy[IW_idx_y, IW_idx_x] = dy
+                    if DEBUG:
+                        print(f"     peak   @ {peak_x:+5.1f}, {peak_y:+5.1f}")
+                        print(f"     dx, dy = {dx:+5.1f}, {dy:+5.1f}")
+
+                    if SHOW_CORRELATION_MAP:
+                        if not (plt.fignum_exists("C_map")):
+                            fig = plt.figure("C_map")
+                            h_imshow = plt.imshow(
+                                np.zeros((IW_size * 2 - 1, IW_size * 2 - 1)),
+                                cmap="gray",
+                                interpolation="none",
+                                vmin=0,
+                                vmax=1,
+                            )
+                            (h_peak,) = plt.plot(IW_size, IW_size, "xr")
+                            h_title = plt.title(f"")
+
+                        h_imshow.set_data(C)  # type: ignore
+                        h_peak.set_data([peak_x], [peak_y])  # type: ignore
+                        h_title.set_text(f"{IW_idx} of {N_IWs}")  # type: ignore
+
+                        plt.draw()
+                        plt.pause(0.0001)
+                        # plt.waitforbuttonpress()
+                        # plt.show(block=False)
+                        # plt.show()
+
+                # Store result in displacement vector map
+                VM_dx[IW_idx_y, IW_idx_x] = dx
+                VM_dy[IW_idx_y, IW_idx_x] = dy
 
     duration = perf_counter() - t_0
     print(f"Finished in {duration:.3f} s")
