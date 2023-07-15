@@ -220,26 +220,23 @@ if __name__ == "__main__":
         # ----------------------------------------------------------------------
 
         for (IW_idx_y, IW_idx_x), IW_px_x in np.ndenumerate(A_IW_grid_x):
-            # Flattened iter index
-            IW_idx = np.ravel_multi_index(
-                (IW_idx_y, IW_idx_x),
-                A_IW_grid_x.shape,
-            )
-
-            # y-pixel position of the current IW center
             IW_px_y = A_IW_grid_y[IW_idx_y, IW_idx_x]
+            IW_idx = np.ravel_multi_index(
+                (IW_idx_y, IW_idx_x), A_IW_grid_x.shape
+            )
 
             if DEBUG:
                 print(
                     f"IW: {IW_idx} of {N_IWs - 1} " f"@px {IW_px_x}, {IW_px_y}"
                 )
 
-            # Undo the shift again when the IW of frame B would leave the
-            # borders of frame B. If so, we will zero out the appropiate
-            # section of the IW of frame B that corresponds to `particles`
-            # that are definitely not present in the IW of frame A, later
-            # on. Likewise, we will zero out pixels in frame A that are not
-            # present in frame B.
+            # Part of the window shifting mechanism:
+            # Undo the shift again when the shifted IW of frame B is leaving the
+            # borders of frame B. If so, we will, later on, zero out the
+            # appropiate section of the IW of frame B that corresponds to
+            # `particles` that are definitely not present in the IW of frame A.
+            # Likewise, we will zero out pixels in frame A that are not present
+            # in frame B.
             zero_out_L = 0  # left of B , x = 0
             zero_out_R = 0  # right of B, x = IW_size - 1
             zero_out_U = 0  # up of B   , y = 0
