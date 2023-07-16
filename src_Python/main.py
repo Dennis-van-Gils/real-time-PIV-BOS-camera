@@ -197,10 +197,10 @@ if __name__ == "__main__":
 
     for stage_idx, IW_size in enumerate(IW_SIZES):
         pstage_idx = stage_idx - 1  # Previous/parent stage index
-        IW_params = lIW_params[stage_idx]
-        N_IWs = IW_params[2]
-        N_IWs_x = IW_params[3]
-        N_IWs_y = IW_params[4]
+
+        N_IWs = lIW_params[stage_idx][2]
+        N_IWs_x = lIW_params[stage_idx][3]
+        N_IWs_y = lIW_params[stage_idx][4]
 
         A_IW_grid_x = lA_IW_grid_x[stage_idx]
         A_IW_grid_y = lA_IW_grid_y[stage_idx]
