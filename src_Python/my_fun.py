@@ -317,7 +317,7 @@ def compute_displacement_vectors_from_C_maps(
             # overhead.
             # C = np.divide(C, np.max(C))  # Not necessary
             # Store back into C_maps. Adds another overhead.
-            # C_maps[IW_idx_y, IW_idx_x, :, :] = C
+            # C_maps[IW_idx, :, :] = C
 
             # Find maximum correlation peak
             iMaxC = int(np.argmax(C))
