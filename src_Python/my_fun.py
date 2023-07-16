@@ -23,32 +23,26 @@ from numba import jit, njit, prange
 )
 def remove_mean_background(img: np.ndarray):
     """In-place operation on `img`.
-    Many times faster with numba than vanilla numpy.
-
     Vanilla numpy:
-      img = np.clip(img - np.mean(img), 0, None).astype(img.dtype)
+      return img - np.mean(img)
+    Ufunc numpy:
+      np.subtract(img, np.mean(img), out=img)
 
     BENCHMARK on computer `Onera`:
-        4096 x 4096 @ 16 bit:
-            vanilla numpy    : 112   ms per iter
-            numba no parallel:  14   ms per iter
-            numba parallel   :   2.5 ms per iter
+        4096 x 4096 @ float32:
+            vanilla numpy    : 32   ms per iter
+            ufunc numpy      : 19   ms per iter
+            numba no parallel: 17   ms per iter
+            numba parallel   :  5.8 ms per iter
 
-        1024 x 1024 @ 16 bit:
-            vanilla numpy    :   6   ms per iter
-            numba no parallel:   0.8 ms per iter
-            numba parallel   :   0.2 ms per iter
+        1024 x 1024 @ float32:
+            numba parallel   :  0.3 ms per iter
     """
 
-    # We are expecting at max a 16-bit grayscale image
-    mu = np.asarray(np.ceil(np.mean(img)), dtype=np.uint16)
-
+    mu = np.mean(img)
     for y in prange(img.shape[0]):
         for x in prange(img.shape[1]):
-            if img[y, x] < mu:
-                img[y, x] = 0
-            else:
-                img[y, x] = img[y, x] - mu
+            img[y, x] = img[y, x] - mu
 
 
 # ------------------------------------------------------------------------------
@@ -360,8 +354,8 @@ if __name__ == "__main__":
     print("------")
 
     if 1:
-        # img = np.random.randint(0, 255, (1024, 1024), dtype=np.uint8)
-        img = np.random.randint(0, 255, (4096, 4096), dtype=np.uint16)
+        # img = np.random.randint(0, 255, (4096, 4096)).astype(np.float32)
+        img = np.random.randint(0, 255, (1024, 1024)).astype(np.float32)
 
         loop = int(1e2)
         result = timeit.timeit(
