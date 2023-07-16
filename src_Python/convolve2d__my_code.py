@@ -22,9 +22,6 @@ class FFTW_Convolver_Full2D:
     result as a contiguous C-style `numpy.ndarray` containing the 'full'
     convolution elements.
 
-    When the shapes of the passed input arrays are not compatible with the
-    convolution operation, an array full of `numpy.nan`s is returned.
-
     Args:
         s1 (tuple):
             Shape of the upcoming input array `in1` passed to method
@@ -41,10 +38,10 @@ class FFTW_Convolver_Full2D:
             Default: 5
     """
 
-    def __init__(self, s1: tuple, s2: tuple, fftw_threads: int = 5):
-        self.s1 = s1
-        self.s2 = s2
+    def __init__(self, s1: tuple, s2: tuple = (), fftw_threads: int = 5):
         # Example: s1 = (64, 64), s2 = (64, 64)
+        if s2 == ():
+            s2 = s1
 
         axes = (0, 1)
         shape = [
@@ -158,10 +155,10 @@ if __name__ == "__main__":
     C = fftw_1.convolve(A, B)
 
     plt.figure(1)
-    plt.imshow(A)
+    plt.imshow(A, cmap="gray")
     plt.figure(2)
-    plt.imshow(B)
+    plt.imshow(B, cmap="gray")
     plt.figure(3)
-    plt.imshow(C)
+    plt.imshow(C, cmap="gray")
 
     plt.show()
