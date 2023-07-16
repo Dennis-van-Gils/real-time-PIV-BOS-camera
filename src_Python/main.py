@@ -31,7 +31,7 @@ from my_fun import (
     create_IW_grid,
     lookup_IW_idx,
     fliplrud,
-    subpx_3pgf_2D,
+    normalize_C_maps,
     compute_displacement_vectors_from_C_maps,
 )
 from convolve2d__my_code import FFTW_Convolver_Full2D
@@ -43,8 +43,8 @@ IW_SIZES = [64, 32]  # Use powers of 2 [px]
 IW_OVERLAP = 0.5  # IW overlap fraction [0 - 1]
 
 DEBUG = False  # Print debug info to terminal?
-SHOW_CORRELATION_MAP = False
-LOAD_MPL = True
+SHOW_CORRELATION_MAPS = False
+LOAD_MPL = False
 # if LOAD_MPL:
 from matplotlib import pyplot as plt
 from matplotlib.patches import Rectangle
@@ -97,9 +97,16 @@ if __name__ == "__main__":
     lB_IW_lims_x: list[np.ndarray] = []  # np.ndarray[N_IWs_y, N_IWs_x, 2]
     lB_IW_lims_y: list[np.ndarray] = []  # np.ndarray[N_IWs_y, N_IWs_x, 2]
 
+    # List of computed IW shifts per stage of the multigrid
+    # NOTE: List index 0, which corresponds to `stage_idx = 0`, will be
+    # initialized with zeros and remain so, because no window shifts exist for
+    # the first multigrid stage by design.
+    lIW_shifts_x: list[np.ndarray] = []  # np.ndarray[N_IWs_y, N_IWs_x]
+    lIW_shifts_y: list[np.ndarray] = []  # np.ndarray[N_IWs_y, N_IWs_x]
+
     # List of computed correlations maps per stage of the multigrid
     #   np.ndarray[N_IWs_y, N_IWs_x, IW_size / 2 + 1, IW_size / 2 + 1]
-    lC: list[np.ndarray] = []
+    lC_maps: list[np.ndarray] = []
 
     # List of computed displacement vector maps per stage of the multigrid
     lVM_grid_x: list[np.ndarray] = []    # np.ndarray[N_IWs_y, N_IWs_x]
@@ -135,9 +142,12 @@ if __name__ == "__main__":
         lB_IW_lims_x.append(np.copy(IW_lims_x))
         lB_IW_lims_y.append(np.copy(IW_lims_y))
 
-        C = np.zeros((N_IWs_y, N_IWs_x, IW_size * 2 - 1, IW_size * 2 - 1))
-        C[:] = np.nan
-        lC.append(C)
+        lIW_shifts_x.append(np.zeros((N_IWs_y, N_IWs_x)))
+        lIW_shifts_y.append(np.zeros((N_IWs_y, N_IWs_x)))
+
+        C_maps = np.zeros((N_IWs_y, N_IWs_x, IW_size * 2 - 1, IW_size * 2 - 1))
+        C_maps[:] = np.nan
+        lC_maps.append(C_maps)
 
         lVM_grid_x.append(np.copy(IW_grid_x))
         lVM_grid_y.append(np.copy(IW_grid_y))
@@ -206,7 +216,10 @@ if __name__ == "__main__":
         B_IW_lims_x = lB_IW_lims_x[stage_idx]
         B_IW_lims_y = lB_IW_lims_y[stage_idx]
 
-        C = lC[stage_idx]
+        IW_shifts_x = lIW_shifts_x[stage_idx]
+        IW_shifts_y = lIW_shifts_y[stage_idx]
+
+        C_maps = lC_maps[stage_idx]
 
         VM_grid_x = lVM_grid_x[stage_idx]
         VM_grid_y = lVM_grid_y[stage_idx]
@@ -219,12 +232,6 @@ if __name__ == "__main__":
         img_IW_shape = (IW_size, IW_size)
         img_IW_A = np.zeros(img_IW_shape, dtype=A.dtype)
         img_IW_B = np.zeros(img_IW_shape, dtype=B.dtype)
-
-        if SHOW_CORRELATION_MAP:
-            # Reset any existing plot of the correlation map, because the IW
-            # size has changed and plotting on top of imshow needs a rescale.
-            if plt.fignum_exists("C_map"):
-                plt.close("C_map")
 
         # ----------------------------------------------------------------------
         #   Walk over all interrogation windows
@@ -327,6 +334,9 @@ if __name__ == "__main__":
                 else:
                     zero_out_U = 0
 
+                IW_shifts_x[IW_idx_y, IW_idx_x] = shift_x
+                IW_shifts_y[IW_idx_y, IW_idx_x] = shift_y
+
                 if DEBUG:
                     if (zero_out_L > 0) or (zero_out_R > 0):
                         print(" , undo x", end="")
@@ -407,112 +417,79 @@ if __name__ == "__main__":
                 or np.max(img_IW_B) == 0
             ):
                 # Save computation time
-                C[IW_idx_y, IW_idx_x, 0, 0] = np.nan
+                C_maps[IW_idx_y, IW_idx_x, 0, 0] = np.nan
 
             else:
                 # Perform 2D cross-correlation
-                # C[IW_idx_y, IW_idx_x, :, :] = fftconvolve(
+                # C_maps[IW_idx_y, IW_idx_x, :, :] = fftconvolve(
                 #     img_IW_B, fliplrud(img_IW_A), mode="full"
                 # )
-                C[IW_idx_y, IW_idx_x, :, :] = fftw.convolve(
+                C_maps[IW_idx_y, IW_idx_x, :, :] = fftw.convolve(
                     img_IW_B, fliplrud(img_IW_A)
                 )
 
+        # It is not necessary to normalize the correlation maps. Adds overhead.
+        # normalize_C_maps(C_maps)  # Not necessary
+
         compute_displacement_vectors_from_C_maps(
-            stage_idx,
-            lIW_params[pstage_idx],
-            lC[stage_idx],
-            A_IW_grid_x,
-            A_IW_grid_y,
-            lVM_dx[pstage_idx],
-            lVM_dy[pstage_idx],
-            N_stages,
+            C_maps,
+            IW_shifts_x,
+            IW_shifts_y,
             VM_dx,
             VM_dy,
+            perform_subpixel_fitting=(stage_idx == N_stages - 1),
         )
 
-        """
-        # for (IW_idx_y, IW_idx_x), IW_px_x in np.ndenumerate(A_IW_grid_x):
-        for IW_idx_y in range(N_IWs_y):
-            for IW_idx_x in range(N_IWs_x):
-                IW_px_x = A_IW_grid_x[IW_idx_y, IW_idx_x]
-                IW_px_y = A_IW_grid_y[IW_idx_y, IW_idx_x]
+        if SHOW_CORRELATION_MAPS:
+            # Reset any existing plot of the correlation map, because the IW
+            # size has changed and plotting on top of imshow needs a rescale.
+            if plt.fignum_exists("C_map"):
+                plt.close("C_map")
 
-                if stage_idx == 0:
-                    # First stage, no pre-shift available
-                    shift_x = 0  # [px]
-                    shift_y = 0  # [px]
-                else:
-                    # Pre-shift available: Look up corresponding index of the IW in
-                    # the larger parent grid
-                    parent_IW_idx_x, parent_IW_idx_y = lookup_IW_idx(
-                        IW_px_x,
-                        IW_px_y,
-                        lIW_params[pstage_idx],
+            # Plotting requires normalizing correlation maps for easy comparison
+            normalize_C_maps(C_maps)
+
+            for IW_idx_y in range(C_maps.shape[0]):
+                for IW_idx_x in range(C_maps.shape[1]):
+                    IW_idx = np.ravel_multi_index(
+                        (IW_idx_y, IW_idx_x), A_IW_grid_x.shape
                     )
+                    C = C_maps[IW_idx_y, IW_idx_x, :, :]
+                    if np.isnan(C[0, 0]):
+                        continue
 
-                    # Retrieve the pre-shift
-                    shift_x = lVM_dx[pstage_idx][
-                        parent_IW_idx_y, parent_IW_idx_x
-                    ]
-                    shift_y = lVM_dy[pstage_idx][
-                        parent_IW_idx_y, parent_IW_idx_x
-                    ]
-                    shift_x = 0 if np.isnan(shift_x) else int(shift_x)
-                    shift_y = 0 if np.isnan(shift_y) else int(shift_y)
-
-                C = lC[stage_idx][IW_idx_y, IW_idx_x, :, :]
-                if np.isnan(C[0, 0]):
-                    dx = np.nan
-                    dy = np.nan
-                else:
-                    np.divide(C, np.max(C), out=C)  # C = C / np.max(C)
-
-                    # Find maximum correlation peak
-                    iMaxC = np.argmax(C)
-                    peak_y, peak_x = np.unravel_index(iMaxC, C.shape, order="C")
-                    peak_x = int(peak_x)
-                    peak_y = int(peak_y)
-
-                    if stage_idx == N_stages - 1:
-                        # Sub-pixel resolution algorithm, 3-point Gaussian fit
-                        peak_x, peak_y = subpx_3pgf_2D(C, peak_x, peak_y)
-
-                    # Calculate displacement vector
-                    dx = peak_x - C.shape[1] // 2 + shift_x
-                    dy = peak_y - C.shape[0] // 2 + shift_y
+                    dx = VM_dx[IW_idx_y, IW_idx_x]
+                    dy = VM_dy[IW_idx_y, IW_idx_x]
+                    shift_x = IW_shifts_x[IW_idx_y, IW_idx_x]
+                    shift_y = IW_shifts_y[IW_idx_y, IW_idx_x]
+                    peak_x = C.shape[1] // 2 + dx - shift_x
+                    peak_y = C.shape[0] // 2 + dy - shift_y
 
                     if DEBUG:
                         print(f"     peak   @ {peak_x:+5.1f}, {peak_y:+5.1f}")
                         print(f"     dx, dy = {dx:+5.1f}, {dy:+5.1f}")
 
-                    if SHOW_CORRELATION_MAP:
-                        if not (plt.fignum_exists("C_map")):
-                            fig = plt.figure("C_map")
-                            h_imshow = plt.imshow(
-                                np.zeros((IW_size * 2 - 1, IW_size * 2 - 1)),
-                                cmap="gray",
-                                interpolation="none",
-                                vmin=0,
-                                vmax=1,
-                            )
-                            (h_peak,) = plt.plot(IW_size, IW_size, "xr")
-                            h_title = plt.title(f"")
+                    if not (plt.fignum_exists("C_map")):
+                        fig = plt.figure("C_map")
+                        h_imshow = plt.imshow(
+                            np.zeros((IW_size * 2 - 1, IW_size * 2 - 1)),
+                            cmap="gray",
+                            interpolation="none",
+                            vmin=0,
+                            vmax=1,
+                        )
+                        (h_peak,) = plt.plot(IW_size, IW_size, "xr")
+                        h_title = plt.title(f"")
 
-                        h_imshow.set_data(C)  # type: ignore
-                        h_peak.set_data([peak_x], [peak_y])  # type: ignore
-                        h_title.set_text(f"{IW_idx} of {N_IWs}")  # type: ignore
+                    h_imshow.set_data(C)  # type: ignore
+                    h_peak.set_data([peak_x], [peak_y])  # type: ignore
+                    h_title.set_text(f"{IW_idx} of {N_IWs}")  # type: ignore
 
-                        plt.draw()
-                        plt.pause(0.0001)
-                        # plt.waitforbuttonpress()
-                        # plt.show(block=False)
-                        # plt.show()
-
-                # Store result in displacement vector map
-                VM_dx[IW_idx_y, IW_idx_x] = dx
-                VM_dy[IW_idx_y, IW_idx_x] = dy
-        """
+                    plt.draw()
+                    plt.pause(0.0001)
+                    # plt.waitforbuttonpress()
+                    # plt.show(block=False)
+                    # plt.show()
 
     duration = perf_counter() - t_0
     print(f"Finished in {duration:.3f} s")
