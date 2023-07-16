@@ -35,7 +35,7 @@ from my_fun import (
     compute_displacement_vectors_from_C_maps,
 )
 
-FASTER = True
+FASTER = False
 if FASTER:
     from convolve2d__my_code_faster import FFTW_Convolver_Full2D
 else:
@@ -58,19 +58,27 @@ import matplotlib as mpl
 
 mpl.use("TkAgg")
 
-import_file = "E:/Work/_GitHub_repo/2D-PIV-BOS/test_imgs/PIV_rising_vortex_plume/B00001.tif"
 
 # ------------------------------------------------------------------------------
 #   Main
 # ------------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    # Read double image and split into frames A & B
-    img = imread(import_file, as_gray=True)
-    img_2h, img_w = np.shape(img)
-    img_h = int(img_2h / 2)
-    A = img[:img_h, :]
-    B = img[img_h:, :]
+    if 1:
+        fn = "E:/Work/_GitHub_repo/2D-PIV-BOS/test_imgs/PIV_rising_vortex_plume/B00001.tif"
+
+        # Read double image and split into frames A & B
+        img = imread(fn, as_gray=True)
+        img_2h, img_w = np.shape(img)
+        img_h = int(img_2h / 2)
+        A = (img[:img_h, :]).astype(np.float32)
+        B = (img[img_h:, :]).astype(np.float32)
+    else:
+        fn1 = "E:/Work/_GitHub_repo/2D-PIV-BOS/test_imgs/a1.tif"
+        fn2 = "E:/Work/_GitHub_repo/2D-PIV-BOS/test_imgs/a2.tif"
+        A = imread(fn1, as_gray=True).astype(np.float32)
+        B = imread(fn2, as_gray=True).astype(np.float32)
+        img_h, img_w = A.shape
 
     # Mean background removal
     remove_mean_background(A)
