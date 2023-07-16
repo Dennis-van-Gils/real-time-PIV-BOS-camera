@@ -335,8 +335,13 @@ def compute_displacement_vectors_from_C_maps(
                 peak_x, peak_y = subpx_3pgf_2D(C, peak_x, peak_y)
 
             # Calculate displacement vector
-            dx = peak_x - C.shape[1] // 2 + IW_shifts_x[IW_idx]
-            dy = peak_y - C.shape[0] // 2 + IW_shifts_y[IW_idx]
+            # TODO: Fix this ugly (+1) toggle. It depends on whether
+            # zero-padding was used for the 2D FFTW convolution (slow), or not
+            # (fast).
+            qx = 1 if (C.shape[0] % 2) == 0 else 0
+            qy = 1 if (C.shape[1] % 2) == 0 else 0
+            dx = peak_x - C.shape[1] // 2 + qx + IW_shifts_x[IW_idx]
+            dy = peak_y - C.shape[0] // 2 + qy + IW_shifts_y[IW_idx]
 
         # Store result in displacement vector map
         VM_dx[IW_idx] = dx

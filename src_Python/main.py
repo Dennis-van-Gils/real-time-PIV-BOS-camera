@@ -34,7 +34,13 @@ from my_fun import (
     normalize_C_maps,
     compute_displacement_vectors_from_C_maps,
 )
-from convolve2d__my_code import FFTW_Convolver_Full2D
+
+FASTER = True
+if FASTER:
+    from convolve2d__my_code_faster import FFTW_Convolver_Full2D
+else:
+    from convolve2d__my_code import FFTW_Convolver_Full2D
+
 
 # Set the IW sizes for multigrid analysis
 # Subsequent IW sizes should be the exact half of the prev IW size
@@ -44,7 +50,7 @@ IW_OVERLAP = 0.5  # IW overlap fraction [0 - 1]
 
 DEBUG = False  # Print debug info to terminal?
 SHOW_CORRELATION_MAPS = False
-LOAD_MPL = False
+LOAD_MPL = True
 # if LOAD_MPL:
 from matplotlib import pyplot as plt
 from matplotlib.patches import Rectangle
@@ -147,7 +153,10 @@ if __name__ == "__main__":
         lIW_shifts_x.append(np.zeros(N_IWs))
         lIW_shifts_y.append(np.zeros(N_IWs))
 
-        C_maps = np.zeros((N_IWs, IW_size * 2 - 1, IW_size * 2 - 1))
+        if FASTER:
+            C_maps = np.zeros((N_IWs, IW_size, IW_size))
+        else:
+            C_maps = np.zeros((N_IWs, IW_size * 2 - 1, IW_size * 2 - 1))
         C_maps[:] = np.nan
         lC_maps.append(C_maps)
 
@@ -157,11 +166,7 @@ if __name__ == "__main__":
         lVM_dy.append(np.zeros(N_IWs))
 
         # Create pyFFTW calculation objects
-        lfftw.append(
-            FFTW_Convolver_Full2D(
-                (IW_size, IW_size), (IW_size, IW_size), fftw_threads=1
-            )
-        )
+        lfftw.append(FFTW_Convolver_Full2D((IW_size, IW_size), fftw_threads=1))
 
         if 0:  # DEBUG flag: Examine IW meshgrid
             # fmt: off
@@ -469,7 +474,7 @@ if __name__ == "__main__":
                 if not (plt.fignum_exists("C_map")):
                     fig = plt.figure("C_map")
                     h_imshow = plt.imshow(
-                        np.zeros((IW_size * 2 - 1, IW_size * 2 - 1)),
+                        np.zeros(C.shape),
                         cmap="gray",
                         interpolation="none",
                         vmin=0,
