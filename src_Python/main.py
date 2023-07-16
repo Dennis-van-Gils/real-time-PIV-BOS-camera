@@ -17,7 +17,6 @@ __version__ = "1.0"
 
 import os
 import sys
-from typing import Any
 from time import perf_counter
 
 import numpy as np
@@ -41,13 +40,6 @@ if FASTER:
 else:
     from convolve2d__my_code import FFTW_Convolver_Full2D
 
-
-# Set the IW sizes for multigrid analysis
-# Subsequent IW sizes should be the exact half of the prev IW size
-IW_SIZES = [64, 32]  # Use powers of 2 [px]
-# IW_SIZES = [64]
-IW_OVERLAP = 0.5  # IW overlap fraction [0 - 1]
-
 DEBUG = False  # Print debug info to terminal?
 SHOW_CORRELATION_MAPS = False
 LOAD_MPL = True
@@ -58,6 +50,10 @@ import matplotlib as mpl
 
 mpl.use("TkAgg")
 
+# Holds the IW sizes for the multigrid analysis. Powers of two are advised with
+# each subsequent IW size the exact half of the previous IW size.
+IW_SIZES = []  # [px]
+IW_OVERLAP = 0.5  # IW overlap fraction [0 - 1]
 
 # ------------------------------------------------------------------------------
 #   Main
@@ -66,6 +62,7 @@ mpl.use("TkAgg")
 if __name__ == "__main__":
     if 1:
         fn = "E:/Work/_GitHub_repo/2D-PIV-BOS/test_imgs/PIV_rising_vortex_plume/B00001.tif"
+        IW_SIZES = [64, 32]
 
         # Read double image and split into frames A & B
         img = imread(fn, as_gray=True)
@@ -76,6 +73,8 @@ if __name__ == "__main__":
     else:
         fn1 = "E:/Work/_GitHub_repo/2D-PIV-BOS/test_imgs/a1.tif"
         fn2 = "E:/Work/_GitHub_repo/2D-PIV-BOS/test_imgs/a2.tif"
+        IW_SIZES = [256, 128, 64, 32]
+
         A = imread(fn1, as_gray=True).astype(np.float32)
         B = imread(fn2, as_gray=True).astype(np.float32)
         img_h, img_w = A.shape
@@ -408,6 +407,8 @@ if __name__ == "__main__":
             # Zero out the appropiate section of the IW of frame B that
             # corresponds to `particles` that are definitely not present in the
             # IW of frame A. Likewise, zero out the IW of frame A.
+            # Zero caries the meaning of being at the mean background level of
+            # the image.
             if zero_out_L > 0:
                 img_IW_B[:, :zero_out_L] = 0
                 img_IW_A[:, -zero_out_L:] = 0
@@ -425,12 +426,11 @@ if __name__ == "__main__":
             #   Perform cross-correlation
             # ------------------------------------------------------------------
 
-            if (
-                img_IW_A.size == 0
-                or np.max(img_IW_A) == 0
-                or np.max(img_IW_B) == 0
-            ):
-                # Save computation time
+            if (np.max(img_IW_A) <= 0) and (np.max(img_IW_B) <= 0):
+                # No details are present in the IW images. All pixels are below
+                # or at the mean background --> Save computation time.
+                # TODO: Make this a user config threshold? Is 0 even correct?
+                # Must match up with 'zeroing out' mechanism, just above here.
                 C_maps[IW_idx, 0, 0] = np.nan
 
             else:
@@ -510,13 +510,25 @@ if __name__ == "__main__":
     quiverX = 3
 
     if LOAD_MPL:
+        grid_x = lVM_grid_x[-1]
+        grid_y = lVM_grid_y[-1]
+        VM_dx = np.copy(lVM_dx[-1])
+        VM_dy = np.copy(lVM_dy[-1])
+
+        # Vector magnitude
+        M = np.sqrt(np.square(VM_dx) + np.square(VM_dy))
+
+        # Threshold on vector magnitude
+        # VM_dx[M < 0.5] = np.nan
+        # VM_dy[M < 0.5] = np.nan
+
         fig = plt.figure()
         plt.imshow(A, cmap="gray", interpolation="none")
         plt.quiver(
-            lVM_grid_x[-1],
-            lVM_grid_y[-1],
-            lVM_dx[-1] * quiverX,
-            lVM_dy[-1] * quiverX,
+            grid_x,
+            grid_y,
+            VM_dx * quiverX,
+            VM_dy * quiverX,
             angles="xy",
             scale_units="xy",
             scale=1,
