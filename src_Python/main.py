@@ -11,7 +11,7 @@ VM: Displacement vector map
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "16-07-2023"
+__date__ = "17-07-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
@@ -208,32 +208,25 @@ if __name__ == "__main__":
     t_0 = perf_counter()
 
     for stage_idx, IW_size in enumerate(IW_SIZES):
-        pstage_idx = stage_idx - 1  # Previous/parent stage index
-
+        # Short-hand variables
         N_IWs = lIW_params[stage_idx][2]
         N_IWs_x = lIW_params[stage_idx][3]
         N_IWs_y = lIW_params[stage_idx][4]
-
         A_IW_grid_x = lA_IW_grid_x[stage_idx]
         A_IW_grid_y = lA_IW_grid_y[stage_idx]
         A_IW_lims_x = lA_IW_lims_x[stage_idx]
         A_IW_lims_y = lA_IW_lims_y[stage_idx]
-
         B_IW_grid_x = lB_IW_grid_x[stage_idx]
         B_IW_grid_y = lB_IW_grid_y[stage_idx]
         B_IW_lims_x = lB_IW_lims_x[stage_idx]
         B_IW_lims_y = lB_IW_lims_y[stage_idx]
-
         IW_shifts_x = lIW_shifts_x[stage_idx]
         IW_shifts_y = lIW_shifts_y[stage_idx]
-
         C_maps = lC_maps[stage_idx]
-
         VM_grid_x = lVM_grid_x[stage_idx]
         VM_grid_y = lVM_grid_y[stage_idx]
         VM_dx = lVM_dx[stage_idx]
         VM_dy = lVM_dy[stage_idx]
-
         fftw = lfftw[stage_idx]
 
         # Preallocate IW image subset of frames A and B
@@ -247,11 +240,6 @@ if __name__ == "__main__":
 
         for IW_idx, IW_px_x in enumerate(A_IW_grid_x):
             IW_px_y = A_IW_grid_y[IW_idx]
-
-            if DEBUG:
-                print(
-                    f"IW: {IW_idx} of {N_IWs - 1} " f"@px {IW_px_x}, {IW_px_y}"
-                )
 
             # Part of the window shifting mechanism:
             # Undo the shift again when the shifted IW of frame B is leaving the
@@ -280,20 +268,16 @@ if __name__ == "__main__":
                 parent_IW_idx = lookup_IW_idx(
                     IW_px_x,
                     IW_px_y,
-                    lIW_params[pstage_idx],
+                    lIW_params[stage_idx - 1],
                 )
 
                 # Retrieve the pre-shift
-                shift_x = lVM_dx[pstage_idx][parent_IW_idx]
-                shift_y = lVM_dy[pstage_idx][parent_IW_idx]
+                shift_x = lVM_dx[stage_idx - 1][parent_IW_idx]
+                shift_y = lVM_dy[stage_idx - 1][parent_IW_idx]
                 shift_x = 0 if np.isnan(shift_x) else int(shift_x)
                 shift_y = 0 if np.isnan(shift_y) else int(shift_y)
 
-                if DEBUG:
-                    print(f"   parent IW {parent_IW_idx}")
-                    print(f"   shift  {shift_x:+2d}, {shift_y:+2d}", end="")
-
-                # Calculate new center and limits of the shifted IW in frame B
+                # Apply the pre-shift to IW B (eager)
                 B_IW_grid_x[IW_idx] += shift_x
                 B_IW_grid_y[IW_idx] += shift_y
                 B_IW_lims_x[IW_idx, :] += shift_x
@@ -337,38 +321,9 @@ if __name__ == "__main__":
                 IW_shifts_x[IW_idx] = shift_x
                 IW_shifts_y[IW_idx] = shift_y
 
-                if DEBUG:
-                    if (zero_out_L > 0) or (zero_out_R > 0):
-                        print(" , undo x", end="")
-                    if (zero_out_U > 0) or (zero_out_D > 0):
-                        print(" , undo y", end="")
-                    print("")
-
             # ------------------------------------------------------------------
             #   Retrieve images of IW frame A and IW frame B
             # ------------------------------------------------------------------
-
-            if DEBUG:
-                print(
-                    "   A_xlim ["
-                    f"{A_IW_lims_x[IW_idx, 0]:4d}, "
-                    f"{A_IW_lims_x[IW_idx, 1]:4d}]"
-                )
-                print(
-                    "   A_ylim ["
-                    f"{A_IW_lims_y[IW_idx, 0]:4d}, "
-                    f"{A_IW_lims_y[IW_idx, 1]:4d}]"
-                )
-                print(
-                    "   B_xlim ["
-                    f"{B_IW_lims_x[IW_idx, 0]:4d}, "
-                    f"{B_IW_lims_x[IW_idx, 1]:4d}]"
-                )
-                print(
-                    "   B_ylim ["
-                    f"{B_IW_lims_y[IW_idx, 0]:4d}, "
-                    f"{B_IW_lims_y[IW_idx, 1]:4d}]"
-                )
 
             if (
                 (zero_out_L == 0)
@@ -388,7 +343,7 @@ if __name__ == "__main__":
                 # We need a copy, because otherwise the upcoming zeroing of the
                 # IW image borders will affect, by means of reference, the
                 # original image and interfere with the correlation of upcoming
-                # and overlapping IWs.
+                # and overlapping IWs. Copying adds a tiny cpu overhead.
                 np.copyto(
                     img_IW_A,
                     A[
@@ -429,7 +384,7 @@ if __name__ == "__main__":
             if (np.max(img_IW_A) <= 0) and (np.max(img_IW_B) <= 0):
                 # No details are present in the IW images. All pixels are below
                 # or at the mean background --> Save computation time.
-                # TODO: Make this a user config threshold? Is 0 even correct?
+                # TODO: Make this a user config threshold? Is <= 0 even correct?
                 # Must match up with 'zeroing out' mechanism, just above here.
                 C_maps[IW_idx, 0, 0] = np.nan
 
@@ -454,6 +409,33 @@ if __name__ == "__main__":
             perform_subpixel_fitting=(stage_idx == N_stages - 1),
         )
 
+    duration = perf_counter() - t_0
+    print(f"Finished in {duration:.3f} s")
+
+    # --------------------------------------------------------------------------
+    #   Debugging output
+    # --------------------------------------------------------------------------
+
+    for stage_idx, IW_size in enumerate(IW_SIZES):
+        N_IWs = lIW_params[stage_idx][2]
+        N_IWs_x = lIW_params[stage_idx][3]
+        N_IWs_y = lIW_params[stage_idx][4]
+        A_IW_grid_x = lA_IW_grid_x[stage_idx]
+        A_IW_grid_y = lA_IW_grid_y[stage_idx]
+        A_IW_lims_x = lA_IW_lims_x[stage_idx]
+        A_IW_lims_y = lA_IW_lims_y[stage_idx]
+        B_IW_grid_x = lB_IW_grid_x[stage_idx]
+        B_IW_grid_y = lB_IW_grid_y[stage_idx]
+        B_IW_lims_x = lB_IW_lims_x[stage_idx]
+        B_IW_lims_y = lB_IW_lims_y[stage_idx]
+        IW_shifts_x = lIW_shifts_x[stage_idx]
+        IW_shifts_y = lIW_shifts_y[stage_idx]
+        C_maps = lC_maps[stage_idx]
+        VM_grid_x = lVM_grid_x[stage_idx]
+        VM_grid_y = lVM_grid_y[stage_idx]
+        VM_dx = lVM_dx[stage_idx]
+        VM_dy = lVM_dy[stage_idx]
+
         if SHOW_CORRELATION_MAPS:
             # Reset any existing plot of the correlation map, because the IW
             # size has changed and plotting on top of imshow needs a rescale.
@@ -463,46 +445,91 @@ if __name__ == "__main__":
             # Plotting requires normalizing correlation maps for easy comparison
             normalize_C_maps(C_maps)
 
-            for IW_idx in range(C_maps.shape[0]):
-                C = C_maps[IW_idx, :, :]
-                if np.isnan(C[0, 0]):
-                    continue
+        for IW_idx, IW_px_x in enumerate(A_IW_grid_x):
+            # NOTE: Information on potentially zeroed-out sections inside
+            # `img_IW_A` and `img_IW_B` is not stored nor accessible here.
+            # Variables `zero_out_L/R/U/D` have not been stored to memory to
+            # save on cpu time.
 
-                dx = VM_dx[IW_idx]
-                dy = VM_dy[IW_idx]
-                shift_x = IW_shifts_x[IW_idx]
-                shift_y = IW_shifts_y[IW_idx]
-                peak_x = C.shape[1] // 2 + dx - shift_x
-                peak_y = C.shape[0] // 2 + dy - shift_y
+            # Short-hand variables
+            IW_px_y = A_IW_grid_y[IW_idx]
+            shift_x = IW_shifts_x[IW_idx]
+            shift_y = IW_shifts_y[IW_idx]
+            C = C_maps[IW_idx]
 
-                if DEBUG:
+            # TODO: For proper debugging, I need to store the found correlations
+            # peaks in a list of arrays, too.
+            dx = VM_dx[IW_idx]
+            dy = VM_dy[IW_idx]
+            shift_x = np.nan_to_num(IW_shifts_x[IW_idx])  # NaN will become 0
+            shift_y = np.nan_to_num(IW_shifts_y[IW_idx])
+            qx = 1 if (C.shape[0] % 2) == 0 else 0
+            qy = 1 if (C.shape[1] % 2) == 0 else 0
+            peak_x = dx + C.shape[1] // 2 - qx - shift_x  # TODO: store & get,
+            peak_y = dy + C.shape[0] // 2 - qy - shift_y  # do not calc again
+
+            if DEBUG:
+                print(
+                    f"IW: {IW_idx} of {N_IWs - 1} " f"@px {IW_px_x}, {IW_px_y}"
+                )
+
+                if stage_idx > 0:
+                    parent_IW_idx = lookup_IW_idx(
+                        IW_px_x,
+                        IW_px_y,
+                        lIW_params[stage_idx - 1],
+                    )
+                    print(f"   parent IW {parent_IW_idx}")
+                    print(f"   shift  {shift_x:+2d}, {shift_y:+2d}")
+
+                print(
+                    "   A_xlim ["
+                    f"{A_IW_lims_x[IW_idx, 0]:4d}, "
+                    f"{A_IW_lims_x[IW_idx, 1]:4d}]"
+                )
+                print(
+                    "   A_ylim ["
+                    f"{A_IW_lims_y[IW_idx, 0]:4d}, "
+                    f"{A_IW_lims_y[IW_idx, 1]:4d}]"
+                )
+                print(
+                    "   B_xlim ["
+                    f"{B_IW_lims_x[IW_idx, 0]:4d}, "
+                    f"{B_IW_lims_x[IW_idx, 1]:4d}]"
+                )
+                print(
+                    "   B_ylim ["
+                    f"{B_IW_lims_y[IW_idx, 0]:4d}, "
+                    f"{B_IW_lims_y[IW_idx, 1]:4d}]"
+                )
+
+                if not np.isnan(C[0, 0]):
                     print(f"     peak   @ {peak_x:+5.1f}, {peak_y:+5.1f}")
                     print(f"     dx, dy = {dx:+5.1f}, {dy:+5.1f}")
 
-                if not (plt.fignum_exists("C_map")):
-                    fig = plt.figure("C_map")
-                    h_imshow = plt.imshow(
-                        np.zeros(C.shape),
-                        cmap="gray",
-                        interpolation="none",
-                        vmin=0,
-                        vmax=1,
-                    )
-                    (h_peak,) = plt.plot(IW_size, IW_size, "xr")
-                    h_title = plt.title(f"")
+            if SHOW_CORRELATION_MAPS:
+                if not np.isnan(C[0, 0]):
+                    if not (plt.fignum_exists("C_map")):
+                        fig = plt.figure("C_map")
+                        h_imshow = plt.imshow(
+                            np.zeros(C.shape),
+                            cmap="gray",
+                            interpolation="none",
+                            vmin=0,
+                            vmax=1,
+                        )
+                        (h_peak,) = plt.plot(IW_size, IW_size, "xr")
+                        h_title = plt.title(f"")
 
-                h_imshow.set_data(C)  # type: ignore
-                h_peak.set_data([peak_x], [peak_y])  # type: ignore
-                h_title.set_text(f"{IW_idx} of {N_IWs}")  # type: ignore
+                    h_imshow.set_data(C)  # type: ignore
+                    h_peak.set_data([peak_x], [peak_y])  # type: ignore
+                    h_title.set_text(f"{IW_idx} of {N_IWs}")  # type: ignore
 
-                plt.draw()
-                plt.pause(0.0001)
-                # plt.waitforbuttonpress()
-                # plt.show(block=False)
-                # plt.show()
-
-    duration = perf_counter() - t_0
-    print(f"Finished in {duration:.3f} s")
+                    plt.draw()
+                    plt.pause(0.0001)
+                    # plt.waitforbuttonpress()
+                    # plt.show(block=False)
+                    # plt.show()
 
     # --------------------------------------------------------------------------
     #   Show original image A with unfiltered vector map on top

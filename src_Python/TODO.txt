@@ -27,6 +27,7 @@ DONE
 x 9) Linearize matrices. Not longer (IW_idx_x, IW_idx_y) but step through using (IW_idx)
 DONE, speed improved
 
-10) Fix the terminal debug output. Perhaps as a function being called at the end of the script.
+x 10) Fix the terminal debug output. Perhaps as a function being called at the end of the script.
+DONE
 
 11) Try OpenCV instead of skimage.io for image processing
