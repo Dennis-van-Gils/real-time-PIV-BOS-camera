@@ -17,9 +17,11 @@ from numba import jit, njit, prange
 # Do not supply a function signature to @njit. Timeit shows best operation
 # without.
 @njit(
+    # "(float32[:, :],)",
     parallel=True,
     cache=True,
     nogil=True,
+    fastmath=True,
 )
 def remove_mean_background(img: np.ndarray):
     """In-place operation on `img`.
@@ -355,8 +357,8 @@ if __name__ == "__main__":
     print("------")
 
     if 1:
-        # img = np.random.randint(0, 255, (4096, 4096)).astype(np.float32)
-        img = np.random.randint(0, 255, (1024, 1024)).astype(np.float32)
+        img = np.random.randint(0, 255, (4096, 4096)).astype(np.float32)
+        # img = np.random.randint(0, 255, (1024, 1024)).astype(np.float32)
 
         loop = int(1e2)
         result = timeit.timeit(
