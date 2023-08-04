@@ -3,7 +3,7 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "16-07-2023"
+__date__ = "04-08-2023"
 __version__ = "1.0"
 
 import numpy as np
@@ -205,7 +205,7 @@ def lookup_IW_idx(
     cache=True,
     nogil=True,
 )
-def fliplrud(img):
+def fliplrud(img: np.ndarray) -> np.ndarray:
     """Flip the passed image left-to-right and up-to-down, necessary to use an
     FFT convolution as a 2D-correlation.
     """
@@ -329,9 +329,10 @@ def compute_displacement_vectors_from_C_maps(
                 peak_x, peak_y = subpx_3pgf_2D(C, peak_x, peak_y)
 
             # Calculate displacement vector
-            # TODO: Fix this ugly (+1) toggle. It depends on whether
-            # zero-padding was used for the 2D FFTW convolution (slow), or not
-            # (fast).
+            # TODO: Fix this ugly (+1/+0) toggle, set via qx and qy. It depends
+            # on whether zero-padding was used for the 2D FFTW convolution
+            # (zero-padding: slow & correct), or not (no zero-padding: fast &
+            # less correct).
             qx = 1 if (C.shape[0] % 2) == 0 else 0
             qy = 1 if (C.shape[1] % 2) == 0 else 0
             dx = peak_x - C.shape[1] // 2 + qx + IW_shifts_x[IW_idx]
@@ -390,6 +391,7 @@ if __name__ == "__main__":
 
     if 1:
         img = np.random.randint(0, 255, (1024, 1024), dtype=np.uint16)
+        img = img.astype(np.float32)
 
         loop = int(1e6)
         result = timeit.timeit(
