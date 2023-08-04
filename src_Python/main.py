@@ -403,6 +403,10 @@ if __name__ == "__main__":
                 # C_maps[IW_idx, :, :] = fftconvolve(IW_B, IW_A_, mode="full")
                 C_maps[IW_idx, :, :] = fftw.convolve(IW_B, IW_A_)
 
+        # ----------------------------------------------------------------------
+        #   Compute displacement vectors
+        # ----------------------------------------------------------------------
+
         # It is not necessary to normalize the correlation maps. Adds overhead.
         # normalize_C_maps(C_maps)  # Not necessary
 
