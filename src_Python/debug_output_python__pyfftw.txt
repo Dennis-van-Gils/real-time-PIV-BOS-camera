@@ -1,6 +1,6 @@
 Creating FFTW plans for convolution... done.
 Creating FFTW plans for convolution... done.
-Finished in 0.489 s
+Finished in 0.487 s
 IW: 0 of 1301 @px 32, 32
    A_xlim [   0,   63]
    A_ylim [   0,   63]
