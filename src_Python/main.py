@@ -36,9 +36,9 @@ from my_fun import (
 
 FASTER = False
 if FASTER:
-    from convolve2d__my_code_faster import FFTW_Convolver_Full2D
+    from dvg_fftw_convolve2d_faster import FFTW_Convolver_Full2D
 else:
-    from convolve2d__my_code import FFTW_Convolver_Full2D
+    from dvg_fftw_convolve2d import FFTW_Convolver_Full2D
 
 DEBUG = False  # Print debug info to terminal?
 SHOW_CORRELATION_MAPS = False
