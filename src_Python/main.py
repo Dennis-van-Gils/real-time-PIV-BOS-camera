@@ -79,24 +79,13 @@ if __name__ == "__main__":
         B = imread(fn2, as_gray=True).astype(np.float32)
         img_h, img_w = A.shape
 
-    # Mean background removal
-    remove_mean_background(A)
-    remove_mean_background(B)
-
-    # Flip the image of frame A left-to-right and up-to-down ahead of time for
-    # the upcoming 2D cross-correlation done via convolution. Doing this ahead
-    # of time instead of doing it just before the convolution operation (inside
-    # the IW loop) saves many duplicate `fliplrud()` operations on identical
-    # data (because of the window overlapping).
-    A_ = fliplrud(A)
-
     # --------------------------------------------------------------------------
-    #   Initialize
+    #   Init
     # --------------------------------------------------------------------------
+
     # Preallocate and populate lists for the upcoming multigrid analysis.
     # stage: Current multigrid stage from the largest IW size to the smallest.
     # Prefix 'l' denotes 'list' with index `stage_idx`.
-    N_stages = len(IW_SIZES)
 
     # List of IW parameters per stage of the multigrid
     #   tuple [IW_size    (``int``),
@@ -139,6 +128,7 @@ if __name__ == "__main__":
     # List of pyFFTW calculation objects per stage of the multigrid
     lfftw: list[FFTW_Convolver_Full2D] = []
 
+    N_stages = len(IW_SIZES)
     for stage_idx, IW_size in enumerate(IW_SIZES):
         # Create interrogation windows
         (
@@ -210,8 +200,24 @@ if __name__ == "__main__":
             plt.show()
 
     # --------------------------------------------------------------------------
+    #   Image preparation
+    # --------------------------------------------------------------------------
+
+    # Mean background removal
+    remove_mean_background(A)
+    remove_mean_background(B)
+
+    # Flip the image of frame A left-to-right and up-to-down ahead of time for
+    # the upcoming 2D cross-correlation done via convolution. Doing this ahead
+    # of time instead of doing it just before the convolution operation (inside
+    # the IW loop) saves many duplicate `fliplrud()` operations on identical
+    # data (because of the window overlapping).
+    A_ = fliplrud(A)
+
+    # --------------------------------------------------------------------------
     #   Walk over all multigrid stages
     # --------------------------------------------------------------------------
+
     t_0 = perf_counter()
 
     for stage_idx, IW_size in enumerate(IW_SIZES):
@@ -394,9 +400,7 @@ if __name__ == "__main__":
 
             else:
                 # Perform 2D cross-correlation
-                # C_maps[IW_idx, :, :] = fftconvolve(
-                #     IW_B, IW_A_, mode="full"
-                # )
+                # C_maps[IW_idx, :, :] = fftconvolve(IW_B, IW_A_, mode="full")
                 C_maps[IW_idx, :, :] = fftw.convolve(IW_B, IW_A_)
 
         # It is not necessary to normalize the correlation maps. Adds overhead.
