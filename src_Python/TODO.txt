@@ -15,7 +15,8 @@ DONE, speed improved
 x 4) DITCH ALL list append. Turn them into a pre-allocated list of numpy arrays where we will write directly into.
 DONE, speed improved
 
-5) Flip complete second image left-to-right and up-to-down (fliplrud) ahead of time. Then takes subsets out of this.
+x 5) Flip complete second image left-to-right and up-to-down (fliplrud) ahead of time. Then take subsets out of this.
+DONE
 
 x 6) Fix incorrect [-2] indexing with (stage_idx - 1)
 DONE

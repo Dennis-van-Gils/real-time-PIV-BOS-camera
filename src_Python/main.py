@@ -11,7 +11,7 @@ VM: Displacement vector map
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "17-07-2023"
+__date__ = "04-08-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
@@ -82,6 +82,13 @@ if __name__ == "__main__":
     # Mean background removal
     remove_mean_background(A)
     remove_mean_background(B)
+
+    # Flip the image of frame A left-to-right and up-to-down ahead of time for
+    # the upcoming 2D cross-correlation done via convolution. Doing this ahead
+    # of time instead of doing it just before the convolution operation (inside
+    # the IW loop) saves many duplicate `fliplrud()` operations on identical
+    # data (because of the window overlapping).
+    A_ = fliplrud(A)
 
     # --------------------------------------------------------------------------
     #   Initialize
@@ -230,9 +237,9 @@ if __name__ == "__main__":
         fftw = lfftw[stage_idx]
 
         # Preallocate IW image subset of frames A and B
-        img_IW_shape = (IW_size, IW_size)
-        img_IW_A = np.zeros(img_IW_shape, dtype=A.dtype)
-        img_IW_B = np.zeros(img_IW_shape, dtype=B.dtype)
+        IW_shape = (IW_size, IW_size)
+        IW_A_ = np.zeros(IW_shape, dtype=A.dtype)
+        IW_B = np.zeros(IW_shape, dtype=B.dtype)
 
         # ----------------------------------------------------------------------
         #   Walk over all interrogation windows
@@ -252,6 +259,7 @@ if __name__ == "__main__":
             zero_out_R = 0  # right of B, x = IW_size - 1
             zero_out_U = 0  # up of B   , y = 0
             zero_out_D = 0  # down of B , y = IW_size - 1
+            IW_needs_to_be_a_copy = False
 
             # ------------------------------------------------------------------
             #   Calculate IW of frame B
@@ -287,6 +295,7 @@ if __name__ == "__main__":
                 # source image B. When so, we will zero out part of the IW
                 # images that have moved out-of-frame, later on.
                 if B_IW_lims_x[IW_idx, 0] < 0:
+                    IW_needs_to_be_a_copy = True
                     zero_out_R = np.abs(shift_x)
                     B_IW_grid_x[IW_idx] -= shift_x
                     B_IW_lims_x[IW_idx, :] -= shift_x
@@ -295,6 +304,7 @@ if __name__ == "__main__":
                     zero_out_R = 0
 
                 if B_IW_lims_x[IW_idx, 1] > img_w - 1:
+                    IW_needs_to_be_a_copy = True
                     zero_out_L = np.abs(shift_x)
                     B_IW_grid_x[IW_idx] -= shift_x
                     B_IW_lims_x[IW_idx, :] -= shift_x
@@ -303,6 +313,7 @@ if __name__ == "__main__":
                     zero_out_L = 0
 
                 if B_IW_lims_y[IW_idx, 0] < 0:
+                    IW_needs_to_be_a_copy = True
                     zero_out_D = np.abs(shift_y)
                     B_IW_grid_y[IW_idx] -= shift_y
                     B_IW_lims_y[IW_idx, :] -= shift_y
@@ -311,6 +322,7 @@ if __name__ == "__main__":
                     zero_out_D = 0
 
                 if B_IW_lims_y[IW_idx, 1] > img_h - 1:
+                    IW_needs_to_be_a_copy = True
                     zero_out_U = np.abs(shift_y)
                     B_IW_grid_y[IW_idx] -= shift_y
                     B_IW_lims_y[IW_idx, :] -= shift_y
@@ -325,63 +337,55 @@ if __name__ == "__main__":
             #   Retrieve images of IW frame A and IW frame B
             # ------------------------------------------------------------------
 
-            if (
-                (zero_out_L == 0)
-                and (zero_out_R == 0)
-                and (zero_out_U == 0)
-                and (zero_out_D == 0)
-            ):
-                img_IW_A = A[
-                    A_IW_lims_y[IW_idx, 0] : A_IW_lims_y[IW_idx, 1] + 1,
-                    A_IW_lims_x[IW_idx, 0] : A_IW_lims_x[IW_idx, 1] + 1,
-                ]
-                img_IW_B = B[
-                    B_IW_lims_y[IW_idx, 0] : B_IW_lims_y[IW_idx, 1] + 1,
-                    B_IW_lims_x[IW_idx, 0] : B_IW_lims_x[IW_idx, 1] + 1,
-                ]
-            else:
+            # Note: `A_` is a flipped left-to-right and up-to-down version of
+            # `A`, so we have to flip the indices as well, hence the use of
+            # `A.shape[] - ...`.
+            Ax0 = A.shape[1] - A_IW_lims_x[IW_idx, 1] - 1
+            Ax1 = A.shape[1] - A_IW_lims_x[IW_idx, 0]
+            Ay0 = A.shape[0] - A_IW_lims_y[IW_idx, 1] - 1
+            Ay1 = A.shape[0] - A_IW_lims_y[IW_idx, 0]
+
+            Bx0 = B_IW_lims_x[IW_idx, 0]
+            Bx1 = B_IW_lims_x[IW_idx, 1] + 1
+            By0 = B_IW_lims_y[IW_idx, 0]
+            By1 = B_IW_lims_y[IW_idx, 1] + 1
+
+            # fmt: off
+            if IW_needs_to_be_a_copy:
                 # We need a copy, because otherwise the upcoming zeroing of the
                 # IW image borders will affect, by means of reference, the
                 # original image and interfere with the correlation of upcoming
                 # and overlapping IWs. Copying adds a tiny cpu overhead.
-                np.copyto(
-                    img_IW_A,
-                    A[
-                        A_IW_lims_y[IW_idx, 0] : A_IW_lims_y[IW_idx, 1] + 1,
-                        A_IW_lims_x[IW_idx, 0] : A_IW_lims_x[IW_idx, 1] + 1,
-                    ],
-                )
-                np.copyto(
-                    img_IW_B,
-                    B[
-                        B_IW_lims_y[IW_idx, 0] : B_IW_lims_y[IW_idx, 1] + 1,
-                        B_IW_lims_x[IW_idx, 0] : B_IW_lims_x[IW_idx, 1] + 1,
-                    ],
-                )
+                np.copyto(IW_A_, A_[Ay0:Ay1, Ax0:Ax1])
+                np.copyto(IW_B , B [By0:By1, Bx0:Bx1])
 
-            # Zero out the appropiate section of the IW of frame B that
-            # corresponds to `particles` that are definitely not present in the
-            # IW of frame A. Likewise, zero out the IW of frame A.
-            # Zero caries the meaning of being at the mean background level of
-            # the image.
-            if zero_out_L > 0:
-                img_IW_B[:, :zero_out_L] = 0
-                img_IW_A[:, -zero_out_L:] = 0
-            if zero_out_R > 0:
-                img_IW_B[:, -zero_out_R:] = 0
-                img_IW_A[:, :zero_out_R] = 0
-            if zero_out_U > 0:
-                img_IW_B[:zero_out_U, :] = 0
-                img_IW_A[-zero_out_U:, :] = 0
-            if zero_out_D > 0:
-                img_IW_B[-zero_out_D:, :] = 0
-                img_IW_A[:zero_out_D, :] = 0
+                # Zero out the appropiate section of the IW of frame B that
+                # corresponds to `particles` that are definitely not present in
+                # the IW of frame A. Likewise, zero out the IW of frame A. Zero
+                # caries the meaning of being at the mean background level of
+                # the image.
+                if zero_out_L > 0:
+                    IW_B [:, :zero_out_L] = 0
+                    IW_A_[:, :zero_out_L] = 0
+                if zero_out_R > 0:
+                    IW_B [:, -zero_out_R:] = 0
+                    IW_A_[:, -zero_out_R:] = 0
+                if zero_out_U > 0:
+                    IW_B [:zero_out_U, :] = 0
+                    IW_A_[:zero_out_U, :] = 0
+                if zero_out_D > 0:
+                    IW_B [-zero_out_D:, :] = 0
+                    IW_A_[-zero_out_D:, :] = 0
+            else:
+                IW_A_ = A_[Ay0:Ay1, Ax0:Ax1]  # Pass by reference
+                IW_B  = B [By0:By1, Bx0:Bx1]  # Pass by reference
+            # fmt: on
 
             # ------------------------------------------------------------------
             #   Perform cross-correlation
             # ------------------------------------------------------------------
 
-            if (np.max(img_IW_A) <= 0) and (np.max(img_IW_B) <= 0):
+            if (np.max(IW_A_) <= 0) and (np.max(IW_B) <= 0):
                 # No details are present in the IW images. All pixels are below
                 # or at the mean background --> Save computation time.
                 # TODO: Make this a user config threshold? Is <= 0 even correct?
@@ -391,11 +395,9 @@ if __name__ == "__main__":
             else:
                 # Perform 2D cross-correlation
                 # C_maps[IW_idx, :, :] = fftconvolve(
-                #     img_IW_B, fliplrud(img_IW_A), mode="full"
+                #     IW_B, IW_A_, mode="full"
                 # )
-                C_maps[IW_idx, :, :] = fftw.convolve(
-                    img_IW_B, fliplrud(img_IW_A)
-                )
+                C_maps[IW_idx, :, :] = fftw.convolve(IW_B, IW_A_)
 
         # It is not necessary to normalize the correlation maps. Adds overhead.
         # normalize_C_maps(C_maps)  # Not necessary
@@ -447,7 +449,7 @@ if __name__ == "__main__":
 
         for IW_idx, IW_px_x in enumerate(A_IW_grid_x):
             # NOTE: Information on potentially zeroed-out sections inside
-            # `img_IW_A` and `img_IW_B` is not stored nor accessible here.
+            # `IW_A` and `IW_B` is not stored nor accessible here.
             # Variables `zero_out_L/R/U/D` have not been stored to memory to
             # save on cpu time.
 
@@ -480,7 +482,7 @@ if __name__ == "__main__":
                         lIW_params[stage_idx - 1],
                     )
                     print(f"   parent IW {parent_IW_idx}")
-                    print(f"   shift  {shift_x:+2d}, {shift_y:+2d}")
+                    print(f"   shift  {shift_x:+2.0f}, {shift_y:+2.0f}")
 
                 print(
                     "   A_xlim ["
