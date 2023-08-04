@@ -20,6 +20,7 @@ import sys
 from time import perf_counter
 
 import numpy as np
+import numpy.typing as npt
 from scipy.signal import fftconvolve
 import numba
 
@@ -36,11 +37,11 @@ from my_fun import (
 
 FASTER = False
 if FASTER:
-    from convolve2d__my_code_faster import FFTW_Convolver_Full2D
+    from dvg_fftw_convolve2d_faster import FFTW_Convolver_Full2D
 else:
-    from convolve2d__my_code import FFTW_Convolver_Full2D
+    from dvg_fftw_convolve2d import FFTW_Convolver_Full2D
 
-DEBUG = False  # Print debug info to terminal?
+DEBUG = True  # Print debug info to terminal?
 SHOW_CORRELATION_MAPS = False
 LOAD_MPL = True
 # if LOAD_MPL:
@@ -60,43 +61,50 @@ IW_OVERLAP = 0.5  # IW overlap fraction [0 - 1]
 # ------------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    if 1:
+    demo_idx = 0
+
+    if demo_idx == 0:
         fn = "E:/Work/_GitHub_repo/2D-PIV-BOS/test_imgs/PIV_rising_vortex_plume/B00001.tif"
         IW_SIZES = [64, 32]
+        quiverX = 3
 
         # Read double image and split into frames A & B
         img = imread(fn, as_gray=True)
         img_2h, img_w = np.shape(img)
         img_h = int(img_2h / 2)
-        A = (img[:img_h, :]).astype(np.float32)
-        B = (img[img_h:, :]).astype(np.float32)
-    else:
+        A = img[:img_h, :]
+        B = img[img_h:, :]
+
+    elif demo_idx == 1:
         fn1 = "E:/Work/_GitHub_repo/2D-PIV-BOS/test_imgs/a1.tif"
         fn2 = "E:/Work/_GitHub_repo/2D-PIV-BOS/test_imgs/a2.tif"
         IW_SIZES = [256, 128, 64, 32]
+        quiverX = 3
 
-        A = imread(fn1, as_gray=True).astype(np.float32)
-        B = imread(fn2, as_gray=True).astype(np.float32)
-        img_h, img_w = A.shape
+        A = imread(fn1, as_gray=True)
+        B = imread(fn2, as_gray=True)
 
-    # Mean background removal
-    remove_mean_background(A)
-    remove_mean_background(B)
+    else:
+        fn1 = "E:/Work/_GitHub_repo/2D-PIV-BOS/test_imgs/4th_PIV-Challenge_Case_E/Camera_03/E_camera_3_frame_00001.tif"
+        fn2 = "E:/Work/_GitHub_repo/2D-PIV-BOS/test_imgs/4th_PIV-Challenge_Case_E/Camera_03/E_camera_3_frame_00002.tif"
+        IW_SIZES = [64, 32]
+        quiverX = 8
 
-    # Flip the image of frame A left-to-right and up-to-down ahead of time for
-    # the upcoming 2D cross-correlation done via convolution. Doing this ahead
-    # of time instead of doing it just before the convolution operation (inside
-    # the IW loop) saves many duplicate `fliplrud()` operations on identical
-    # data (because of the window overlapping).
-    A_ = fliplrud(A)
+        A = imread(fn1, as_gray=True)
+        B = imread(fn2, as_gray=True)
+
+    # Enforce type and order
+    A = np.asarray(A, dtype=np.float32, order="C")
+    B = np.asarray(B, dtype=np.float32, order="C")
+    img_h, img_w = A.shape
 
     # --------------------------------------------------------------------------
-    #   Initialize
+    #   Init
     # --------------------------------------------------------------------------
+
     # Preallocate and populate lists for the upcoming multigrid analysis.
     # stage: Current multigrid stage from the largest IW size to the smallest.
     # Prefix 'l' denotes 'list' with index `stage_idx`.
-    N_stages = len(IW_SIZES)
 
     # List of IW parameters per stage of the multigrid
     #   tuple [IW_size    (``int``),
@@ -108,37 +116,38 @@ if __name__ == "__main__":
 
     # fmt: off
     # List of IW meshgrids and limits per stage of the multigrid
-    lA_IW_grid_x: list[np.ndarray] = []  # np.ndarray[N_IWs]
-    lA_IW_grid_y: list[np.ndarray] = []  # np.ndarray[N_IWs]
-    lA_IW_lims_x: list[np.ndarray] = []  # np.ndarray[N_IWs, 2]
-    lA_IW_lims_y: list[np.ndarray] = []  # np.ndarray[N_IWs, 2]
+    lA_IW_grid_x: list[npt.NDArray[np.int32]] = []  # NDArray shape (N_IWs, )
+    lA_IW_grid_y: list[npt.NDArray[np.int32]] = []  # NDArray shape (N_IWs, )
+    lA_IW_lims_x: list[npt.NDArray[np.int32]] = []  # NDArray shape (N_IWs, 2)
+    lA_IW_lims_y: list[npt.NDArray[np.int32]] = []  # NDArray shape (N_IWs, 2)
 
-    lB_IW_grid_x: list[np.ndarray] = []  # np.ndarray[N_IWs]
-    lB_IW_grid_y: list[np.ndarray] = []  # np.ndarray[N_IWs]
-    lB_IW_lims_x: list[np.ndarray] = []  # np.ndarray[N_IWs, 2]
-    lB_IW_lims_y: list[np.ndarray] = []  # np.ndarray[N_IWs, 2]
+    lB_IW_grid_x: list[npt.NDArray[np.int32]] = []  # NDArray shape (N_IWs, )
+    lB_IW_grid_y: list[npt.NDArray[np.int32]] = []  # NDArray shape (N_IWs, )
+    lB_IW_lims_x: list[npt.NDArray[np.int32]] = []  # NDArray shape (N_IWs, 2)
+    lB_IW_lims_y: list[npt.NDArray[np.int32]] = []  # NDArray shape (N_IWs, 2)
 
     # List of computed IW shifts per stage of the multigrid
     # NOTE: List index 0, which corresponds to `stage_idx = 0`, will be
     # initialized with zeros and remain so, because no window shifts exist for
     # the first multigrid stage by design.
-    lIW_shifts_x: list[np.ndarray] = []  # np.ndarray[N_IWs]
-    lIW_shifts_y: list[np.ndarray] = []  # np.ndarray[N_IWs]
+    lIW_shifts_x: list[npt.NDArray[np.int32]] = []  # NDArray shape (N_IWs, )
+    lIW_shifts_y: list[npt.NDArray[np.int32]] = []  # NDArray shape (N_IWs, )
 
     # List of computed correlations maps per stage of the multigrid
-    #   np.ndarray[N_IWs, IW_size / 2 + 1, IW_size / 2 + 1]
-    lC_maps: list[np.ndarray] = []
+    #   NDArray shape (N_IWs, IW_size / 2 + 1, IW_size / 2 + 1)
+    lC_maps: list[npt.NDArray[np.float32]] = []
 
     # List of computed displacement vector maps per stage of the multigrid
-    lVM_grid_x: list[np.ndarray] = []    # np.ndarray[N_IWs]
-    lVM_grid_y: list[np.ndarray] = []    # np.ndarray[N_IWs]
-    lVM_dx: list[np.ndarray] = []        # np.ndarray[N_IWs]
-    lVM_dy: list[np.ndarray] = []        # np.ndarray[N_IWs]
+    lVM_grid_x: list[npt.NDArray[np.int32]] = []    # NDArray shape (N_IWs, )
+    lVM_grid_y: list[npt.NDArray[np.int32]] = []    # NDArray shape (N_IWs, )
+    lVM_dx: list[npt.NDArray[np.float32]] = []      # NDArray shape (N_IWs, )
+    lVM_dy: list[npt.NDArray[np.float32]] = []      # NDArray shape (N_IWs, )
     # fmt: on
 
     # List of pyFFTW calculation objects per stage of the multigrid
     lfftw: list[FFTW_Convolver_Full2D] = []
 
+    N_stages = len(IW_SIZES)
     for stage_idx, IW_size in enumerate(IW_SIZES):
         # Create interrogation windows
         (
@@ -164,20 +173,22 @@ if __name__ == "__main__":
         lB_IW_lims_x.append(np.copy(IW_lims_x))
         lB_IW_lims_y.append(np.copy(IW_lims_y))
 
-        lIW_shifts_x.append(np.zeros(N_IWs))
-        lIW_shifts_y.append(np.zeros(N_IWs))
+        lIW_shifts_x.append(np.zeros(N_IWs, dtype=np.int32))
+        lIW_shifts_y.append(np.zeros(N_IWs, dtype=np.int32))
 
         if FASTER:
-            C_maps = np.zeros((N_IWs, IW_size, IW_size))
+            C_maps = np.zeros((N_IWs, IW_size, IW_size), dtype=np.float32)
         else:
-            C_maps = np.zeros((N_IWs, IW_size * 2 - 1, IW_size * 2 - 1))
+            C_maps = np.zeros(
+                (N_IWs, IW_size * 2 - 1, IW_size * 2 - 1), dtype=np.float32
+            )
         C_maps[:] = np.nan
         lC_maps.append(C_maps)
 
         lVM_grid_x.append(np.copy(IW_grid_x))
         lVM_grid_y.append(np.copy(IW_grid_y))
-        lVM_dx.append(np.zeros(N_IWs))
-        lVM_dy.append(np.zeros(N_IWs))
+        lVM_dx.append(np.zeros(N_IWs, dtype=np.float32))
+        lVM_dy.append(np.zeros(N_IWs, dtype=np.float32))
 
         # Create pyFFTW calculation objects
         lfftw.append(FFTW_Convolver_Full2D((IW_size, IW_size), fftw_threads=1))
@@ -210,8 +221,24 @@ if __name__ == "__main__":
             plt.show()
 
     # --------------------------------------------------------------------------
+    #   Image preparation
+    # --------------------------------------------------------------------------
+
+    # Mean background removal
+    remove_mean_background(A)
+    remove_mean_background(B)
+
+    # Flip the image of frame A left-to-right and up-to-down ahead of time for
+    # the upcoming 2D cross-correlation done via convolution. Doing this ahead
+    # of time instead of doing it just before the convolution operation (inside
+    # the IW loop) saves many duplicate `fliplrud()` operations on identical
+    # data (because of the window overlapping).
+    A_ = fliplrud(A)
+
+    # --------------------------------------------------------------------------
     #   Walk over all multigrid stages
     # --------------------------------------------------------------------------
+
     t_0 = perf_counter()
 
     for stage_idx, IW_size in enumerate(IW_SIZES):
@@ -394,10 +421,12 @@ if __name__ == "__main__":
 
             else:
                 # Perform 2D cross-correlation
-                # C_maps[IW_idx, :, :] = fftconvolve(
-                #     IW_B, IW_A_, mode="full"
-                # )
+                # C_maps[IW_idx, :, :] = fftconvolve(IW_B, IW_A_, mode="full")
                 C_maps[IW_idx, :, :] = fftw.convolve(IW_B, IW_A_)
+
+        # ----------------------------------------------------------------------
+        #   Compute displacement vectors
+        # ----------------------------------------------------------------------
 
         # It is not necessary to normalize the correlation maps. Adds overhead.
         # normalize_C_maps(C_maps)  # Not necessary
@@ -459,12 +488,13 @@ if __name__ == "__main__":
             shift_y = IW_shifts_y[IW_idx]
             C = C_maps[IW_idx]
 
-            # TODO: For proper debugging, I need to store the found correlations
-            # peaks in a list of arrays, too.
+            # TODO: For proper debugging, I should store the found correlations
+            # peaks in a list of arrays, too. Now, I will have to calculate
+            # `peak_x` and `peak_y` backwards again.
             dx = VM_dx[IW_idx]
             dy = VM_dy[IW_idx]
-            shift_x = np.nan_to_num(IW_shifts_x[IW_idx])  # NaN will become 0
-            shift_y = np.nan_to_num(IW_shifts_y[IW_idx])
+            shift_x = IW_shifts_x[IW_idx]
+            shift_y = IW_shifts_y[IW_idx]
             qx = 1 if (C.shape[0] % 2) == 0 else 0
             qy = 1 if (C.shape[1] % 2) == 0 else 0
             peak_x = dx + C.shape[1] // 2 - qx - shift_x  # TODO: store & get,
@@ -536,7 +566,6 @@ if __name__ == "__main__":
     # --------------------------------------------------------------------------
     #   Show original image A with unfiltered vector map on top
     # --------------------------------------------------------------------------
-    quiverX = 3
 
     if LOAD_MPL:
         grid_x = lVM_grid_x[-1]
