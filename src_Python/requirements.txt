@@ -1,5 +1,6 @@
 numpy
 numba
+icc_rt
 scipy
 matplotlib
 pyfftw
