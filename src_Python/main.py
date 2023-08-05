@@ -83,7 +83,9 @@ if __name__ == "__main__":
 
     img_files = glob.glob(path)
     N_img_files = len(img_files)
-    # N_img_files = 2
+
+    if DEBUG:  # Overrule: Only process the first image pair
+        N_img_files = 2
 
     # Read first image to get image width and height
     A = imread(img_files[0], as_gray=True)

@@ -12,7 +12,7 @@ huge performance gain.
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "04-08-2023"
+__date__ = "06-08-2023"
 __version__ = "1.0.0"
 # pylint: disable=invalid-name, missing-function-docstring
 
@@ -23,7 +23,7 @@ from numba import njit
 
 
 @njit(
-    "complex128[:, :](complex128[:, :], complex128[:, :])",
+    "complex64[:, :](complex64[:, :], complex64[:, :])",
     nogil=True,
     cache=True,
 )
@@ -76,14 +76,14 @@ class FFTW_Convolver_Full2D:
 
         # Create the FFTW plans
         # fmt: off
-        self._rfft_in1  = pyfftw.zeros_aligned(self.fshape, dtype="float64")
-        self._rfft_in2  = pyfftw.zeros_aligned(self.fshape, dtype="float64")
+        self._rfft_in1  = pyfftw.zeros_aligned(self.fshape, dtype="float32")
+        self._rfft_in2  = pyfftw.zeros_aligned(self.fshape, dtype="float32")
 
-        self._rfft_out1 = pyfftw.empty_aligned(fshape_out, dtype="complex128")
-        self._rfft_out2 = pyfftw.empty_aligned(fshape_out, dtype="complex128")
+        self._rfft_out1 = pyfftw.empty_aligned(fshape_out, dtype="complex64")
+        self._rfft_out2 = pyfftw.empty_aligned(fshape_out, dtype="complex64")
 
-        self._irfft_in  = pyfftw.empty_aligned(fshape_out, dtype="complex128")
-        self._irfft_out = pyfftw.empty_aligned(self.fshape, dtype="float64")
+        self._irfft_in  = pyfftw.empty_aligned(fshape_out, dtype="complex64")
+        self._irfft_out = pyfftw.empty_aligned(self.fshape, dtype="float32")
         # fmt: on
 
         print("Creating FFTW plans for convolution...", end="")
