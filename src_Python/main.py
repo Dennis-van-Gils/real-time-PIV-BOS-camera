@@ -11,23 +11,22 @@ VM: Displacement vector map
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "04-08-2023"
+__date__ = "05-08-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
-import os
-import sys
 import glob
 from time import perf_counter
 
 import numpy as np
 import numpy.typing as npt
+from skimage.io import imread
 from scipy.signal import fftconvolve
 import numba
 
-from skimage.io import imread
 
 from my_fun import (
+    get_filename_from_full_path,
     remove_mean_background,
     create_IW_grid,
     lookup_IW_idx,
@@ -45,14 +44,14 @@ else:
 DEBUG = False  # Print debug info to terminal?
 SHOW_CORRELATION_MAPS = False
 LOAD_MPL = True
-# if LOAD_MPL:
-from matplotlib import pyplot as plt
-from matplotlib.patches import Rectangle
-import matplotlib as mpl
-import matplotlib.cm as cm
-from matplotlib.colors import Normalize
 
-mpl.use("TkAgg")
+if LOAD_MPL:
+    import matplotlib as mpl
+    from matplotlib import pyplot as plt
+    from matplotlib.patches import Rectangle
+    from matplotlib.colors import Normalize
+
+    mpl.use("TkAgg")
 
 # Holds the IW sizes for the multigrid analysis. Powers of two are advised with
 # each subsequent IW size the exact half of the previous IW size.
@@ -64,45 +63,31 @@ IW_OVERLAP = 0.5  # IW overlap fraction [0 - 1]
 # ------------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    demo_idx = 2
+    piv_set = 0
 
-    if demo_idx == 0:
-        fn = r"E:/Work/_GitHub_repo/2D-PIV-BOS/test_imgs/PIV_rising_vortex_plume/B00001.tif"
+    if piv_set == 0:
+        path = r"../test_imgs/PIV_rising_vortex_plume/*.png"
         IW_SIZES = [64, 32]
-        quiverX = 3
-
-        # Read double image and split into frames A & B
-        img = imread(fn, as_gray=True)
-        img_2h, img_w = np.shape(img)
-        img_h = int(img_2h / 2)
-        A = img[:img_h, :]
-        B = img[img_h:, :]
-
-    elif demo_idx == 1:
-        fn1 = r"E:/Work/_GitHub_repo/2D-PIV-BOS/test_imgs/a1.tif"
-        fn2 = r"E:/Work/_GitHub_repo/2D-PIV-BOS/test_imgs/a2.tif"
+        quiver_size = 3
+        color_div = 14
+    elif piv_set == 1:
+        path = r"../test_imgs/swirling_vortices/*.tif"
         IW_SIZES = [256, 128, 64, 32]
-        quiverX = 3
-
-        A = imread(fn1, as_gray=True)
-        B = imread(fn2, as_gray=True)
-
+        quiver_size = 3
+        color_div = 24
     else:
-        path = r"E:/Work/_GitHub_repo/2D-PIV-BOS/test_imgs/4th_PIV-Challenge_Case_E/*.tif"
-        img_files = glob.glob(path)
-        N_img_files = len(img_files)
-
-        fn1 = img_files[0]
-        fn2 = img_files[1]
+        path = r"../test_imgs/4th_PIV-Challenge_Case_E/*.tif"
         IW_SIZES = [64, 32]
-        quiverX = 8
+        quiver_size = 8
+        color_div = 4
 
-        A = imread(fn1, as_gray=True)
-        B = imread(fn2, as_gray=True)
+    img_files = glob.glob(path)
+    N_img_files = len(img_files)
+    # N_img_files = 2
 
-    # Enforce type and order
+    # Read first image to get image width and height
+    A = imread(img_files[0], as_gray=True)
     A = np.asarray(A, dtype=np.float32, order="C")
-    B = np.asarray(B, dtype=np.float32, order="C")
     img_h, img_w = A.shape
 
     # --------------------------------------------------------------------------
@@ -140,8 +125,8 @@ if __name__ == "__main__":
 
     # List of computed IW shifts per stage of the multigrid
     # NOTE: List index 0, which corresponds to `stage_idx = 0`, will be
-    # initialized with zeros and remain so, because no window shifts exist for
-    # the first multigrid stage by design.
+    # initialized with zeros and remain so throughout, because no window shifts
+    # ever exist for the first multigrid stage by design. Thats okay.
     lIW_shifts_x: list[npt.NDArray[np.int32]] = []  # NDArray shape (N_IWs, )
     lIW_shifts_y: list[npt.NDArray[np.int32]] = []  # NDArray shape (N_IWs, )
 
@@ -210,6 +195,7 @@ if __name__ == "__main__":
         # Create pyFFTW calculation objects
         lfftw.append(FFTW_Convolver_Full2D((IW_size, IW_size), fftw_threads=1))
 
+        """
         if 0:  # DEBUG flag: Examine IW meshgrid
             # fmt: off
             p = {"fillstyle": "none", "markersize": 6, "linewidth": 2}
@@ -236,34 +222,43 @@ if __name__ == "__main__":
             # fmt: on
             plt.legend()
             plt.show()
+        """
 
     # --------------------------------------------------------------------------
-    #   Loop over all image pairs
+    #   Walk over all image pairs
     # --------------------------------------------------------------------------
 
     for file_idx in range(0, N_img_files - 1, 2):
         fn1 = img_files[file_idx]
         fn2 = img_files[file_idx + 1]
-
-        print(fn1)
+        print(get_filename_from_full_path(fn1))
 
         # Reset
         for stage_idx, IW_size in enumerate(IW_SIZES):
-            lA_IW_grid_x[stage_idx] = np.copy(lIW_grid_x[stage_idx])
-            lA_IW_grid_y[stage_idx] = np.copy(lIW_grid_y[stage_idx])
-            lA_IW_lims_x[stage_idx] = np.copy(lIW_lims_x[stage_idx])
-            lA_IW_lims_y[stage_idx] = np.copy(lIW_lims_y[stage_idx])
+            # `lA_IW_grid_x/y` remain constant and do not need a reset.
+            # `lA_IW_lims_x/y` remain constant and do not need a reset.
 
+            # Reset is really necessary.
             lB_IW_grid_x[stage_idx] = np.copy(lIW_grid_x[stage_idx])
             lB_IW_grid_y[stage_idx] = np.copy(lIW_grid_y[stage_idx])
             lB_IW_lims_x[stage_idx] = np.copy(lIW_lims_x[stage_idx])
             lB_IW_lims_y[stage_idx] = np.copy(lIW_lims_y[stage_idx])
 
+            """
+            # Reset not strictly necessary as all cells will get updated
+            # one-by-one. Reset only to make debugging easier.
             lIW_shifts_x[stage_idx].fill(0)
             lIW_shifts_y[stage_idx].fill(0)
+
+            # Reset not strictly necessary as all cells will get updated at
+            # once. Reset only to make debugging easier.
             lVM_dx[stage_idx][:].fill(0)
             lVM_dy[stage_idx][:].fill(0)
+
+            # Reset not strictly necessary as all cells will get updated
+            # one-by-one. Reset only to make debugging easier.
             lC_maps[stage_idx][:].fill(np.nan)
+            """
 
         # --------------------------------------------------------------------------
         #   Image preparation
@@ -324,8 +319,11 @@ if __name__ == "__main__":
             #   Walk over all interrogation windows
             # ----------------------------------------------------------------------
 
-            for IW_idx, IW_px_x in enumerate(A_IW_grid_x):
-                IW_px_y = A_IW_grid_y[IW_idx]
+            for IW_idx in range(N_IWs):
+                # ------------------------------------------------------------------
+                #   Calculate IW of frame B
+                #   Apply window shifting technique
+                # ------------------------------------------------------------------
 
                 # Part of the window shifting mechanism:
                 # Undo the shift again when the shifted IW of frame B is leaving the
@@ -340,21 +338,17 @@ if __name__ == "__main__":
                 zero_out_D = 0  # down of B , y = IW_size - 1
                 IW_needs_to_be_a_copy = False
 
-                # ------------------------------------------------------------------
-                #   Calculate IW of frame B
-                #   Apply window shifting technique
-                # ------------------------------------------------------------------
-
+                # Check for window pre-shift
                 if stage_idx == 0:
-                    # First stage, no pre-shift available
                     shift_x = 0  # [px]
                     shift_y = 0  # [px]
+
                 else:
                     # Pre-shift available: Look up corresponding index of the IW in
                     # the larger parent grid
                     parent_IW_idx = lookup_IW_idx(
-                        IW_px_x,
-                        IW_px_y,
+                        A_IW_grid_x[IW_idx],
+                        A_IW_grid_y[IW_idx],
                         lIW_params[stage_idx - 1],
                     )
 
@@ -409,6 +403,7 @@ if __name__ == "__main__":
                     else:
                         zero_out_U = 0
 
+                    # Store
                     IW_shifts_x[IW_idx] = shift_x
                     IW_shifts_y[IW_idx] = shift_y
 
@@ -419,24 +414,31 @@ if __name__ == "__main__":
                 # Note: `A_` is a flipped left-to-right and up-to-down version of
                 # `A`, so we have to flip the indices as well, hence the use of
                 # `A.shape[] - ...`.
-                Ax0 = A.shape[1] - A_IW_lims_x[IW_idx, 1] - 1
-                Ax1 = A.shape[1] - A_IW_lims_x[IW_idx, 0]
-                Ay0 = A.shape[0] - A_IW_lims_y[IW_idx, 1] - 1
-                Ay1 = A.shape[0] - A_IW_lims_y[IW_idx, 0]
-
-                Bx0 = B_IW_lims_x[IW_idx, 0]
-                Bx1 = B_IW_lims_x[IW_idx, 1] + 1
-                By0 = B_IW_lims_y[IW_idx, 0]
-                By1 = B_IW_lims_y[IW_idx, 1] + 1
-
                 # fmt: off
+                A_slice_x = slice(
+                    A.shape[1] - A_IW_lims_x[IW_idx, 1] - 1,
+                    A.shape[1] - A_IW_lims_x[IW_idx, 0],
+                )
+                A_slice_y = slice(
+                    A.shape[0] - A_IW_lims_y[IW_idx, 1] - 1,
+                    A.shape[0] - A_IW_lims_y[IW_idx, 0],
+                )
+                B_slice_x = slice(
+                    B_IW_lims_x[IW_idx, 0],
+                    B_IW_lims_x[IW_idx, 1] + 1
+                )
+                B_slice_y = slice(
+                    B_IW_lims_y[IW_idx, 0],
+                    B_IW_lims_y[IW_idx, 1] + 1
+                )
+
                 if IW_needs_to_be_a_copy:
                     # We need a copy, because otherwise the upcoming zeroing of the
                     # IW image borders will affect, by means of reference, the
                     # original image and interfere with the correlation of upcoming
                     # and overlapping IWs. Copying adds a tiny cpu overhead.
-                    np.copyto(IW_A_, A_[Ay0:Ay1, Ax0:Ax1])
-                    np.copyto(IW_B , B [By0:By1, Bx0:Bx1])
+                    np.copyto(IW_A_, A_[A_slice_y, A_slice_x])
+                    np.copyto(IW_B , B [B_slice_y, B_slice_x])
 
                     # Zero out the appropiate section of the IW of frame B that
                     # corresponds to `particles` that are definitely not present in
@@ -444,20 +446,20 @@ if __name__ == "__main__":
                     # caries the meaning of being at the mean background level of
                     # the image.
                     if zero_out_L > 0:
-                        IW_B [:, :zero_out_L] = 0
                         IW_A_[:, :zero_out_L] = 0
+                        IW_B [:, :zero_out_L] = 0
                     if zero_out_R > 0:
-                        IW_B [:, -zero_out_R:] = 0
                         IW_A_[:, -zero_out_R:] = 0
+                        IW_B [:, -zero_out_R:] = 0
                     if zero_out_U > 0:
-                        IW_B [:zero_out_U, :] = 0
                         IW_A_[:zero_out_U, :] = 0
+                        IW_B [:zero_out_U, :] = 0
                     if zero_out_D > 0:
-                        IW_B [-zero_out_D:, :] = 0
                         IW_A_[-zero_out_D:, :] = 0
+                        IW_B [-zero_out_D:, :] = 0
                 else:
-                    IW_A_ = A_[Ay0:Ay1, Ax0:Ax1]  # Pass by reference
-                    IW_B  = B [By0:By1, Bx0:Bx1]  # Pass by reference
+                    IW_A_ = A_[A_slice_y, A_slice_x]  # Pass by reference
+                    IW_B  = B [B_slice_y, B_slice_x]  # Pass by reference
                 # fmt: on
 
                 # ------------------------------------------------------------------
@@ -519,22 +521,23 @@ if __name__ == "__main__":
             VM_dx = lVM_dx[stage_idx]
             VM_dy = lVM_dy[stage_idx]
 
-            if SHOW_CORRELATION_MAPS:
+            if SHOW_CORRELATION_MAPS and LOAD_MPL:
                 # Reset any existing plot of the correlation map, because the IW
                 # size has changed and plotting on top of imshow needs a rescale.
-                if plt.fignum_exists("C_map"):
-                    plt.close("C_map")
+                if plt.fignum_exists("C_map"):  # type: ignore
+                    plt.close("C_map")  # type: ignore
 
                 # Plotting requires normalizing correlation maps for easy comparison
                 normalize_C_maps(C_maps)
 
-            for IW_idx, IW_px_x in enumerate(A_IW_grid_x):
+            for IW_idx in range(N_IWs):
                 # NOTE: Information on potentially zeroed-out sections inside
                 # `IW_A` and `IW_B` is not stored nor accessible here.
                 # Variables `zero_out_L/R/U/D` have not been stored to memory to
                 # save on cpu time.
 
                 # Short-hand variables
+                IW_px_x = A_IW_grid_x[IW_idx]
                 IW_px_y = A_IW_grid_y[IW_idx]
                 shift_x = IW_shifts_x[IW_idx]
                 shift_y = IW_shifts_y[IW_idx]
@@ -596,30 +599,30 @@ if __name__ == "__main__":
                         print(f"     peak   @ {peak_x:+5.1f}, {peak_y:+5.1f}")
                         print(f"     dx, dy = {dx:+5.1f}, {dy:+5.1f}")
 
-                if SHOW_CORRELATION_MAPS:
+                if SHOW_CORRELATION_MAPS and LOAD_MPL:
                     if not np.isnan(C[0, 0]):
-                        if not (plt.fignum_exists("C_map")):
-                            fig = plt.figure("C_map")
-                            h_imshow = plt.imshow(
+                        if not (plt.fignum_exists("C_map")):  # type: ignore
+                            fig = plt.figure("C_map")  # type: ignore
+                            h_imshow = plt.imshow(  # type: ignore
                                 C,
                                 cmap="gray",
                                 interpolation="none",
                                 vmin=0,
                                 vmax=1,
                             )
-                            (h_peak,) = plt.plot([peak_x], [peak_y], "xr")
-                            h_title = plt.title(f"{IW_idx} of {N_IWs}")
+                            (h_peak,) = plt.plot([peak_x], [peak_y], "xr")  # type: ignore
+                            h_title = plt.title(f"{IW_idx} of {N_IWs}")  # type: ignore
 
                         else:
                             h_imshow.set_data(C)  # type: ignore
                             h_peak.set_data([peak_x], [peak_y])  # type: ignore
                             h_title.set_text(f"{IW_idx} of {N_IWs}")  # type: ignore
 
-                        plt.draw()
-                        plt.pause(0.0001)
-                        # plt.waitforbuttonpress()
-                        # plt.show(block=False)
-                        # plt.show()
+                        plt.draw()  # type: ignore
+                        plt.pause(0.0001)  # type: ignore
+                        # plt.waitforbuttonpress()  # type: ignore
+                        # plt.show(block=False)  # type: ignore
+                        # plt.show()  # type: ignore
 
         # --------------------------------------------------------------------------
         #   Show original image A with unfiltered vector map on top
@@ -635,22 +638,20 @@ if __name__ == "__main__":
             M = np.sqrt(np.square(VM_dx) + np.square(VM_dy))
 
             # Threshold on vector magnitude
-            VM_dx[M < 0.5] = np.nan
-            VM_dy[M < 0.5] = np.nan
+            # VM_dx[M < 0.5] = np.nan
+            # VM_dy[M < 0.5] = np.nan
 
-            colors = M / 4
-            # norm = Normalize()
-            # norm.autoscale(colors)
-            colormap = cm.inferno
+            colors = M / color_div
+            colormap = mpl.cm.jet  # type: ignore
 
-            if not (plt.fignum_exists("VM")):
-                fig = plt.figure("VM")
-                h_imshow = plt.imshow(A, cmap="gray", interpolation="none")
-                h_quiver = plt.quiver(
+            if not (plt.fignum_exists("VM")):  # type: ignore
+                fig = plt.figure("VM")  # type: ignore
+                h_imshow = plt.imshow(A, cmap="gray", interpolation="none")  # type: ignore
+                h_quiver = plt.quiver(  # type: ignore
                     grid_x,
                     grid_y,
-                    VM_dx * quiverX,
-                    VM_dy * quiverX,
+                    np.zeros(VM_dx.shape),
+                    np.zeros(VM_dy.shape),
                     angles="xy",
                     scale_units="xy",
                     scale=2,
@@ -658,15 +659,14 @@ if __name__ == "__main__":
                     color=colormap(colors),
                     linewidths=1,
                 )
-                h_title = plt.title(f"{file_idx}")
+                h_title = plt.title(f"{get_filename_from_full_path(fn1)}")  # type: ignore
 
-            else:
-                h_imshow.set_data(A)  # type: ignore
-                h_quiver.set_UVC(VM_dx * quiverX, VM_dy * quiverX)  # type: ignore
-                h_quiver.set_color(colormap(colors))  # type: ignore
-                h_title.set_text(f"{file_idx}")  # type: ignore
+            h_imshow.set_data(A)  # type: ignore
+            h_quiver.set_UVC(VM_dx * quiver_size, VM_dy * quiver_size)  # type: ignore
+            h_quiver.set_color(colormap(colors))  # type: ignore
+            h_title.set_text(f"{get_filename_from_full_path(fn1)}")  # type: ignore
 
-            plt.draw()
-            plt.pause(0.0001)
-            # plt.waitforbuttonpress()
-            # plt.show()
+            plt.draw()  # type: ignore
+            plt.pause(0.0001)  # type: ignore
+            # plt.waitforbuttonpress()  # type: ignore
+            # plt.show()  # type: ignore
