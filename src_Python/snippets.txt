@@ -1,0 +1,66 @@
+# type: ignore
+"""
+Collection of code snippets that got removed from the main Python files, but
+that I still want to hold on to.
+"""
+
+# ------------------------------------------------------------------------------
+#   Examine IW meshgrid
+# ------------------------------------------------------------------------------
+
+from matplotlib import pyplot as plt
+from matplotlib.patches import Rectangle
+
+if 0:  # DEBUG flag: Examine IW meshgrid
+    # fmt: off
+    p = {"fillstyle": "none", "markersize": 6, "linewidth": 2}
+    plt.figure()
+    plt.plot(
+        IW_lims_x[:, 0],
+        IW_lims_y[:, 0],
+        "xg", label="IW starts", **p)
+    plt.plot(
+        IW_lims_x[:, 1],
+        IW_lims_y[:, 1],
+        "xr", label="IW ends", **p)
+    plt.plot(
+        IW_grid_x,
+        IW_grid_y,
+        "ok", label="IW centers", **p)
+
+    # Plot image bounding box
+    plt.gca().add_patch(
+        Rectangle(
+            (0, 0), img_w - 1, img_h - 1, edgecolor="k", fill=None, lw=1
+        )
+    )
+    # fmt: on
+    plt.legend()
+    plt.show()
+
+# ------------------------------------------------------------------------------
+#   Colorize quivers and normalize
+# ------------------------------------------------------------------------------
+
+from matplotlib.colors import Normalize
+
+# Vector magnitude
+M = np.sqrt(np.square(VM_dx) + np.square(VM_dy))
+
+colors = M
+norm = Normalize()
+norm.autoscale(colors)
+colormap = mpl.cm.jet  # type: ignore
+
+fig = plt.figure("VM")
+h_quiver = plt.quiver(
+    grid_x,
+    grid_y,
+    np.zeros(VM_dx.shape),
+    np.zeros(VM_dy.shape),
+    angles="xy",
+    scale_units="xy",
+    scale=2,
+    color=colormap(colors),
+    linewidths=1,
+)
