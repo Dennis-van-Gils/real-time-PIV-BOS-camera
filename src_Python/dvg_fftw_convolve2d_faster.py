@@ -22,17 +22,73 @@ __version__ = "1.0.0"
 
 import sys
 import numpy as np
+import numpy.typing as npt
 import pyfftw
-from numba import njit
+from numba import njit, prange
+
+# ------------------------------------------------------------------------------
+#   fast_multiply
+# ------------------------------------------------------------------------------
+
+"""Timeit results on computer Onera:
+
+                [ms] per iter
+shape           fast_multiply   fast_multiply_p
+(32, 32)        --> 0.00150         0.01414
+(64, 64)        --> 0.00409         0.01787
+(128, 128)      --> 0.01537         0.02439
+(256, 256)          0.05726     --> 0.03989
+(512, 512)          0.22363     --> 0.08859
+(1024, 1024)        1.09012     --> 0.32051
+(2048, 2048)        4.37083     --> 3.89286
+"""
 
 
 @njit(
-    "complex64[:, :](complex64[:, :], complex64[:, :])",
+    "(complex64[:, :], complex64[:, :], complex64[:, :])",
     nogil=True,
     cache=True,
 )
-def fast_multiply(in1: np.ndarray, in2: np.ndarray) -> np.ndarray:
-    return np.multiply(in1, in2)
+def fast_multiply(
+    in1: npt.NDArray[np.complex64],
+    in2: npt.NDArray[np.complex64],
+    out: npt.NDArray[np.complex64],
+):
+    """
+    * In-place operation on `out`.
+    * Faster version of `out = np.multiply(in1, in2)`.
+    * Not parallelized.
+    """
+    for i in range(in1.shape[0]):
+        for j in range(in1.shape[1]):
+            out[i, j] = in1[i, j] * in2[i, j]
+
+
+@njit(
+    "(complex64[:, :], complex64[:, :], complex64[:, :])",
+    nogil=True,
+    cache=True,
+    parallel=True,
+)
+def fast_multiply_p(
+    in1: npt.NDArray[np.complex64],
+    in2: npt.NDArray[np.complex64],
+    out: npt.NDArray[np.complex64],
+):
+    """
+    * In-place operation on `out`.
+    * Faster version of `out = np.multiply(in1, in2)`.
+    * Parallelized. Only beneficial for `shape >~ (256, 256)`. Use
+    `fast_multiply_o()` when shape is smaller.
+    """
+    for i in prange(in1.shape[0]):
+        for j in prange(in1.shape[1]):
+            out[i, j] = in1[i, j] * in2[i, j]
+
+
+# ------------------------------------------------------------------------------
+#   FFTW_Convolver_Full2D
+# ------------------------------------------------------------------------------
 
 
 class FFTW_Convolver_Full2D:
@@ -98,7 +154,9 @@ class FFTW_Convolver_Full2D:
     #   convolve
     # --------------------------------------------------------------------------
 
-    def convolve(self, in1: np.ndarray, in2: np.ndarray) -> np.ndarray:
+    def convolve(
+        self, in1: npt.NDArray[np.float32], in2: npt.NDArray[np.float32]
+    ) -> npt.NDArray[np.float32]:
         """Performs the FFT convolution on input arrays `in1` and `in2` and
         returns the result as a contiguous C-style `numpy.ndarray` containing
         the 'full' convolution elements.
@@ -122,7 +180,7 @@ class FFTW_Convolver_Full2D:
         self._fftw_rfft2()
 
         # Convolution and backwards Fourier transformation
-        self._irfft_in[:] = fast_multiply(self._rfft_out1, self._rfft_out2)
+        fast_multiply(self._rfft_out1, self._rfft_out2, self._irfft_in)
         result = self._fftw_irfft()
 
         # Return the 'full' elements
@@ -140,9 +198,8 @@ def fast_fftshift(C):
     half_rows = rows // 2
     half_cols = cols // 2
 
-    shifted = np.empty_like(C)
-
     # Swap quadrants
+    shifted = np.empty_like(C)
     shifted[:half_rows, :half_cols] = C[half_rows:, half_cols:]
     shifted[:half_rows, half_cols:] = C[half_rows:, :half_cols]
     shifted[half_rows:, :half_cols] = C[:half_rows, half_cols:]
@@ -155,9 +212,9 @@ if __name__ == "__main__":
     # TRY CuPy:
     # https://www.appsloveworld.com/numpy/100/83/how-to-do-100000-times-2d-fft-in-a-faster-way-using-python
 
+    import timeit
     from scipy.signal import windows
     import matplotlib.pyplot as plt
-    import pyfftw
 
     def gaussian_kernel(n, std, normalised=False):
         """
@@ -170,19 +227,18 @@ if __name__ == "__main__":
             gaussian2D /= 2 * np.pi * (std**2)
         return gaussian2D
 
-    size_A = 64
-    A = gaussian_kernel(size_A, size_A / 8)
-    B = gaussian_kernel(size_A, size_A / 2)
+    if 0:
+        size_A = 64
+        A = gaussian_kernel(size_A, size_A / 8)
+        B = gaussian_kernel(size_A, size_A / 2)
 
-    fftw_1 = FFTW_Convolver_Full2D(A.shape, fftw_threads=1)
+        fftw_1 = FFTW_Convolver_Full2D(A.shape, fftw_threads=1)
+        C = fftw_1.convolve(A, B)
 
-    C = fftw_1.convolve(A, B)
-
-    plt.figure(1)
-    plt.imshow(A, cmap="gray")
-    plt.figure(2)
-    plt.imshow(B, cmap="gray")
-    plt.figure(3)
-    plt.imshow(C, cmap="gray")
-
-    plt.show()
+        plt.figure(1)
+        plt.imshow(A, cmap="gray")
+        plt.figure(2)
+        plt.imshow(B, cmap="gray")
+        plt.figure(3)
+        plt.imshow(C, cmap="gray")
+        plt.show()

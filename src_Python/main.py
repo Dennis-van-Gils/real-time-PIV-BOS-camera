@@ -35,13 +35,13 @@ from my_fun import (
     compute_displacement_vectors_from_C_maps,
 )
 
-FASTER = False
+FASTER = True
 if FASTER:
     from dvg_fftw_convolve2d_faster import FFTW_Convolver_Full2D
 else:
     from dvg_fftw_convolve2d import FFTW_Convolver_Full2D
 
-DEBUG = False  # Print debug info to terminal?
+DEBUG = True  # Print debug info to terminal?
 SHOW_CORRELATION_MAPS = False
 LOAD_MPL = True
 
@@ -670,5 +670,5 @@ if __name__ == "__main__":
 
             plt.draw()  # type: ignore
             plt.pause(0.0001)  # type: ignore
-            # plt.waitforbuttonpress()  # type: ignore
+            plt.waitforbuttonpress()  # type: ignore
             # plt.show()  # type: ignore
