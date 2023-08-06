@@ -12,6 +12,72 @@ huge performance gain.
 This 'faster' version does not zero-append the input arrays to the next fast
 length. It is hence faster, because the matrices it operates on are smaller, but
 the output is less accurate due to edge effects when convoluting.
+
+I asked ChatGPT the following
+-----------------------------
+
+I am performing a 2D correlation using FFT with zero-padding to the next fast
+length. What are the differences in the output matrix if I would not zero-pad to
+the next fast length? Assume the input matrices are powers of 2.
+
+ChatGPT answer:
+
+Zero-padding plays an important role in 2D correlation using FFT. When you
+perform a 2D correlation using FFT, zero-padding to the next power of 2 (fast
+length) can affect the output matrix in several ways compared to not
+zero-padding to the next power of 2.
+
+Here are the key differences between the two cases:
+
+    Circular Convolution vs. Linear Convolution:
+        Without zero-padding: If you don't zero-pad, the FFT-based convolution
+        will result in circular convolution. This means that the output will
+        wrap around at the edges, which might not be suitable for many
+        applications.
+
+        With zero-padding: Zero-padding allows the FFT-based convolution to
+        perform linear convolution. Linear convolution results in a proper
+        overlap-add method, where the output size matches the size of the input
+        matrices without wrap-around effects.
+
+    Resolution and Accuracy:
+        Without zero-padding: In the case of circular convolution, you may
+        encounter aliasing effects, where the high-frequency components from the
+        edges wrap around and interfere with the desired results.
+
+        With zero-padding: Zero-padding increases the resolution of the
+        convolution result by reducing aliasing. It provides more accurate
+        results since it effectively introduces additional "virtual" data points
+        in the input matrices, allowing the convolution to better capture
+        high-frequency information.
+
+    Output Size:
+        Without zero-padding: The output size of the convolution will be equal
+        to the sum of the dimensions of the input matrices minus 1 (due to
+        circular convolution).
+
+        With zero-padding: The output size of the convolution will be the sum of
+        the dimensions of the zero-padded matrices minus 1, resulting in a
+        larger output matrix.
+
+    Edge Effects:
+        Without zero-padding: Circular convolution can produce artifacts at the
+        edges due to the wrap-around behavior.
+
+        With zero-padding: Linear convolution with zero-padding mitigates edge
+        effects, resulting in cleaner results near the edges of the output
+        matrix.
+
+    Computational Efficiency:
+        With zero-padding: While zero-padding may seem to introduce some
+        computational overhead, it is usually not a significant factor, and the
+        benefits of accurate results and reduced artifacts typically outweigh
+        this minor cost.
+
+In summary, zero-padding to the next power of 2 when performing 2D correlation
+using FFT is generally recommended. It helps avoid circular convolution
+artifacts, improves accuracy, reduces edge effects, and produces a more
+meaningful and usable output matrix.
 """
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
