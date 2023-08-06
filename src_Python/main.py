@@ -31,6 +31,7 @@ from my_fun import (
     create_IW_grid,
     lookup_IW_idx,
     fliplrud,
+    fast_max,
     normalize_C_maps,
     compute_displacement_vectors_from_C_maps,
 )
@@ -425,7 +426,7 @@ if __name__ == "__main__":
                 #   Perform cross-correlation
                 # ------------------------------------------------------------------
 
-                if (np.max(IW_A_) <= 0) and (np.max(IW_B) <= 0):
+                if fast_max(IW_A_) <= 0:
                     # No details are present in the IW images. All pixels are below
                     # or at the mean background --> Save computation time.
                     # TODO: Make this a user config threshold? Is <= 0 even correct?
@@ -627,5 +628,7 @@ if __name__ == "__main__":
 
             plt.draw()  # type: ignore
             plt.pause(0.0001)  # type: ignore
-            # plt.waitforbuttonpress()  # type: ignore
-            # plt.show()  # type: ignore
+
+            if DEBUG:
+                plt.waitforbuttonpress()  # type: ignore
+                # plt.show()  # type: ignore

@@ -289,6 +289,33 @@ def subpx_3pgf_2D(
 
 
 # ------------------------------------------------------------------------------
+#   fast_max
+# ------------------------------------------------------------------------------
+
+
+@njit(
+    "float32(float32[:, :],)",
+    # parallel=True,  # Matrix shape is generally too small to benefit from parallel
+    cache=True,
+    nogil=True,
+)
+def fast_max(in1: npt.NDArray[np.float32]) -> np.float32:
+    """Numba-accelerated version of `np.max()`"""
+    return np.max(in1)
+
+    """
+    # This block has equal performance to `return np.max(in1)`
+    my_max = in1[0, 0]
+    for i in range(in1.shape[0]):
+        for j in range(in1.shape[1]):
+            if my_max < in1[i, j]:
+                my_max = in1[i, j]
+
+    return my_max
+    """
+
+
+# ------------------------------------------------------------------------------
 #   normalize_C_maps
 # ------------------------------------------------------------------------------
 
