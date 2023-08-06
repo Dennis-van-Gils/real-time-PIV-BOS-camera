@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-DO NOT USE: Suffers from edge effects, because we do not zero-append.
+DO NOT USE: Suffers from edge effects, because we do not zero-pad.
 Performs lightning-fast convolutions on 2D input arrays.
 
 The convolution is based on the fast-Fourier transform (FFT) as performed by the
