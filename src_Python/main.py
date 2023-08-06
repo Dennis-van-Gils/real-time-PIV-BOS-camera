@@ -24,7 +24,7 @@ from skimage.io import imread
 from scipy.signal import fftconvolve
 import numba
 
-
+from dvg_fftw_convolve2d import FFTW_Convolver_Full2D
 from my_fun import (
     get_filename_from_full_path,
     remove_mean_background,
@@ -34,7 +34,6 @@ from my_fun import (
     normalize_C_maps,
     compute_displacement_vectors_from_C_maps,
 )
-from dvg_fftw_convolve2d import FFTW_Convolver_Full2D
 
 DEBUG = False  # Print debug info to terminal?
 SHOW_CORRELATION_MAPS = False
@@ -43,8 +42,6 @@ LOAD_MPL = True
 if LOAD_MPL:
     import matplotlib as mpl
     from matplotlib import pyplot as plt
-    from matplotlib.patches import Rectangle
-    from matplotlib.colors import Normalize
 
     mpl.use("TkAgg")
 
@@ -189,35 +186,6 @@ if __name__ == "__main__":
         # Create pyFFTW calculation objects
         lfftw.append(FFTW_Convolver_Full2D((IW_size, IW_size), fftw_threads=1))
 
-        """
-        if 0:  # DEBUG flag: Examine IW meshgrid
-            # fmt: off
-            p = {"fillstyle": "none", "markersize": 6, "linewidth": 2}
-            plt.figure()
-            plt.plot(
-                IW_lims_x[:, 0],
-                IW_lims_y[:, 0],
-                "xg", label="IW starts", **p)
-            plt.plot(
-                IW_lims_x[:, 1],
-                IW_lims_y[:, 1],
-                "xr", label="IW ends", **p)
-            plt.plot(
-                IW_grid_x,
-                IW_grid_y,
-                "ok", label="IW centers", **p)
-
-            # Plot image bounding box
-            plt.gca().add_patch(
-                Rectangle(
-                    (0, 0), img_w - 1, img_h - 1, edgecolor="k", fill=None, lw=1
-                )
-            )
-            # fmt: on
-            plt.legend()
-            plt.show()
-        """
-
     # --------------------------------------------------------------------------
     #   Walk over all image pairs
     # --------------------------------------------------------------------------
@@ -228,17 +196,16 @@ if __name__ == "__main__":
         print(get_filename_from_full_path(fn1))
 
         # Reset
-        for stage_idx, IW_size in enumerate(IW_SIZES):
-            # `lA_IW_grid_x/y` remain constant and do not need a reset.
-            # `lA_IW_lims_x/y` remain constant and do not need a reset.
-
-            # Reset is really necessary.
+        for stage_idx in range(N_stages):
             lB_IW_grid_x[stage_idx] = np.copy(lIW_grid_x[stage_idx])
             lB_IW_grid_y[stage_idx] = np.copy(lIW_grid_y[stage_idx])
             lB_IW_lims_x[stage_idx] = np.copy(lIW_lims_x[stage_idx])
             lB_IW_lims_y[stage_idx] = np.copy(lIW_lims_y[stage_idx])
 
             """
+            # `lA_IW_grid_x/y` remain constant and do not need a reset.
+            # `lA_IW_lims_x/y` remain constant and do not need a reset.
+
             # Reset not strictly necessary as all cells will get updated
             # one-by-one. Reset only to make debugging easier.
             lIW_shifts_x[stage_idx].fill(0)
