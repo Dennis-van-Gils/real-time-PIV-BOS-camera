@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Performs lightning-fast convolutions on 2D input arrays.
+"""
+DO NOT USE: Suffers from edge effects, because we do not zero-append.
+Performs lightning-fast convolutions on 2D input arrays.
 
 The convolution is based on the fast-Fourier transform (FFT) as performed by the
 excellent `fftw` (http://www.fftw.org) library. It will plan the transformations
@@ -179,11 +181,11 @@ class FFTW_Convolver_Full2D:
     """
 
     def __init__(self, s: tuple, fftw_threads: int = 5):
-        self.s = s
+        # Example: s = (64, 64)
+        # s_out    evaluates to (64, 33)
 
+        self.s = s
         s_out = (s[0], s[1] // 2 + 1)
-        # s_final = (s[0] * 2 - 1, s[1] * 2 - 1)
-        # s_final = s_out
 
         # Create the FFTW plans
         # fmt: off
@@ -231,7 +233,8 @@ class FFTW_Convolver_Full2D:
         convolution operation, an array full of `np.nan`s is returned.
 
         Returns:
-            The full convolution results as a 2D numpy array.
+            The full convolution results as a 2D numpy array with a shape
+            equal to `in1`.
         """
         # Force contiguous C-style numpy arrays, super fast when already so
         in1 = np.asarray(in1)

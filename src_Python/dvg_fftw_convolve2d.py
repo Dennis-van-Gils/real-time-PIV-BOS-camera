@@ -110,7 +110,12 @@ class FFTW_Convolver_Full2D:
     """
 
     def __init__(self, s1: tuple, s2: tuple = (), fftw_threads: int = 5):
-        # Example: s1 = (64, 64), s2 = (64, 64)
+        # Example:   s1 = (64, 64), s2 = (64, 64)
+        # shape      evaluates to (127, 127)
+        # fshape     evaluates to (128, 128)
+        # fshape_out evaluates to (128, 65)
+        # fslice     evaluates to ((0:127), (0:127))
+
         if s2 == ():
             s2 = s1
 
@@ -119,15 +124,13 @@ class FFTW_Convolver_Full2D:
             max((s1[i], s2[i])) if i not in axes else s1[i] + s2[i] - 1
             for i in range(2)
         ]
-        # Evaluates to (127, 127)
 
         # Speed up FFT by padding to optimal size.
         self.fshape = [pyfftw.next_fast_len(shape[a]) for a in axes]
         fshape_out = [self.fshape[0], self.fshape[1] // 2 + 1]
-        # fshape     evaluates to (128, 128)
-        # fshape_out evaluates to (128, 65)
 
-        # Slice corresponding to the 'full' convolution elements
+        # Slice corresponding to the 'full' convolution elements to be
+        # finally returned as convolution result
         self.fslice = tuple([slice(sz) for sz in shape])
 
         # Create the FFTW plans
@@ -176,7 +179,8 @@ class FFTW_Convolver_Full2D:
         convolution operation, an array full of `np.nan`s is returned.
 
         Returns:
-            The full convolution results as a 2D numpy array.
+            The full convolution results as a 2D numpy array with a shape
+            equal to `in1 + in2 - 1`.
         """
         # Force contiguous C-style numpy arrays, super fast when already so
         in1 = np.asarray(in1)
