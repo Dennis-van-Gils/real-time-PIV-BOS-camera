@@ -21,7 +21,8 @@ DONE
 x 6) Fix incorrect [-2] indexing with (stage_idx - 1)
 DONE
 
-7) In 2D-convolve, try the passed array length, instead of 'fastlen'
+x 7) In 2D-convolve, try the passed array length, instead of 'fastlen'
+DONE. Outcome: zero-padding to fastlen is needed for correct results. Without zero-padding the results suffer from edge defects, though it is faster.
 
 8) Try Cupy
 
@@ -33,6 +34,7 @@ DONE
 
 11) Try OpenCV instead of skimage.io for image processing
 
-12) Examine possible speed up of `convolve2d()`. Timeit.
+x 12) Examine possible speed up of `convolve2d()`. Timeit.
+DONE, speed improved
 
 13) Parallelize by dividing pool of all IWs into chunks to be processed in separate parallel threads
