@@ -1,2 +1,13 @@
+NOTE: profiling makes little sense with jitted numba accelerations. Most
+profilers don't measure well with C compiled code.
+
+XXX: Does not work with numba
 python -m cProfile -o main.prof main.py
 snakeviz main.prof
+
+XXX: Does not work with numba
+https://github.com/pyutils/line_profiler
+pip install line_profiler[ipython]
+Use `@profile` decorators in your code
+kernprof -lv main.py
+python -m line_profiler main.py.lprof
