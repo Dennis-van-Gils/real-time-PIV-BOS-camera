@@ -11,7 +11,7 @@ VM: Displacement vector map
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "05-08-2023"
+__date__ = "06-08-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
@@ -34,12 +34,7 @@ from my_fun import (
     normalize_C_maps,
     compute_displacement_vectors_from_C_maps,
 )
-
-FASTER = False
-if FASTER:
-    from dvg_fftw_convolve2d_faster import FFTW_Convolver_Full2D
-else:
-    from dvg_fftw_convolve2d import FFTW_Convolver_Full2D
+from dvg_fftw_convolve2d import FFTW_Convolver_Full2D
 
 DEBUG = False  # Print debug info to terminal?
 SHOW_CORRELATION_MAPS = False
@@ -133,7 +128,7 @@ if __name__ == "__main__":
     lIW_shifts_y: list[npt.NDArray[np.int32]] = []  # NDArray shape (N_IWs, )
 
     # List of computed correlations maps per stage of the multigrid
-    #   NDArray shape (N_IWs, IW_size / 2 + 1, IW_size / 2 + 1)
+    #   NDArray shape (N_IWs, IW_size * 2 - 1, IW_size * 2 - 1)
     lC_maps: list[npt.NDArray[np.float32]] = []
 
     # List of computed displacement vector maps per stage of the multigrid
@@ -180,12 +175,9 @@ if __name__ == "__main__":
         lIW_shifts_x.append(np.zeros(N_IWs, dtype=np.int32))
         lIW_shifts_y.append(np.zeros(N_IWs, dtype=np.int32))
 
-        if FASTER:
-            C_maps = np.zeros((N_IWs, IW_size, IW_size), dtype=np.float32)
-        else:
-            C_maps = np.zeros(
-                (N_IWs, IW_size * 2 - 1, IW_size * 2 - 1), dtype=np.float32
-            )
+        C_maps = np.empty(
+            (N_IWs, IW_size * 2 - 1, IW_size * 2 - 1), dtype=np.float32
+        )
         C_maps[:] = np.nan
         lC_maps.append(C_maps)
 
@@ -416,31 +408,29 @@ if __name__ == "__main__":
                 # Note: `A_` is a flipped left-to-right and up-to-down version of
                 # `A`, so we have to flip the indices as well, hence the use of
                 # `A.shape[] - ...`.
-                # fmt: off
-                A_slice_x = slice(
-                    A.shape[1] - A_IW_lims_x[IW_idx, 1] - 1,
-                    A.shape[1] - A_IW_lims_x[IW_idx, 0],
+                A_slice = (
+                    slice(
+                        A.shape[0] - A_IW_lims_y[IW_idx, 1] - 1,
+                        A.shape[0] - A_IW_lims_y[IW_idx, 0],
+                    ),
+                    slice(
+                        A.shape[1] - A_IW_lims_x[IW_idx, 1] - 1,
+                        A.shape[1] - A_IW_lims_x[IW_idx, 0],
+                    ),
                 )
-                A_slice_y = slice(
-                    A.shape[0] - A_IW_lims_y[IW_idx, 1] - 1,
-                    A.shape[0] - A_IW_lims_y[IW_idx, 0],
-                )
-                B_slice_x = slice(
-                    B_IW_lims_x[IW_idx, 0],
-                    B_IW_lims_x[IW_idx, 1] + 1
-                )
-                B_slice_y = slice(
-                    B_IW_lims_y[IW_idx, 0],
-                    B_IW_lims_y[IW_idx, 1] + 1
+                B_slice = (
+                    slice(B_IW_lims_y[IW_idx, 0], B_IW_lims_y[IW_idx, 1] + 1),
+                    slice(B_IW_lims_x[IW_idx, 0], B_IW_lims_x[IW_idx, 1] + 1),
                 )
 
+                # fmt: off
                 if IW_needs_to_be_a_copy:
                     # We need a copy, because otherwise the upcoming zeroing of the
                     # IW image borders will affect, by means of reference, the
                     # original image and interfere with the correlation of upcoming
                     # and overlapping IWs. Copying adds a tiny cpu overhead.
-                    np.copyto(IW_A_, A_[A_slice_y, A_slice_x])
-                    np.copyto(IW_B , B [B_slice_y, B_slice_x])
+                    np.copyto(IW_A_, A_[A_slice])
+                    np.copyto(IW_B , B [B_slice])
 
                     # Zero out the appropiate section of the IW of frame B that
                     # corresponds to `particles` that are definitely not present in
@@ -460,8 +450,8 @@ if __name__ == "__main__":
                         IW_A_[-zero_out_D:, :] = 0
                         IW_B [-zero_out_D:, :] = 0
                 else:
-                    IW_A_ = A_[A_slice_y, A_slice_x]  # Pass by reference
-                    IW_B  = B [B_slice_y, B_slice_x]  # Pass by reference
+                    IW_A_ = A_[A_slice]  # Pass by reference
+                    IW_B  = B [B_slice]  # Pass by reference
                 # fmt: on
 
                 # ------------------------------------------------------------------

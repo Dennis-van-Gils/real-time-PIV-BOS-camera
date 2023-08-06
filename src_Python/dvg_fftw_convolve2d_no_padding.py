@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Performs lightning-fast convolutions on 2D input arrays.
+"""
+DO NOT USE: Suffers from edge effects, because we do not zero-pad.
+Performs lightning-fast convolutions on 2D input arrays.
 
 The convolution is based on the fast-Fourier transform (FFT) as performed by the
 excellent `fftw` (http://www.fftw.org) library. It will plan the transformations
@@ -8,6 +10,76 @@ ahead of time to optimize the calculations. Also, multiple threads can be
 specified for the FFT and, when set to > 1, the Python GIL will not be invoked.
 This results in true multithreading across multiple cores, which can result in a
 huge performance gain.
+
+This 'faster' version does not zero-append the input arrays to the next fast
+length. It is hence faster, because the matrices it operates on are smaller, but
+the output is less accurate due to edge effects when convoluting.
+
+I asked ChatGPT the following
+-----------------------------
+
+I am performing a 2D correlation using FFT with zero-padding to the next fast
+length. What are the differences in the output matrix if I would not zero-pad to
+the next fast length? Assume the input matrices are powers of 2.
+
+ChatGPT answer:
+
+Zero-padding plays an important role in 2D correlation using FFT. When you
+perform a 2D correlation using FFT, zero-padding to the next power of 2 (fast
+length) can affect the output matrix in several ways compared to not
+zero-padding to the next power of 2.
+
+Here are the key differences between the two cases:
+
+    Circular Convolution vs. Linear Convolution:
+        Without zero-padding: If you don't zero-pad, the FFT-based convolution
+        will result in circular convolution. This means that the output will
+        wrap around at the edges, which might not be suitable for many
+        applications.
+
+        With zero-padding: Zero-padding allows the FFT-based convolution to
+        perform linear convolution. Linear convolution results in a proper
+        overlap-add method, where the output size matches the size of the input
+        matrices without wrap-around effects.
+
+    Resolution and Accuracy:
+        Without zero-padding: In the case of circular convolution, you may
+        encounter aliasing effects, where the high-frequency components from the
+        edges wrap around and interfere with the desired results.
+
+        With zero-padding: Zero-padding increases the resolution of the
+        convolution result by reducing aliasing. It provides more accurate
+        results since it effectively introduces additional "virtual" data points
+        in the input matrices, allowing the convolution to better capture
+        high-frequency information.
+
+    Output Size:
+        Without zero-padding: The output size of the convolution will be equal
+        to the sum of the dimensions of the input matrices minus 1 (due to
+        circular convolution).
+
+        With zero-padding: The output size of the convolution will be the sum of
+        the dimensions of the zero-padded matrices minus 1, resulting in a
+        larger output matrix.
+
+    Edge Effects:
+        Without zero-padding: Circular convolution can produce artifacts at the
+        edges due to the wrap-around behavior.
+
+        With zero-padding: Linear convolution with zero-padding mitigates edge
+        effects, resulting in cleaner results near the edges of the output
+        matrix.
+
+    Computational Efficiency:
+        With zero-padding: While zero-padding may seem to introduce some
+        computational overhead, it is usually not a significant factor, and the
+        benefits of accurate results and reduced artifacts typically outweigh
+        this minor cost.
+
+In summary, zero-padding to the next power of 2 when performing 2D correlation
+using FFT is generally recommended. It helps avoid circular convolution
+artifacts, improves accuracy, reduces edge effects, and produces a more
+meaningful and usable output matrix.
 """
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
@@ -93,13 +165,12 @@ class FFTW_Convolver_Full2D:
     result as a contiguous C-style `numpy.ndarray` containing the 'full'
     convolution elements.
 
-    Args:
-        s1 (tuple):
-            Shape of the upcoming input array `in1` passed to method
-            `convolve()`.
+    Here, we demand both `in1` and `in2` to be of equal size for calculation
+    speed improvements.
 
-        s2 (tuple):
-            Shape of the upcoming input array `in2` passed to method
+    Args:
+        s (tuple):
+            Shape of the upcoming input arrays `in1` and `in2` passed to method
             `convolve()`.
 
         fftw_threads (int, optional):
@@ -109,40 +180,23 @@ class FFTW_Convolver_Full2D:
             Default: 5
     """
 
-    def __init__(self, s1: tuple, s2: tuple = (), fftw_threads: int = 5):
-        # Example:   s1 = (64, 64), s2 = (64, 64)
-        # shape      evaluates to (127, 127)
-        # fshape     evaluates to (128, 128)
-        # fshape_out evaluates to (128, 65)
-        # fslice     evaluates to ((0:127), (0:127))
+    def __init__(self, s: tuple, fftw_threads: int = 5):
+        # Example: s = (64, 64)
+        # s_out    evaluates to (64, 33)
 
-        if s2 == ():
-            s2 = s1
-
-        axes = (0, 1)
-        shape = [
-            max((s1[i], s2[i])) if i not in axes else s1[i] + s2[i] - 1
-            for i in range(2)
-        ]
-
-        # Speed up FFT by padding to optimal size.
-        self.fshape = [pyfftw.next_fast_len(shape[a]) for a in axes]
-        fshape_out = [self.fshape[0], self.fshape[1] // 2 + 1]
-
-        # Slice corresponding to the 'full' convolution elements to be
-        # finally returned as convolution result
-        self.fslice = tuple([slice(sz) for sz in shape])
+        self.s = s
+        s_out = (s[0], s[1] // 2 + 1)
 
         # Create the FFTW plans
         # fmt: off
-        self._rfft_in1  = pyfftw.zeros_aligned(self.fshape, dtype="float32")
-        self._rfft_in2  = pyfftw.zeros_aligned(self.fshape, dtype="float32")
+        self._rfft_in1  = pyfftw.zeros_aligned(s    , dtype="float32")
+        self._rfft_in2  = pyfftw.zeros_aligned(s    , dtype="float32")
 
-        self._rfft_out1 = pyfftw.empty_aligned(fshape_out, dtype="complex64")
-        self._rfft_out2 = pyfftw.empty_aligned(fshape_out, dtype="complex64")
+        self._rfft_out1 = pyfftw.empty_aligned(s_out, dtype="complex64")
+        self._rfft_out2 = pyfftw.empty_aligned(s_out, dtype="complex64")
 
-        self._irfft_in  = pyfftw.empty_aligned(fshape_out, dtype="complex64")
-        self._irfft_out = pyfftw.empty_aligned(self.fshape, dtype="float32")
+        self._irfft_in  = pyfftw.empty_aligned(s_out, dtype="complex64")
+        self._irfft_out = pyfftw.empty_aligned(s    , dtype="float32")
         # fmt: on
 
         print("Creating FFTW plans for convolution...", end="")
@@ -150,7 +204,7 @@ class FFTW_Convolver_Full2D:
 
         p = {
             "axes": (0, 1),
-            "flags": ("FFTW_MEASURE", "FFTW_DESTROY_INPUT"),
+            "flags": ("FFTW_MEASURE",),
             "threads": fftw_threads,
         }
         self._fftw_rfft1 = pyfftw.FFTW(self._rfft_in1, self._rfft_out1, **p)
@@ -180,7 +234,7 @@ class FFTW_Convolver_Full2D:
 
         Returns:
             The full convolution results as a 2D numpy array with a shape
-            equal to `in1 + in2 - 1`.
+            equal to `in1`.
         """
         # Force contiguous C-style numpy arrays, super fast when already so
         in1 = np.asarray(in1)
@@ -188,9 +242,9 @@ class FFTW_Convolver_Full2D:
 
         # Perform FFT convolution
         # -----------------------
-        # Zero padding and forwards Fourier transformation
-        self._rfft_in1[: in1.shape[0], : in1.shape[1]] = in1
-        self._rfft_in2[: in2.shape[0], : in2.shape[1]] = in2
+        # Forwards Fourier transformation
+        self._rfft_in1[:] = in1
+        self._rfft_in2[:] = in2
         self._fftw_rfft1()
         self._fftw_rfft2()
 
@@ -199,7 +253,28 @@ class FFTW_Convolver_Full2D:
         result = self._fftw_irfft()
 
         # Return the 'full' elements
-        return result[self.fslice]
+        return fast_fftshift(result)
+
+
+@njit(
+    "float32[:, :](float32[:, :])",
+    nogil=True,
+    cache=True,
+)
+def fast_fftshift(C):
+    """Like `numpy.fft.fftshift(), but faster."""
+    rows, cols = C.shape
+    half_rows = rows // 2
+    half_cols = cols // 2
+
+    # Swap quadrants
+    shifted = np.empty_like(C)
+    shifted[:half_rows, :half_cols] = C[half_rows:, half_cols:]
+    shifted[:half_rows, half_cols:] = C[half_rows:, :half_cols]
+    shifted[half_rows:, :half_cols] = C[:half_rows, half_cols:]
+    shifted[half_rows:, half_cols:] = C[:half_rows, :half_cols]
+
+    return shifted
 
 
 if __name__ == "__main__":
@@ -226,7 +301,7 @@ if __name__ == "__main__":
         A = gaussian_kernel(size_A, size_A / 8)
         B = gaussian_kernel(size_A, size_A / 2)
 
-        fftw_1 = FFTW_Convolver_Full2D(A.shape, B.shape, fftw_threads=1)
+        fftw_1 = FFTW_Convolver_Full2D(A.shape, fftw_threads=1)
         C = fftw_1.convolve(A, B)
 
         plt.figure(1)
@@ -236,57 +311,3 @@ if __name__ == "__main__":
         plt.figure(3)
         plt.imshow(C, cmap="gray")
         plt.show()
-
-    if 1:  # Timeit different `fast_multiply()` schemes
-        shapes = (
-            (32, 32),
-            (64, 64),
-            (128, 128),
-            (256, 256),
-            (512, 512),
-            (1024, 1024),
-            (2048, 2048),
-        )
-        results1 = []
-        results2 = []
-        loop = int(1e3)
-
-        print("Timeit different `fast_multiply()` schemes:")
-        for shape in shapes:
-            print(f"  shape: {shape}")
-            # fmt: off
-            np.random.seed(0)
-            a = (np.random.uniform(-1, 1, shape) +
-                 np.random.uniform( 1, 1, shape) * 1.0j)
-            b = (np.random.uniform(-1, 1, shape) +
-                 np.random.uniform( 1, 1, shape) * 1.0j)
-            # fmt: on
-            a = np.asarray(a, dtype=np.complex64)
-            b = np.asarray(b, dtype=np.complex64)
-            out = np.empty(a.shape, dtype=a.dtype)
-
-            result = timeit.timeit(
-                "fast_multiply(a, b, out)",
-                setup=lambda: fast_multiply(a, b, out),
-                globals=globals(),
-                number=loop,
-            )
-            result = result / loop * 1000
-            results1.append(result)
-
-            result = timeit.timeit(
-                "fast_multiply_p(a, b, out)",
-                setup=lambda: fast_multiply_p(a, b, out),
-                globals=globals(),
-                number=loop,
-            )
-            result = result / loop * 1000
-            results2.append(result)
-
-        print("\n")
-        print("                [ms] per iter")
-        print("shape           fast_multiply   fast_multiply_p")
-        for i in range(len(shapes)):
-            print(
-                f"{str(shapes[i]):16s}{results1[i]:<16.5f}{results2[i]:<16.5f}"
-            )

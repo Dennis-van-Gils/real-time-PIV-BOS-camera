@@ -32,3 +32,7 @@ x 10) Fix the terminal debug output. Perhaps as a function being called at the e
 DONE
 
 11) Try OpenCV instead of skimage.io for image processing
+
+12) Examine possible speed up of `convolve2d()`. Timeit.
+
+13) Parallelize by dividing pool of all IWs into chunks to be processed in separate parallel threads
