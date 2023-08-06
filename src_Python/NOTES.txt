@@ -1,23 +1,24 @@
 Links on parallelization
 ------------------------
+
 https://stackoverflow.com/questions/49368207/using-threading-to-slice-an-array-into-chunks-and-perform-calculation-on-each-ch
 https://realpython.com/how-to-split-a-python-list-into-chunks/
 
-Get memory address of numpy array:
-  a = np.array([0, 10, 20, 30, 40])
-  print(hex(a.ctypes.data))
 
 Parallelization
 ---------------
 
-Inside of the IW loop:
-
-A_IW_grid_x   constant, read only
-A_IW_grid_y   constant, read only
-A_IW_lims_x   constant, read only
-A_IW_lims_y   constant, read only
-A_            constant, read only
-B             constant, read only
+# To be passed inside of the IW loop
+stage_idx
+A_                          constant, read only
+B                           constant, read only
+lIW_params[stage_idx - 1]   constant, read only
+lVM_dx[stage_idx - 1]       constant, read only
+lVM_dy[stage_idx - 1]       constant, read only
+A_IW_grid_x                 constant, read only
+A_IW_grid_y                 constant, read only
+A_IW_lims_x                 constant, read only
+A_IW_lims_y                 constant, read only
 B_IW_grid_x   operated on, but not an output: break into chunks using slices, call by ref!
 B_IW_grid_y   operated on, but not an output: break into chunks using slices, call by ref!
 B_IW_lims_x   operated on, but not an output: break into chunks using slices, call by ref!
@@ -26,14 +27,11 @@ IW_shifts_x   output, try in-place          : break into chunks using slices, ca
 IW_shifts_y   output, try in-place          : break into chunks using slices, call by ref!
 C_maps        output, try in-place          : break into chunks using slices, call by ref!
 
-lIW_params[stage_idx - 1]   constant, read only
-lVM_dx[stage_idx - 1]       constant, read only
-lVM_dy[stage_idx - 1]       constant, read only
-
 # Need to create separate instances per 'thread' or 'process'
 allocate IW_A_
 allocate IW_B
 create pyFFTW objects
+
 
 Slicing into chunks
 -------------------
@@ -46,3 +44,10 @@ a = np.arange(100)
 my_slices = split_into_slices(a, 25)
 for my_slice in my_slices:
     print(a[my_slice])
+
+
+Check memory address of numpy array
+-----------------------------------
+
+a = np.array([0, 10, 20, 30, 40])
+print(hex(a.ctypes.data))

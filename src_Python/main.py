@@ -22,7 +22,6 @@ import numpy as np
 import numpy.typing as npt
 from skimage.io import imread
 from scipy.signal import fftconvolve
-import numba
 
 from dvg_fftw_convolve2d import FFTW_Convolver_Full2D
 from my_fun import (
@@ -31,10 +30,10 @@ from my_fun import (
     create_IW_grid,
     lookup_IW_idx,
     fliplrud,
-    fast_max,
     normalize_C_maps,
     compute_displacement_vectors_from_C_maps,
 )
+from process_IWs import process_IWs
 
 DEBUG = False  # Print debug info to terminal?
 SHOW_CORRELATION_MAPS = False
@@ -252,9 +251,6 @@ if __name__ == "__main__":
 
         for stage_idx, IW_size in enumerate(IW_SIZES):
             # Short-hand variables
-            N_IWs = lIW_params[stage_idx][2]
-            N_IWs_x = lIW_params[stage_idx][3]
-            N_IWs_y = lIW_params[stage_idx][4]
             A_IW_grid_x = lA_IW_grid_x[stage_idx]
             A_IW_grid_y = lA_IW_grid_y[stage_idx]
             A_IW_lims_x = lA_IW_lims_x[stage_idx]
@@ -281,162 +277,28 @@ if __name__ == "__main__":
             #   Walk over all interrogation windows
             # ----------------------------------------------------------------------
 
-            for IW_idx in range(N_IWs):
-                # ------------------------------------------------------------------
-                #   Calculate IW of frame B
-                #   Apply window shifting technique
-                # ------------------------------------------------------------------
-
-                # Part of the window shifting mechanism:
-                # Undo the shift again when the shifted IW of frame B is leaving the
-                # borders of frame B. If so, we will, later on, zero out the
-                # appropiate section of the IW of frame B that corresponds to
-                # `particles` that are definitely not present in the IW of frame A.
-                # Likewise, we will zero out pixels in frame A that are not present
-                # in frame B.
-                zero_out_L = 0  # left of B , x = 0
-                zero_out_R = 0  # right of B, x = IW_size - 1
-                zero_out_U = 0  # up of B   , y = 0
-                zero_out_D = 0  # down of B , y = IW_size - 1
-                IW_needs_to_be_a_copy = False
-
-                # Check for window pre-shift
-                if stage_idx == 0:
-                    shift_x = 0  # [px]
-                    shift_y = 0  # [px]
-
-                else:
-                    # Pre-shift available: Look up corresponding index of the IW in
-                    # the larger parent grid
-                    parent_IW_idx = lookup_IW_idx(
-                        A_IW_grid_x[IW_idx],
-                        A_IW_grid_y[IW_idx],
-                        lIW_params[stage_idx - 1],
-                    )
-
-                    # Retrieve the pre-shift
-                    shift_x = lVM_dx[stage_idx - 1][parent_IW_idx]
-                    shift_y = lVM_dy[stage_idx - 1][parent_IW_idx]
-                    shift_x = 0 if np.isnan(shift_x) else int(shift_x)
-                    shift_y = 0 if np.isnan(shift_y) else int(shift_y)
-
-                    # Apply the pre-shift to IW B (eager)
-                    B_IW_grid_x[IW_idx] += shift_x
-                    B_IW_grid_y[IW_idx] += shift_y
-                    B_IW_lims_x[IW_idx, :] += shift_x
-                    B_IW_lims_y[IW_idx, :] += shift_y
-
-                    # Check and prevent the shift of IW B from moving outside of the
-                    # source image B. When so, we will zero out part of the IW
-                    # images that have moved out-of-frame, later on.
-                    if B_IW_lims_x[IW_idx, 0] < 0:
-                        IW_needs_to_be_a_copy = True
-                        zero_out_R = np.abs(shift_x)
-                        B_IW_grid_x[IW_idx] -= shift_x
-                        B_IW_lims_x[IW_idx, :] -= shift_x
-                        shift_x = 0
-                    else:
-                        zero_out_R = 0
-
-                    if B_IW_lims_x[IW_idx, 1] > img_w - 1:
-                        IW_needs_to_be_a_copy = True
-                        zero_out_L = np.abs(shift_x)
-                        B_IW_grid_x[IW_idx] -= shift_x
-                        B_IW_lims_x[IW_idx, :] -= shift_x
-                        shift_x = 0
-                    else:
-                        zero_out_L = 0
-
-                    if B_IW_lims_y[IW_idx, 0] < 0:
-                        IW_needs_to_be_a_copy = True
-                        zero_out_D = np.abs(shift_y)
-                        B_IW_grid_y[IW_idx] -= shift_y
-                        B_IW_lims_y[IW_idx, :] -= shift_y
-                        shift_y = 0
-                    else:
-                        zero_out_D = 0
-
-                    if B_IW_lims_y[IW_idx, 1] > img_h - 1:
-                        IW_needs_to_be_a_copy = True
-                        zero_out_U = np.abs(shift_y)
-                        B_IW_grid_y[IW_idx] -= shift_y
-                        B_IW_lims_y[IW_idx, :] -= shift_y
-                        shift_y = 0
-                    else:
-                        zero_out_U = 0
-
-                    # Store
-                    IW_shifts_x[IW_idx] = shift_x
-                    IW_shifts_y[IW_idx] = shift_y
-
-                # ------------------------------------------------------------------
-                #   Retrieve images of IW frame A and IW frame B
-                # ------------------------------------------------------------------
-
-                # Note: `A_` is a flipped left-to-right and up-to-down version of
-                # `A`, so we have to flip the indices as well, hence the use of
-                # `A.shape[] - ...`.
-                A_slice = (
-                    slice(
-                        A.shape[0] - A_IW_lims_y[IW_idx, 1] - 1,
-                        A.shape[0] - A_IW_lims_y[IW_idx, 0],
-                    ),
-                    slice(
-                        A.shape[1] - A_IW_lims_x[IW_idx, 1] - 1,
-                        A.shape[1] - A_IW_lims_x[IW_idx, 0],
-                    ),
-                )
-                B_slice = (
-                    slice(B_IW_lims_y[IW_idx, 0], B_IW_lims_y[IW_idx, 1] + 1),
-                    slice(B_IW_lims_x[IW_idx, 0], B_IW_lims_x[IW_idx, 1] + 1),
-                )
-
-                # fmt: off
-                if IW_needs_to_be_a_copy:
-                    # We need a copy, because otherwise the upcoming zeroing of the
-                    # IW image borders will affect, by means of reference, the
-                    # original image and interfere with the correlation of upcoming
-                    # and overlapping IWs. Copying adds a tiny cpu overhead.
-                    np.copyto(IW_A_, A_[A_slice])
-                    np.copyto(IW_B , B [B_slice])
-
-                    # Zero out the appropiate section of the IW of frame B that
-                    # corresponds to `particles` that are definitely not present in
-                    # the IW of frame A. Likewise, zero out the IW of frame A. Zero
-                    # caries the meaning of being at the mean background level of
-                    # the image.
-                    if zero_out_L > 0:
-                        IW_A_[:, :zero_out_L] = 0
-                        IW_B [:, :zero_out_L] = 0
-                    if zero_out_R > 0:
-                        IW_A_[:, -zero_out_R:] = 0
-                        IW_B [:, -zero_out_R:] = 0
-                    if zero_out_U > 0:
-                        IW_A_[:zero_out_U, :] = 0
-                        IW_B [:zero_out_U, :] = 0
-                    if zero_out_D > 0:
-                        IW_A_[-zero_out_D:, :] = 0
-                        IW_B [-zero_out_D:, :] = 0
-                else:
-                    IW_A_ = A_[A_slice]  # Pass by reference
-                    IW_B  = B [B_slice]  # Pass by reference
-                # fmt: on
-
-                # ------------------------------------------------------------------
-                #   Perform cross-correlation
-                # ------------------------------------------------------------------
-
-                if fast_max(IW_A_) <= 0:
-                    # No details are present in the IW images. All pixels are below
-                    # or at the mean background --> Save computation time.
-                    # TODO: Make this a user config threshold? Is <= 0 even correct?
-                    # Must match up with 'zeroing out' mechanism, just above here.
-                    C_maps[IW_idx, 0, 0] = np.nan
-
-                else:
-                    # Perform 2D cross-correlation
-                    # C_maps[IW_idx, :, :] = fftconvolve(IW_B, IW_A_, mode="full")
-                    C_maps[IW_idx, :, :] = fftw.convolve(IW_B, IW_A_)
+            process_IWs(
+                stage_idx,
+                A_,
+                B,
+                lIW_params[stage_idx - 1],
+                lVM_dx[stage_idx - 1],
+                lVM_dy[stage_idx - 1],
+                A_IW_grid_x,
+                A_IW_grid_y,
+                A_IW_lims_x,
+                A_IW_lims_y,
+                B_IW_grid_x,
+                B_IW_grid_y,
+                B_IW_lims_x,
+                B_IW_lims_y,
+                IW_A_,
+                IW_B,
+                IW_shifts_x,
+                IW_shifts_y,
+                C_maps,
+                fftw,
+            )
 
             # ----------------------------------------------------------------------
             #   Compute displacement vectors
@@ -463,8 +325,6 @@ if __name__ == "__main__":
 
         for stage_idx, IW_size in enumerate(IW_SIZES):
             N_IWs = lIW_params[stage_idx][2]
-            N_IWs_x = lIW_params[stage_idx][3]
-            N_IWs_y = lIW_params[stage_idx][4]
             A_IW_grid_x = lA_IW_grid_x[stage_idx]
             A_IW_grid_y = lA_IW_grid_y[stage_idx]
             A_IW_lims_x = lA_IW_lims_x[stage_idx]
