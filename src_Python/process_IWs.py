@@ -3,7 +3,7 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "07-08-2023"
+__date__ = "08-08-2023"
 __version__ = "1.0"
 
 import numpy as np
@@ -42,26 +42,26 @@ from my_fun import lookup_IW_idx, all_smaller_or_equal_to
     cache=True,
     nogil=True,
 )
-# fmt: off
 def obtain_IWs_from_image(
+    # fmt: off
     IW_idx     : int,
     stage_idx  : int,
-    A_         : npt.NDArray[np.float32],  # read only
-    B          : npt.NDArray[np.float32],  # read only
+    A_         : npt.NDArray[np.float32],  # read-only
+    B          : npt.NDArray[np.float32],  # read-only
     prev_IW_params: tuple[int, float, int, int, int],
-                                           # read only
-    prev_VM_dx : npt.NDArray[np.float32],  # read only
-    prev_VM_dy : npt.NDArray[np.float32],  # read only
-    A_IW_grid_x: npt.NDArray[np.int32],    # read only
-    A_IW_grid_y: npt.NDArray[np.int32],    # read only
-    A_IW_lims_x: npt.NDArray[np.int32],    # read only
-    A_IW_lims_y: npt.NDArray[np.int32],    # read only
+                                           # read-only
+    prev_VM_dx : npt.NDArray[np.float32],  # read-only
+    prev_VM_dy : npt.NDArray[np.float32],  # read-only
+    A_IW_grid_x: npt.NDArray[np.int32],    # read-only
+    A_IW_grid_y: npt.NDArray[np.int32],    # read-only
+    A_IW_lims_x: npt.NDArray[np.int32],    # read-only
+    A_IW_lims_y: npt.NDArray[np.int32],    # read-only
     B_IW_grid_x: npt.NDArray[np.int32],    # in-place operation, debug output
     B_IW_grid_y: npt.NDArray[np.int32],    # in-place operation, debug output
     B_IW_lims_x: npt.NDArray[np.int32],    # in-place operation, debug output
     B_IW_lims_y: npt.NDArray[np.int32],    # in-place operation, debug output
     IW_shifts_x: npt.NDArray[np.int32],    # in-place operation, debug output
-    IW_shifts_y: npt.NDArray[np.int32],    # in-place operation, debug output
+    IW_shifts_y: npt.NDArray[np.int32],  # in-place operation, debug output
 ) -> tuple[npt.NDArray[np.float32], npt.NDArray[np.float32]]:
     # fmt: on
     """In-place operation on:
@@ -220,19 +220,19 @@ def obtain_IWs_from_image(
 
 
 # @profile
-# fmt: off
 def process_IWs(
+    # fmt: off
     stage_idx  : int,
-    A_         : npt.NDArray[np.float32],  # read only
-    B          : npt.NDArray[np.float32],  # read only
+    A_         : npt.NDArray[np.float32],  # read-only
+    B          : npt.NDArray[np.float32],  # read-only
     prev_IW_params: tuple[int, float, int, int, int],
-                                           # read only
-    prev_VM_dx : npt.NDArray[np.float32],  # read only
-    prev_VM_dy : npt.NDArray[np.float32],  # read only
-    A_IW_grid_x: npt.NDArray[np.int32],    # read only
-    A_IW_grid_y: npt.NDArray[np.int32],    # read only
-    A_IW_lims_x: npt.NDArray[np.int32],    # read only
-    A_IW_lims_y: npt.NDArray[np.int32],    # read only
+                                           # read-only
+    prev_VM_dx : npt.NDArray[np.float32],  # read-only
+    prev_VM_dy : npt.NDArray[np.float32],  # read-only
+    A_IW_grid_x: npt.NDArray[np.int32],    # read-only
+    A_IW_grid_y: npt.NDArray[np.int32],    # read-only
+    A_IW_lims_x: npt.NDArray[np.int32],    # read-only
+    A_IW_lims_y: npt.NDArray[np.int32],    # read-only
     B_IW_grid_x: npt.NDArray[np.int32],    # in-place operation, debug output
     B_IW_grid_y: npt.NDArray[np.int32],    # in-place operation, debug output
     B_IW_lims_x: npt.NDArray[np.int32],    # in-place operation, debug output
@@ -241,6 +241,7 @@ def process_IWs(
     IW_shifts_y: npt.NDArray[np.int32],    # in-place operation, debug output
     C_maps     : npt.NDArray[np.float32],  # in-place output
     fftw       : FFTW_Convolver_Full2D,
+    IWs_slice  : slice = slice(None),
 ):
     # fmt: on
     """In-place operation on:
@@ -252,12 +253,20 @@ def process_IWs(
     * `IW_shifts_y`
     * `C_maps`
 
-    Walk over all interrogation windows from source images `A_` and `B` using
-    window pre-shifts when available from the previous multigrid stage, and
-    compute the 2D correlation maps.
+    Walk over all interrogation windows (IW) to be taken from source images `A_`
+    and `B` using window pre-shifts when available from the previous multigrid
+    stage, and compute the 2D correlation maps.
+
+    The last argument `IWs_slice` can be set to only process a certain slice out
+    of all the IWs. This is useful to distribute the calculation of all IWs over
+    multiple concurrent tasks. Defaults to all IWs when omitted.
     """
 
-    for IW_idx in range(C_maps.shape[0]):
+    idx_start = 0 if IWs_slice.start is None else IWs_slice.start
+    idx_stop = C_maps.shape[0] if IWs_slice.stop is None else IWs_slice.stop
+    idx_step = 1 if IWs_slice.step is None else IWs_slice.step
+
+    for IW_idx in range(idx_start, idx_stop, idx_step):
         IW_A_, IW_B = obtain_IWs_from_image(
             IW_idx,
             stage_idx,
@@ -288,5 +297,5 @@ def process_IWs(
 
         else:
             # Perform 2D cross-correlation
-            #C_maps[IW_idx, :, :] = fftconvolve(IW_B, IW_A_, mode="full")
+            # C_maps[IW_idx, :, :] = fftconvolve(IW_B, IW_A_, mode="full")
             C_maps[IW_idx, :, :] = fftw.convolve(IW_B, IW_A_)

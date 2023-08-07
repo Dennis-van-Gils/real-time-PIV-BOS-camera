@@ -11,12 +11,13 @@ VM: Displacement vector map
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "07-08-2023"
+__date__ = "08-08-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
 import glob
 from time import perf_counter
+import concurrent.futures
 
 import numpy as np
 import numpy.typing as npt
@@ -48,6 +49,11 @@ if LOAD_MPL:
 # each subsequent IW size the exact half of the previous IW size.
 IW_SIZES = []  # [px]
 IW_OVERLAP = 0.5  # IW overlap fraction [0 - 1]
+
+# Number of concurrent workers. Each worker will process a chunk of all the IWs
+# over which the 2D correlations are calculated. The chunks will get (near)
+# evenly divided over all workers.
+N_WORKERS = 2
 
 # ------------------------------------------------------------------------------
 #   Main
@@ -134,8 +140,10 @@ if __name__ == "__main__":
     lVM_dy: list[npt.NDArray[np.float32]] = []      # NDArray shape (N_IWs, )
     # fmt: on
 
-    # List of pyFFTW calculation objects per stage of the multigrid
-    lfftw: list[FFTW_Convolver_Full2D] = []
+    # List of pyFFTW calculation instances per stage of the multigrid. In
+    # addition, each stage will have a multiple of identical pyFFTW instances
+    # equal to the number of concurrent workers set in `N_WORKERS`.
+    lfftw: list[list[FFTW_Convolver_Full2D]] = []
 
     N_stages = len(IW_SIZES)
     for stage_idx, IW_size in enumerate(IW_SIZES):
@@ -183,7 +191,12 @@ if __name__ == "__main__":
         lVM_dy.append(np.zeros(N_IWs, dtype=np.float32))
 
         # Create pyFFTW calculation objects
-        lfftw.append(FFTW_Convolver_Full2D((IW_size, IW_size), fftw_threads=1))
+        fftw_workers = []
+        for worker_idx in range(N_WORKERS):
+            fftw_workers.append(
+                FFTW_Convolver_Full2D((IW_size, IW_size), fftw_threads=1)
+            )
+        lfftw.append(fftw_workers)
 
     # --------------------------------------------------------------------------
     #   Walk over all image pairs
@@ -265,14 +278,22 @@ if __name__ == "__main__":
             VM_grid_y = lVM_grid_y[stage_idx]
             VM_dx = lVM_dx[stage_idx]
             VM_dy = lVM_dy[stage_idx]
-            fftw = lfftw[stage_idx]
+            fftw_workers = lfftw[stage_idx]
 
             # ------------------------------------------------------------------
             #   Walk over all interrogation windows and compute the 2D
             #   correlation maps
             # ------------------------------------------------------------------
 
-            process_IWs(
+            # (Near) evenly distribute all IWs over all workers
+            IWs_slices = []
+            N_IWs = lIW_params[stage_idx][2]
+            for i in range(N_WORKERS):
+                idx_start = int(np.floor(N_IWs / N_WORKERS * i))
+                idx_stop = int(np.floor(N_IWs / N_WORKERS * (i + 1)))
+                IWs_slices.append(slice(idx_start, idx_stop))
+
+            p = (
                 stage_idx,
                 A_,
                 B,
@@ -290,8 +311,40 @@ if __name__ == "__main__":
                 IW_shifts_x,
                 IW_shifts_y,
                 C_maps,
-                fftw,
             )
+
+            # with concurrent.futures.ProcessPoolExecutor(
+            with concurrent.futures.ThreadPoolExecutor(
+                max_workers=N_WORKERS
+            ) as x:
+                for worker_idx in range(N_WORKERS):
+                    future = x.submit(
+                        process_IWs,
+                        *p,
+                        fftw=fftw_workers[worker_idx],
+                        IWs_slice=IWs_slices[worker_idx],
+                    )
+
+            # process_IWs(
+            #     stage_idx,
+            #     A_,
+            #     B,
+            #     lIW_params[stage_idx - 1],
+            #     lVM_dx[stage_idx - 1],
+            #     lVM_dy[stage_idx - 1],
+            #     A_IW_grid_x,
+            #     A_IW_grid_y,
+            #     A_IW_lims_x,
+            #     A_IW_lims_y,
+            #     B_IW_grid_x,
+            #     B_IW_grid_y,
+            #     B_IW_lims_x,
+            #     B_IW_lims_y,
+            #     IW_shifts_x,
+            #     IW_shifts_y,
+            #     C_maps,
+            #     fftw,
+            # )
 
             # ------------------------------------------------------------------
             #   Compute displacement vectors
