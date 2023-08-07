@@ -134,8 +134,6 @@ def obtain_IWs_from_image(
             B_IW_grid_x[IW_idx] -= shift_x
             B_IW_lims_x[IW_idx, :] -= shift_x
             shift_x = 0
-        else:
-            zero_out_R = 0
 
         if B_IW_lims_x[IW_idx, 1] > B.shape[1] - 1:
             IW_needs_to_be_a_copy = True
@@ -143,8 +141,6 @@ def obtain_IWs_from_image(
             B_IW_grid_x[IW_idx] -= shift_x
             B_IW_lims_x[IW_idx, :] -= shift_x
             shift_x = 0
-        else:
-            zero_out_L = 0
 
         if B_IW_lims_y[IW_idx, 0] < 0:
             IW_needs_to_be_a_copy = True
@@ -152,8 +148,6 @@ def obtain_IWs_from_image(
             B_IW_grid_y[IW_idx] -= shift_y
             B_IW_lims_y[IW_idx, :] -= shift_y
             shift_y = 0
-        else:
-            zero_out_D = 0
 
         if B_IW_lims_y[IW_idx, 1] > B.shape[0] - 1:
             IW_needs_to_be_a_copy = True
@@ -161,8 +155,6 @@ def obtain_IWs_from_image(
             B_IW_grid_y[IW_idx] -= shift_y
             B_IW_lims_y[IW_idx, :] -= shift_y
             shift_y = 0
-        else:
-            zero_out_U = 0
 
         # Store
         IW_shifts_x[IW_idx] = shift_x
