@@ -3,7 +3,7 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "06-08-2023"
+__date__ = "07-08-2023"
 __version__ = "1.0"
 
 import os
@@ -235,6 +235,8 @@ def lookup_IW_idx(
 def fliplrud(img: npt.NDArray[np.float32]) -> npt.NDArray[np.float32]:
     """Flip the passed image left-to-right and up-to-down, necessary to use an
     FFT convolution as a 2D-correlation.
+    NOTE: The returned matrix will /not/ be contiguous, regardless of whether
+    the input matrix was C or Fortran-contiguous.
     """
     # Vanilla numpy:
     #   return np.flipud(np.fliplr(img))

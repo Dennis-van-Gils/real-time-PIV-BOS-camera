@@ -11,7 +11,7 @@ VM: Displacement vector map
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "06-08-2023"
+__date__ = "07-08-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
@@ -21,7 +21,6 @@ from time import perf_counter
 import numpy as np
 import numpy.typing as npt
 from skimage.io import imread
-from scipy.signal import fftconvolve
 
 from dvg_fftw_convolve2d import FFTW_Convolver_Full2D
 from my_fun import (
@@ -221,9 +220,9 @@ if __name__ == "__main__":
             lC_maps[stage_idx][:].fill(np.nan)
             """
 
-        # --------------------------------------------------------------------------
+        # ----------------------------------------------------------------------
         #   Image preparation
-        # --------------------------------------------------------------------------
+        # ----------------------------------------------------------------------
 
         A = imread(fn1, as_gray=True)
         B = imread(fn2, as_gray=True)
@@ -236,16 +235,16 @@ if __name__ == "__main__":
         remove_mean_background(A)
         remove_mean_background(B)
 
-        # Flip the image of frame A left-to-right and up-to-down ahead of time for
-        # the upcoming 2D cross-correlation done via convolution. Doing this ahead
-        # of time instead of doing it just before the convolution operation (inside
-        # the IW loop) saves many duplicate `fliplrud()` operations on identical
-        # data (because of the window overlapping).
-        A_ = fliplrud(A)
+        # Flip the image of frame A left-to-right and up-to-down ahead of time
+        # as needed for the upcoming 2D cross-correlation done via convolution.
+        # Doing this ahead of time instead of doing it inside `process_IWs()`
+        # for each individual IW saves many duplicate `fliplrud()` operations on
+        # identical data because of the window overlapping.
+        A_ = np.asarray(fliplrud(A), order="C")
 
-        # --------------------------------------------------------------------------
+        # ----------------------------------------------------------------------
         #   Walk over all multigrid stages
-        # --------------------------------------------------------------------------
+        # ----------------------------------------------------------------------
 
         t_0 = perf_counter()
 
@@ -268,14 +267,10 @@ if __name__ == "__main__":
             VM_dy = lVM_dy[stage_idx]
             fftw = lfftw[stage_idx]
 
-            # Preallocate IW image subset of frames A and B
-            IW_shape = (IW_size, IW_size)
-            IW_A_ = np.zeros(IW_shape, dtype=A.dtype)
-            IW_B = np.zeros(IW_shape, dtype=B.dtype)
-
-            # ----------------------------------------------------------------------
-            #   Walk over all interrogation windows
-            # ----------------------------------------------------------------------
+            # ------------------------------------------------------------------
+            #   Walk over all interrogation windows and compute the 2D
+            #   correlation maps
+            # ------------------------------------------------------------------
 
             process_IWs(
                 stage_idx,
@@ -292,20 +287,18 @@ if __name__ == "__main__":
                 B_IW_grid_y,
                 B_IW_lims_x,
                 B_IW_lims_y,
-                IW_A_,
-                IW_B,
                 IW_shifts_x,
                 IW_shifts_y,
                 C_maps,
                 fftw,
             )
 
-            # ----------------------------------------------------------------------
+            # ------------------------------------------------------------------
             #   Compute displacement vectors
-            # ----------------------------------------------------------------------
+            # ------------------------------------------------------------------
 
-            # It is not necessary to normalize the correlation maps. Adds overhead.
-            # normalize_C_maps(C_maps)  # Not necessary
+            # It is not necessary to normalize the correlation maps
+            # normalize_C_maps(C_maps)  # Not necessary, adds overhead
 
             compute_displacement_vectors_from_C_maps(
                 C_maps,
@@ -319,9 +312,9 @@ if __name__ == "__main__":
         duration = perf_counter() - t_0
         print(f"Finished in {duration:.3f} s")
 
-        # --------------------------------------------------------------------------
+        # ----------------------------------------------------------------------
         #   Debugging output
-        # --------------------------------------------------------------------------
+        # ----------------------------------------------------------------------
 
         for stage_idx, IW_size in enumerate(IW_SIZES):
             N_IWs = lIW_params[stage_idx][2]
