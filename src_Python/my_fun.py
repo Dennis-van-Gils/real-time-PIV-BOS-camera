@@ -323,6 +323,35 @@ def fast_max(in1: npt.NDArray[np.float32]) -> np.float32:
 
 
 # ------------------------------------------------------------------------------
+#   all_smaller_or_equal_to
+# ------------------------------------------------------------------------------
+
+
+@njit(
+    "boolean(float32[:, :], float32)",
+    # parallel=True,  # Not possible
+    cache=True,
+    nogil=True,
+)
+def all_smaller_or_equal_to(
+    array_in: npt.NDArray[np.float32],
+    value: float,
+) -> bool:
+    """Faster version of `np.max(array_in) <= value` because we can exit early
+    here.
+    NOTE: We do not enforce the input matrix to be C-contiguous, because this
+    module will pass discontiguous matrices into `all_smaller_or_equal_to()`. If
+    we would enforce C-contiguity than the code executes ~2 times faster.
+    """
+    for i in range(array_in.shape[0]):
+        for j in range(array_in.shape[1]):
+            if array_in[i, j] > value:
+                return False
+
+    return True
+
+
+# ------------------------------------------------------------------------------
 #   normalize_C_maps
 # ------------------------------------------------------------------------------
 

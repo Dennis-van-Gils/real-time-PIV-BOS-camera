@@ -12,7 +12,7 @@ from numba import njit
 from scipy.signal import fftconvolve  # Only used for code validation
 
 from dvg_fftw_convolve2d import FFTW_Convolver_Full2D
-from my_fun import lookup_IW_idx, fast_max
+from my_fun import lookup_IW_idx, all_smaller_or_equal_to
 
 # import line_profiler
 # profile = line_profiler.LineProfiler()
@@ -286,7 +286,7 @@ def process_IWs(
             IW_shifts_y,
         )
 
-        if fast_max(IW_A_) <= 0:
+        if all_smaller_or_equal_to(IW_A_, 0):
             # No details are present in the IW images. All pixels are below
             # or at the mean background --> Save computation time.
             # TODO: Make this a user config threshold? Is <= 0 even correct?

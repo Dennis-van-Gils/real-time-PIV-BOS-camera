@@ -38,3 +38,6 @@ x 12) Examine possible speed up of `convolve2d()`. Timeit.
 DONE, speed improved
 
 13) Parallelize by dividing pool of all IWs into chunks to be processed in separate parallel threads
+
+x 14) `if fast_max(IW_A_) <= 0` can be changed to exit early. Speed improvement.
+DONE
