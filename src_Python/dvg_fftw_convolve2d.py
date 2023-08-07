@@ -12,7 +12,7 @@ huge performance gain.
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "06-08-2023"
+__date__ = "07-08-2023"
 __version__ = "1.0.0"
 # pylint: disable=invalid-name, missing-function-docstring
 
@@ -30,18 +30,18 @@ from numba import njit, prange
 
                 [ms] per iter
 shape           fast_multiply   fast_multiply_p
-(32, 32)        --> 0.00150         0.01414
-(64, 64)        --> 0.00409         0.01787
-(128, 128)      --> 0.01537         0.02439
-(256, 256)          0.05726     --> 0.03989
-(512, 512)          0.22363     --> 0.08859
-(1024, 1024)        1.09012     --> 0.32051
-(2048, 2048)        4.37083     --> 3.89286
+(32, 32)        --> 0.00102         0.01334
+(64, 64)        --> 0.00222         0.01491
+(128, 128)      --> 0.00718         0.02000
+(256, 256)      --> 0.02753         0.03023
+(512, 512)          0.10537     --> 0.06094
+(1024, 1024)        0.78878     --> 0.40209
+(2048, 2048)        4.00985     --> 3.85964
 """
 
 
 @njit(
-    "(complex64[:, :], complex64[:, :], complex64[:, :])",
+    "(complex64[:, ::1], complex64[:, ::1], complex64[:, ::1])",
     nogil=True,
     cache=True,
 )
@@ -61,7 +61,7 @@ def fast_multiply(
 
 
 @njit(
-    "(complex64[:, :], complex64[:, :], complex64[:, :])",
+    "(complex64[:, ::1], complex64[:, ::1], complex64[:, ::1])",
     nogil=True,
     cache=True,
     parallel=True,
@@ -90,8 +90,7 @@ def fast_multiply_p(
 class FFTW_Convolver_Full2D:
     """Manages a fast-Fourier transform (FFT) convolution on 2D input arrays
     `in1` and `in2` as passed to method `convolve()`, which will return the
-    result as a contiguous C-style `numpy.ndarray` containing the 'full'
-    convolution elements.
+    result as a `numpy.ndarray` containing the 'full' convolution elements.
 
     Args:
         s1 (tuple):
@@ -137,11 +136,9 @@ class FFTW_Convolver_Full2D:
         # fmt: off
         self._rfft_in1  = pyfftw.zeros_aligned(self.fshape, dtype="float32")
         self._rfft_in2  = pyfftw.zeros_aligned(self.fshape, dtype="float32")
-
-        self._rfft_out1 = pyfftw.empty_aligned(fshape_out, dtype="complex64")
-        self._rfft_out2 = pyfftw.empty_aligned(fshape_out, dtype="complex64")
-
-        self._irfft_in  = pyfftw.empty_aligned(fshape_out, dtype="complex64")
+        self._rfft_out1 = pyfftw.empty_aligned(fshape_out , dtype="complex64")
+        self._rfft_out2 = pyfftw.empty_aligned(fshape_out , dtype="complex64")
+        self._irfft_in  = pyfftw.empty_aligned(fshape_out , dtype="complex64")
         self._irfft_out = pyfftw.empty_aligned(self.fshape, dtype="float32")
         # fmt: on
 
@@ -172,22 +169,19 @@ class FFTW_Convolver_Full2D:
         self, in1: npt.NDArray[np.float32], in2: npt.NDArray[np.float32]
     ) -> npt.NDArray[np.float32]:
         """Performs the FFT convolution on input arrays `in1` and `in2` and
-        returns the result as a contiguous C-style `numpy.ndarray` containing
-        the 'full' convolution elements.
-
-        When the shapes of the passed input arrays are not compatible with the
-        convolution operation, an array full of `np.nan`s is returned.
+        returns the result as a `numpy.ndarray` containing the 'full'
+        convolution elements.
 
         Returns:
             The full convolution results as a 2D numpy array with a shape
             equal to `in1 + in2 - 1`.
-        """
-        # Force contiguous C-style numpy arrays, super fast when already so
-        in1 = np.asarray(in1)
-        in2 = np.asarray(in2)
 
-        # Perform FFT convolution
-        # -----------------------
+        NOTE: `in1` and `in2` do not necessarily have to be C-contiguous,
+        because they will, internal to this method, get copied into C-contiguous
+        arrays during the zero-padding operation.
+        NOTE: The output matrix is not contiguous.
+        """
+
         # Zero padding and forwards Fourier transformation
         self._rfft_in1[: in1.shape[0], : in1.shape[1]] = in1
         self._rfft_in2[: in2.shape[0], : in2.shape[1]] = in2

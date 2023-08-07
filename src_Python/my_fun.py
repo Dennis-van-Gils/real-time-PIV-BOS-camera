@@ -3,7 +3,7 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "06-08-2023"
+__date__ = "07-08-2023"
 __version__ = "1.0"
 
 import os
@@ -27,7 +27,7 @@ def get_filename_from_full_path(p: str):
 
 
 @njit(
-    "(float32[:, :], )",
+    "(float32[:, ::1], )",
     parallel=True,
     cache=True,
     nogil=True,
@@ -41,19 +41,24 @@ def remove_mean_background(img: npt.NDArray[np.float32]):
         Ufunc numpy  : np.subtract(img, np.mean(img), out=img)
 
         4096 x 4096 @ float32:
-            vanilla numpy    : 32   ms per iter
-            ufunc numpy      : 19   ms per iter
-            numba no parallel: 17   ms per iter
-            numba parallel   :  5.8 ms per iter
+            vanilla numpy    : 32    ms per iter
+            ufunc numpy      : 19    ms per iter
+            numba no parallel:  7.8  ms per iter
+            numba parallel   :  5.6  ms per iter
 
         1024 x 1024 @ float32:
-            numba parallel   :  0.3 ms per iter
+            numba parallel   :  0.23 ms per iter
     """
 
-    mu = np.mean(img)
+    sigma = 0  # sum
     for y in prange(img.shape[0]):
         for x in prange(img.shape[1]):
-            img[y, x] = img[y, x] - mu
+            sigma += img[y, x]
+    mu = sigma / img.size  # mean
+
+    for y in prange(img.shape[0]):
+        for x in prange(img.shape[1]):
+            img[y, x] -= mu
 
 
 # ------------------------------------------------------------------------------
@@ -235,6 +240,8 @@ def lookup_IW_idx(
 def fliplrud(img: npt.NDArray[np.float32]) -> npt.NDArray[np.float32]:
     """Flip the passed image left-to-right and up-to-down, necessary to use an
     FFT convolution as a 2D-correlation.
+    NOTE: The returned matrix will /not/ be contiguous, regardless of whether
+    the input matrix was C or Fortran-contiguous.
     """
     # Vanilla numpy:
     #   return np.flipud(np.fliplr(img))
@@ -295,16 +302,17 @@ def subpx_3pgf_2D(
 
 @njit(
     "float32(float32[:, :],)",
-    # parallel=True,  # Matrix shape is generally too small to benefit from parallel
+    # parallel=True,  # Not possible
     cache=True,
     nogil=True,
 )
 def fast_max(in1: npt.NDArray[np.float32]) -> np.float32:
-    """Numba-accelerated version of `np.max()`"""
-    return np.max(in1)
-
+    """Numba-accelerated version of `np.max()`.
+    NOTE: We do not enforce the input matrix to be C-contiguous, because this
+    module will pass discontiguous matrices into `fast_max()`. If we would
+    enforce C-contiguity than the code executes ~2 times faster.
     """
-    # This block has equal performance to `return np.max(in1)`
+
     my_max = in1[0, 0]
     for i in range(in1.shape[0]):
         for j in range(in1.shape[1]):
@@ -312,7 +320,35 @@ def fast_max(in1: npt.NDArray[np.float32]) -> np.float32:
                 my_max = in1[i, j]
 
     return my_max
+
+
+# ------------------------------------------------------------------------------
+#   all_smaller_or_equal_to
+# ------------------------------------------------------------------------------
+
+
+@njit(
+    "boolean(float32[:, :], float32)",
+    # parallel=True,  # Not possible
+    cache=True,
+    nogil=True,
+)
+def all_smaller_or_equal_to(
+    array_in: npt.NDArray[np.float32],
+    value: float,
+) -> bool:
+    """Faster version of `np.max(array_in) <= value` because we can exit early
+    here.
+    NOTE: We do not enforce the input matrix to be C-contiguous, because this
+    module will pass discontiguous matrices into `all_smaller_or_equal_to()`. If
+    we would enforce C-contiguity than the code executes ~2 times faster.
     """
+    for i in range(array_in.shape[0]):
+        for j in range(array_in.shape[1]):
+            if array_in[i, j] > value:
+                return False
+
+    return True
 
 
 # ------------------------------------------------------------------------------
@@ -346,7 +382,7 @@ def normalize_C_maps(C_maps: npt.NDArray[np.float32]):
 
 
 @njit(
-    "(float32[:, :, :], int32[:], int32[:], float32[:], float32[:], boolean)",
+    "(float32[:, :, :], int32[::1], int32[::1], float32[::1], float32[::1], boolean)",
     parallel=True,
     cache=True,
     nogil=True,
@@ -475,3 +511,17 @@ if __name__ == "__main__":
             number=loop,
         )
         print(f"subpx_3pgf_2D : {result / loop * 1000:.5f} ms per iter")
+
+    if 1:
+        test_shape = (32, 32)
+        A = np.random.randn(*test_shape)
+        A = np.asarray(A, dtype=np.float32)
+
+        loop = int(1e3)
+        result = timeit.timeit(
+            "fast_max(A)",
+            setup=lambda: fast_max(A),
+            globals=globals(),
+            number=loop,
+        )
+        print(f"fast_max      : {result / loop * 1000:.5f} ms per iter")
