@@ -101,8 +101,8 @@ def obtain_IWs_from_image(
 
     # Check for window pre-shift
     if stage_idx == 0:
-        shift_x = 0  # [px]
-        shift_y = 0  # [px]
+        shift_x = np.int32(0)  # [px]
+        shift_y = np.int32(0)  # [px]
 
     else:
         # Pre-shift available: Look up corresponding index of the IW in the
@@ -116,8 +116,8 @@ def obtain_IWs_from_image(
         # Retrieve the pre-shift
         shift_x = prev_VM_dx[parent_IW_idx]
         shift_y = prev_VM_dy[parent_IW_idx]
-        shift_x = 0 if np.isnan(shift_x) else int(shift_x)
-        shift_y = 0 if np.isnan(shift_y) else int(shift_y)
+        shift_x = np.int32(0) if np.isnan(shift_x) else np.int32(shift_x)
+        shift_y = np.int32(0) if np.isnan(shift_y) else np.int32(shift_y)
 
         # Apply the pre-shift to IW B (eager)
         B_IW_grid_x[IW_idx] += shift_x
@@ -133,28 +133,28 @@ def obtain_IWs_from_image(
             zero_out_R = np.abs(shift_x)
             B_IW_grid_x[IW_idx] -= shift_x
             B_IW_lims_x[IW_idx, :] -= shift_x
-            shift_x = 0
+            shift_x = np.int32(0)
 
         if B_IW_lims_x[IW_idx, 1] > B.shape[1] - 1:
             IW_needs_to_be_a_copy = True
             zero_out_L = np.abs(shift_x)
             B_IW_grid_x[IW_idx] -= shift_x
             B_IW_lims_x[IW_idx, :] -= shift_x
-            shift_x = 0
+            shift_x = np.int32(0)
 
         if B_IW_lims_y[IW_idx, 0] < 0:
             IW_needs_to_be_a_copy = True
             zero_out_D = np.abs(shift_y)
             B_IW_grid_y[IW_idx] -= shift_y
             B_IW_lims_y[IW_idx, :] -= shift_y
-            shift_y = 0
+            shift_y = np.int32(0)
 
         if B_IW_lims_y[IW_idx, 1] > B.shape[0] - 1:
             IW_needs_to_be_a_copy = True
             zero_out_U = np.abs(shift_y)
             B_IW_grid_y[IW_idx] -= shift_y
             B_IW_lims_y[IW_idx, :] -= shift_y
-            shift_y = 0
+            shift_y = np.int32(0)
 
         # Store
         IW_shifts_x[IW_idx] = shift_x
