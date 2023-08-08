@@ -185,12 +185,13 @@ class FFTW_Convolver_Full2D:
 
         # Low-level rocket-fft
         # """
-        rfftn(self._rfft_in1, self._rfft_out1, axes=(0, 1))
-        rfftn(self._rfft_in2, self._rfft_out2, axes=(0, 1))
+        # TODO: Examine: Code silently returns at call `rfftn()` without work
+        rfftn(self._rfft_in1, self._rfft_out1)
+        rfftn(self._rfft_in2, self._rfft_out2)
 
         # Convolution and backwards Fourier transformation
         fast_multiply(self._rfft_out1, self._rfft_out2, self._irfft_in)
-        irfftn(self._irfft_in, self._irfft_out, axes=(0, 1), forward=False)
+        irfftn(self._irfft_in, self._irfft_out, forward=False)
         result = self._irfft_out
         # """
 
@@ -229,9 +230,9 @@ fft_njit = partial(
 def rfftn(
     ain,
     aout,
-    axes=(0, 1),
+    axes=np.array([0, 1], dtype=np.int64),
     forward=True,
-    fct=np.float64(1.0),
+    fct=np.float32(1.0),
     nthreads=np.int64(1),
 ):
     r2c(ain, aout, axes, forward, fct, nthreads)
@@ -241,9 +242,9 @@ def rfftn(
 def irfftn(
     ain,
     aout,
-    axes=(0, 1),
+    axes=np.array([0, 1], dtype=np.int64),
     forward=True,
-    fct=np.float64(1.0),
+    fct=np.float32(1.0),
     nthreads=np.int64(1),
 ):
     c2r(ain, aout, axes, forward, fct, nthreads)
