@@ -53,7 +53,12 @@ IW_OVERLAP = 0.5  # IW overlap fraction [0 - 1]
 # Number of concurrent workers. Each worker will process a chunk of all the IWs
 # over which the 2D correlations are calculated. The chunks will get (near)
 # evenly divided over all workers.
-N_WORKERS = 2
+N_WORKERS = 1
+
+N_FFTW_THREADS = 1
+
+# Info: Release GIL in pyFFTW also when argument `threads=1`.
+# https://github.com/pyFFTW/pyFFTW/commit/0fed0706aaa6898913d4e8716d7eb3f9a4a1351d
 
 # ------------------------------------------------------------------------------
 #   Main
@@ -194,13 +199,18 @@ if __name__ == "__main__":
         fftw_workers = []
         for worker_idx in range(N_WORKERS):
             fftw_workers.append(
-                FFTW_Convolver_Full2D((IW_size, IW_size), fftw_threads=1)
+                FFTW_Convolver_Full2D(
+                    (IW_size, IW_size),
+                    fftw_threads=N_FFTW_THREADS,
+                )
             )
         lfftw.append(fftw_workers)
 
     # --------------------------------------------------------------------------
     #   Walk over all image pairs
     # --------------------------------------------------------------------------
+
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=N_WORKERS)
 
     for file_idx in range(0, N_img_files - 1, 2):
         fn1 = img_files[file_idx]
@@ -313,17 +323,19 @@ if __name__ == "__main__":
                 C_maps,
             )
 
-            # with concurrent.futures.ProcessPoolExecutor(
-            with concurrent.futures.ThreadPoolExecutor(
-                max_workers=N_WORKERS
-            ) as x:
-                for worker_idx in range(N_WORKERS):
-                    future = x.submit(
+            futures = []
+            for worker_idx in range(N_WORKERS):
+                futures.append(
+                    executor.submit(
                         process_IWs,
                         *p,
                         fftw=fftw_workers[worker_idx],
                         IWs_slice=IWs_slices[worker_idx],
                     )
+                )
+
+            # Wait for all tasks to complete
+            concurrent.futures.wait(futures)
 
             # process_IWs(
             #     stage_idx,
@@ -538,3 +550,5 @@ if __name__ == "__main__":
             if DEBUG:
                 plt.waitforbuttonpress()  # type: ignore
                 # plt.show()  # type: ignore
+
+    executor.shutdown()
