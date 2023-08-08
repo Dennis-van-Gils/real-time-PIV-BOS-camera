@@ -11,7 +11,8 @@ import numpy.typing as npt
 from numba import njit
 from scipy.signal import fftconvolve  # Only used for code validation
 
-from dvg_fftw_convolve2d import FFTW_Convolver_Full2D
+# from dvg_fftw_convolve2d import FFTW_Convolver_Full2D
+from dvg_rocketfftw_convolve2d import FFTW_Convolver_Full2D
 from my_fun import lookup_IW_idx, all_smaller_or_equal_to
 
 # import line_profiler

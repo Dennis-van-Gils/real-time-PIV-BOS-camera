@@ -23,7 +23,8 @@ import numpy as np
 import numpy.typing as npt
 from skimage.io import imread
 
-from dvg_fftw_convolve2d import FFTW_Convolver_Full2D
+# from dvg_fftw_convolve2d import FFTW_Convolver_Full2D
+from dvg_rocketfftw_convolve2d import FFTW_Convolver_Full2D
 from my_fun import (
     get_filename_from_full_path,
     remove_mean_background,
