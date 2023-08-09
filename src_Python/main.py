@@ -199,7 +199,7 @@ if __name__ == "__main__":
         fftw_workers = []
         for worker_idx in range(N_WORKERS):
             fftw_workers.append(
-                FFTW_Convolver_Full2D(A.shape, (IW_size, IW_size))
+                FFTW_Convolver_Full2D(A.shape, N_IWs, (IW_size, IW_size))
             )
         lfftw.append(fftw_workers)
 

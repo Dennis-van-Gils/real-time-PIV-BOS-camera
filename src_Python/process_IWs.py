@@ -300,6 +300,9 @@ def process_IWs(
             zero_out_D,
         )
 
+        fftw.convolve(IW_idx)
+
+        """
         if fftw.IW_A_all_smaller_or_equal_to(0):
             # No details are present in the IW images. All pixels are below
             # or at the mean background --> Save computation time.
@@ -311,4 +314,7 @@ def process_IWs(
         else:
             # Perform 2D cross-correlation
             # C_maps[IW_idx, :, :] = fftconvolve(IW_B, IW_A_, mode="full")
-            C_maps[IW_idx, :, :] = fftw.convolve()
+            C_maps[IW_idx, :, :] = fftw.convolve(IW_idx)
+        """
+
+    C_maps[:] = fftw.processed_C_maps()

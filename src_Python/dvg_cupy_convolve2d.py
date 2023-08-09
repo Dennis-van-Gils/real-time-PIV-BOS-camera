@@ -43,7 +43,7 @@ class FFTW_Convolver_Full2D:
             Default: 5
     """
 
-    def __init__(self, s_img: tuple, s1: tuple, s2: tuple = ()):
+    def __init__(self, s_img: tuple, N_IWs: int, s1: tuple, s2: tuple = ()):
         # Example:   s1 = (64, 64), s2 = (64, 64)
         # shape      evaluates to (127, 127)
         # fshape     evaluates to (128, 128)
@@ -54,6 +54,7 @@ class FFTW_Convolver_Full2D:
             s2 = s1
 
         self.s1 = s1
+        self.N_IWs = N_IWs
 
         axes = (0, 1)
         shape = [
@@ -86,6 +87,9 @@ class FFTW_Convolver_Full2D:
 
         self.IW_A_ = cp.ndarray(s1, dtype="float")
         self.IW_B = cp.ndarray(s1, dtype="float")
+        self.C_maps = cp.ndarray(
+            (N_IWs, s1[0] * 2 - 1, s1[1] * 2 - 1), dtype="float"
+        )
 
     def load_frame_A_into_gpu(self, A_: npt.NDArray[np.float32]):
         self.A_ = cp.asarray(A_)
@@ -109,8 +113,10 @@ class FFTW_Convolver_Full2D:
         zero_out_D,
     ):
         # fmt: off
-        cp.copyto(self.IW_A_, self.A_[Ay0:Ay1, Ax0:Ax1])
-        cp.copyto(self.IW_B , self.B [By0:By1, Bx0:Bx1])
+        #cp.copyto(self.IW_A_, self.A_[Ay0:Ay1, Ax0:Ax1])
+        #cp.copyto(self.IW_B , self.B [By0:By1, Bx0:Bx1])
+        self.IW_A_ = self.A_[Ay0:Ay1, Ax0:Ax1]
+        self.IW_B  = self.B [By0:By1, Bx0:Bx1]
 
         if zero_out_L > 0:
             self.IW_A_[:, :zero_out_L] = 0
@@ -126,41 +132,41 @@ class FFTW_Convolver_Full2D:
             self.IW_B [-zero_out_D:, :] = 0
         # fmt: on
 
-    def IW_A_all_smaller_or_equal_to(self, value: float = 0):
-        return cp.max(self.IW_A_) <= value
-
     # --------------------------------------------------------------------------
     #   convolve
     # --------------------------------------------------------------------------
 
-    def convolve(self) -> npt.NDArray[np.float32]:
-        """Performs the FFT convolution on input arrays `in1` and `in2` and
-        returns the result as a `numpy.ndarray` containing the 'full'
-        convolution elements.
+    def convolve(self, IW_idx: int):
+        """Performs the FFT convolution over /all/ IWs"""
 
-        Returns:
-            The full convolution results as a 2D numpy array with a shape
-            equal to `in1 + in2 - 1`.
+        if cp.max(self.IW_A_) <= 0:
+            # No details are present in the IW images. All pixels are below
+            # or at the mean background --> Save computation time.
+            # TODO: Make this a user config threshold? Is <= 0 even correct?
+            # Must match up with 'zeroing out' mechanism of function
+            # `obtain_IW_limits()`.
+            self.C_maps[IW_idx, 0, 0] = np.nan
 
-        NOTE: `in1` and `in2` do not necessarily have to be C-contiguous,
-        because they will, internal to this method, get copied into C-contiguous
-        arrays during the zero-padding operation.
-        NOTE: The output matrix is not contiguous.
-        """
+        else:
+            # Perform 2D cross-correlation
 
-        # Zero padding and forwards Fourier transformation
-        self._rfft_in1[: self.s1[0], : self.s1[1]] = self.IW_A_
-        self._rfft_in2[: self.s1[0], : self.s1[1]] = self.IW_B
-        sp1 = cp.fft.rfftn(
-            self._rfft_in1, self.fshape, axes=(0, 1), norm="forward"
-        )
-        sp2 = cp.fft.rfftn(
-            self._rfft_in2, self.fshape, axes=(0, 1), norm="forward"
-        )
+            # Zero padding and forwards Fourier transformation
+            self._rfft_in1[: self.s1[0], : self.s1[1]] = self.IW_A_
+            self._rfft_in2[: self.s1[0], : self.s1[1]] = self.IW_B
+            sp1 = cp.fft.rfftn(
+                self._rfft_in1, self.fshape, axes=(0, 1), norm="forward"
+            )
+            sp2 = cp.fft.rfftn(
+                self._rfft_in2, self.fshape, axes=(0, 1), norm="forward"
+            )
 
-        # Convolution and backwards Fourier transformation
-        m = cp.multiply(sp1, sp2)
-        result = cp.fft.irfftn(m, self.fshape, axes=(0, 1), norm="backward")
+            # Convolution and backwards Fourier transformation
+            m = cp.multiply(sp1, sp2)
+            result = cp.fft.irfftn(m, self.fshape, axes=(0, 1), norm="backward")
 
-        # Return the 'full' elements
-        return cp.asnumpy(result[self.fslice])
+            # Return the 'full' elements
+            # return cp.asnumpy(result[self.fslice])
+            self.C_maps[IW_idx, :, :] = result[self.fslice]
+
+    def processed_C_maps(self) -> npt.NDArray[np.float32]:
+        return cp.asnumpy(self.C_maps)
