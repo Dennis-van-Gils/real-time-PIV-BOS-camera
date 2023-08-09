@@ -23,7 +23,7 @@ import numpy as np
 import numpy.typing as npt
 from skimage.io import imread
 
-from dvg_fftw_convolve2d import FFTW_Convolver_Full2D
+from dvg_cupy_convolve2d import FFTW_Convolver_Full2D
 from my_fun import (
     get_filename_from_full_path,
     remove_mean_background,
@@ -199,10 +199,7 @@ if __name__ == "__main__":
         fftw_workers = []
         for worker_idx in range(N_WORKERS):
             fftw_workers.append(
-                FFTW_Convolver_Full2D(
-                    (IW_size, IW_size),
-                    fftw_threads=N_FFTW_THREADS,
-                )
+                FFTW_Convolver_Full2D(A.shape, (IW_size, IW_size))
             )
         lfftw.append(fftw_workers)
 
@@ -289,6 +286,13 @@ if __name__ == "__main__":
             VM_dx = lVM_dx[stage_idx]
             VM_dy = lVM_dy[stage_idx]
             fftw_workers = lfftw[stage_idx]
+
+            # ------------------------------------------------------------------
+            #   Copy over images into gpu
+            # ------------------------------------------------------------------
+
+            fftw_workers[0].load_frame_A_into_gpu(A_)
+            fftw_workers[0].load_frame_B_into_gpu(B)
 
             # ------------------------------------------------------------------
             #   Walk over all interrogation windows and compute the 2D

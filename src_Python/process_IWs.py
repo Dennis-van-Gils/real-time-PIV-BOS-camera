@@ -11,43 +11,44 @@ import numpy.typing as npt
 from numba import njit
 from scipy.signal import fftconvolve  # Only used for code validation
 
-from dvg_fftw_convolve2d import FFTW_Convolver_Full2D
+from dvg_cupy_convolve2d import FFTW_Convolver_Full2D
 from my_fun import lookup_IW_idx, all_smaller_or_equal_to
 
-# import line_profiler
-# profile = line_profiler.LineProfiler()
 
 # ------------------------------------------------------------------------------
-#   obtain_IWs_from_image
+#   obtain_IW_limits
 # ------------------------------------------------------------------------------
 
 
 @njit(
-    "Tuple((float32[:, :], float32[:, :])) \
-        (int32, int32, \
-        float32[:, ::1], float32[:, ::1], \
-        Tuple((int32, float32, int32, int32, int32)), \
-        float32[::1], \
-        float32[::1], \
-        int32[::1], \
-        int32[::1], \
-        int32[:, ::1], \
-        int32[:, ::1], \
-        int32[::1], \
-        int32[::1], \
-        int32[:, ::1], \
-        int32[:, ::1], \
-        int32[::1], \
-        int32[::1])",
+    "Tuple(( \
+        int32, int32, int32, int32, \
+        int32, int32, int32, int32, \
+        int32, int32, int32, int32 \
+    )) \
+    (int32, int32, \
+    Tuple((int32, int32)), \
+    Tuple((int32, float32, int32, int32, int32)), \
+    float32[::1], \
+    float32[::1], \
+    int32[::1], \
+    int32[::1], \
+    int32[:, ::1], \
+    int32[:, ::1], \
+    int32[::1], \
+    int32[::1], \
+    int32[:, ::1], \
+    int32[:, ::1], \
+    int32[::1], \
+    int32[::1])",
     cache=True,
     nogil=True,
 )
-def obtain_IWs_from_image(
+def obtain_IW_limits(
     # fmt: off
     IW_idx     : int,
     stage_idx  : int,
-    A_         : npt.NDArray[np.float32],  # read-only
-    B          : npt.NDArray[np.float32],  # read-only
+    A_shape    : tuple[int, int],
     prev_IW_params: tuple[int, float, int, int, int],
                                            # read-only
     prev_VM_dx : npt.NDArray[np.float32],  # read-only
@@ -62,7 +63,20 @@ def obtain_IWs_from_image(
     B_IW_lims_y: npt.NDArray[np.int32],    # in-place operation, debug output
     IW_shifts_x: npt.NDArray[np.int32],    # in-place operation, debug output
     IW_shifts_y: npt.NDArray[np.int32],  # in-place operation, debug output
-) -> tuple[npt.NDArray[np.float32], npt.NDArray[np.float32]]:
+) -> tuple[
+    np.int32,
+    np.int32,
+    np.int32,
+    np.int32,
+    np.int32,
+    np.int32,
+    np.int32,
+    np.int32,
+    np.int32,
+    np.int32,
+    np.int32,
+    np.int32,
+]:
     # fmt: on
     """In-place operation on:
     * `B_IW_grid_x`
@@ -97,7 +111,6 @@ def obtain_IWs_from_image(
     zero_out_R = 0  # right of B, x = IW_size - 1
     zero_out_U = 0  # up of B   , y = 0
     zero_out_D = 0  # down of B , y = IW_size - 1
-    IW_needs_to_be_a_copy = False
 
     # Check for window pre-shift
     if stage_idx == 0:
@@ -129,28 +142,24 @@ def obtain_IWs_from_image(
         # image B. When so, we will zero out part of the IW images that have
         # moved out-of-frame, later on.
         if B_IW_lims_x[IW_idx, 0] < 0:
-            IW_needs_to_be_a_copy = True
             zero_out_R = np.abs(shift_x)
             B_IW_grid_x[IW_idx] -= shift_x
             B_IW_lims_x[IW_idx, :] -= shift_x
             shift_x = np.int32(0)
 
-        if B_IW_lims_x[IW_idx, 1] > B.shape[1] - 1:
-            IW_needs_to_be_a_copy = True
+        if B_IW_lims_x[IW_idx, 1] > A_shape[1] - 1:
             zero_out_L = np.abs(shift_x)
             B_IW_grid_x[IW_idx] -= shift_x
             B_IW_lims_x[IW_idx, :] -= shift_x
             shift_x = np.int32(0)
 
         if B_IW_lims_y[IW_idx, 0] < 0:
-            IW_needs_to_be_a_copy = True
             zero_out_D = np.abs(shift_y)
             B_IW_grid_y[IW_idx] -= shift_y
             B_IW_lims_y[IW_idx, :] -= shift_y
             shift_y = np.int32(0)
 
-        if B_IW_lims_y[IW_idx, 1] > B.shape[0] - 1:
-            IW_needs_to_be_a_copy = True
+        if B_IW_lims_y[IW_idx, 1] > A_shape[0] - 1:
             zero_out_U = np.abs(shift_y)
             B_IW_grid_y[IW_idx] -= shift_y
             B_IW_lims_y[IW_idx, :] -= shift_y
@@ -166,52 +175,30 @@ def obtain_IWs_from_image(
 
     # Note: `A_` is a flipped left-to-right and up-to-down version of `A`, so we
     # have to flip the indices as well, hence the use of `A.shape[] - ...`.
-    A_slice = (
-        slice(
-            A_.shape[0] - A_IW_lims_y[IW_idx, 1] - 1,
-            A_.shape[0] - A_IW_lims_y[IW_idx, 0],
-        ),
-        slice(
-            A_.shape[1] - A_IW_lims_x[IW_idx, 1] - 1,
-            A_.shape[1] - A_IW_lims_x[IW_idx, 0],
-        ),
+    Ax0 = A_shape[1] - A_IW_lims_x[IW_idx, 1] - 1
+    Ax1 = A_shape[1] - A_IW_lims_x[IW_idx, 0]
+    Ay0 = A_shape[0] - A_IW_lims_y[IW_idx, 1] - 1
+    Ay1 = A_shape[0] - A_IW_lims_y[IW_idx, 0]
+
+    Bx0 = B_IW_lims_x[IW_idx, 0]
+    Bx1 = B_IW_lims_x[IW_idx, 1] + 1
+    By0 = B_IW_lims_y[IW_idx, 0]
+    By1 = B_IW_lims_y[IW_idx, 1] + 1
+
+    return (
+        np.int32(Ax0),
+        np.int32(Ax1),
+        np.int32(Ay0),
+        np.int32(Ay1),
+        np.int32(Bx0),
+        np.int32(Bx1),
+        np.int32(By0),
+        np.int32(By1),
+        np.int32(zero_out_L),
+        np.int32(zero_out_R),
+        np.int32(zero_out_U),
+        np.int32(zero_out_D),
     )
-    B_slice = (
-        slice(B_IW_lims_y[IW_idx, 0], B_IW_lims_y[IW_idx, 1] + 1),
-        slice(B_IW_lims_x[IW_idx, 0], B_IW_lims_x[IW_idx, 1] + 1),
-    )
-
-    # fmt: off
-    if IW_needs_to_be_a_copy:
-        # We need a copy, because otherwise the upcoming zeroing of the IW image
-        # borders will affect, by means of reference, the original image and
-        # interfere with the correlation of upcoming and overlapping IWs.
-        # Copying adds a tiny cpu overhead.
-        IW_A_ = np.copy(A_[A_slice])  # C-contiguous
-        IW_B  = np.copy(B [B_slice])  # C-contiguous
-
-        # Zero out the appropiate section of the IW of frame B that corresponds
-        # to `particles` that are definitely not present in the IW of frame A.
-        # Likewise, zero out the IW of frame A. Zero caries the meaning of being
-        # at the mean background level of the image.
-        if zero_out_L > 0:
-            IW_A_[:, :zero_out_L] = 0
-            IW_B [:, :zero_out_L] = 0
-        if zero_out_R > 0:
-            IW_A_[:, -zero_out_R:] = 0
-            IW_B [:, -zero_out_R:] = 0
-        if zero_out_U > 0:
-            IW_A_[:zero_out_U, :] = 0
-            IW_B [:zero_out_U, :] = 0
-        if zero_out_D > 0:
-            IW_A_[-zero_out_D:, :] = 0
-            IW_B [-zero_out_D:, :] = 0
-    else:
-        IW_A_ = A_[A_slice]  # Pass by reference, not contiguous
-        IW_B  = B [B_slice]  # Pass by reference, not contiguous
-    # fmt: on
-
-    return IW_A_, IW_B
 
 
 # ------------------------------------------------------------------------------
@@ -219,7 +206,6 @@ def obtain_IWs_from_image(
 # ------------------------------------------------------------------------------
 
 
-# @profile
 def process_IWs(
     # fmt: off
     stage_idx  : int,
@@ -267,11 +253,23 @@ def process_IWs(
     idx_step = 1 if IWs_slice.step is None else IWs_slice.step
 
     for IW_idx in range(idx_start, idx_stop, idx_step):
-        IW_A_, IW_B = obtain_IWs_from_image(
+        (
+            Ax0,
+            Ax1,
+            Ay0,
+            Ay1,
+            Bx0,
+            Bx1,
+            By0,
+            By1,
+            zero_out_L,
+            zero_out_R,
+            zero_out_U,
+            zero_out_D,
+        ) = obtain_IW_limits(
             IW_idx,
             stage_idx,
-            A_,
-            B,
+            A_.shape,
             prev_IW_params,
             prev_VM_dx,
             prev_VM_dy,
@@ -287,15 +285,30 @@ def process_IWs(
             IW_shifts_y,
         )
 
-        if all_smaller_or_equal_to(IW_A_, 0):
+        fftw.construct_IW_A_B(
+            Ax0,
+            Ax1,
+            Ay0,
+            Ay1,
+            Bx0,
+            Bx1,
+            By0,
+            By1,
+            zero_out_L,
+            zero_out_R,
+            zero_out_U,
+            zero_out_D,
+        )
+
+        if fftw.IW_A_all_smaller_or_equal_to(0):
             # No details are present in the IW images. All pixels are below
             # or at the mean background --> Save computation time.
             # TODO: Make this a user config threshold? Is <= 0 even correct?
             # Must match up with 'zeroing out' mechanism of function
-            # `obtain_IWs_from_image()`.
+            # `obtain_IW_limits()`.
             C_maps[IW_idx, 0, 0] = np.nan
 
         else:
             # Perform 2D cross-correlation
             # C_maps[IW_idx, :, :] = fftconvolve(IW_B, IW_A_, mode="full")
-            C_maps[IW_idx, :, :] = fftw.convolve(IW_B, IW_A_)
+            C_maps[IW_idx, :, :] = fftw.convolve()

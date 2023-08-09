@@ -3,6 +3,6 @@ numba
 icc_rt
 scipy
 matplotlib
-pyfftw
+cupy
 scikit-image
 imagecodecs 
