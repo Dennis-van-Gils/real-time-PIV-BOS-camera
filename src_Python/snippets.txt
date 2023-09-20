@@ -5,6 +5,23 @@ that I still want to hold on to.
 """
 
 # ------------------------------------------------------------------------------
+#   2D correlation using native numpy
+# ------------------------------------------------------------------------------
+
+
+from numpy.fft import fft2, ifft2
+
+# NOTE: 'fft2' and 'ifft2' can not be jitted.
+def np_fftconvolve(A, B):
+    A_ = fft2(A, s=(A.shape[0] * 2 - 1, A.shape[1] * 2 - 1))
+    B_ = fft2(B, s=(B.shape[0] * 2 - 1, B.shape[1] * 2 - 1))
+    C_ = A_ * B_
+    D = np.real(ifft2(C_))
+    return D.astype(np.float32)
+    # return np.real(ifft2(fft2(A) * fft2(B)))
+
+
+# ------------------------------------------------------------------------------
 #   Examine IW meshgrid
 # ------------------------------------------------------------------------------
 

@@ -1,3 +1,11 @@
+TO INVESTIGATE
+--------------
+
+* Speeding up 2D correlation:
+https://github.com/ContinuumIO/numbapro-examples/blob/master/convolution/fftconvolve.py
+https://laurentperrinet.github.io/sciblog/posts/2017-09-20-the-fastest-2d-convolution-in-the-world.html
+
+
 Links on parallelization
 ------------------------
 
