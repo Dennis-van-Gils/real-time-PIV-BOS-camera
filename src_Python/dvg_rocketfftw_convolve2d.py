@@ -9,7 +9,7 @@ https://numba.discourse.group/t/rocket-fft-a-numba-extension-supporting-numpy-ff
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "08-08-2023"
+__date__ = "20-09-2023"
 __version__ = "1.0.0"
 # pylint: disable=invalid-name, missing-function-docstring
 
@@ -185,7 +185,6 @@ class FFTW_Convolver_Full2D:
 
         # Low-level rocket-fft
         # """
-        # TODO: Examine: Code silently returns at call `rfftn()` without work
         rfftn(self._rfft_in1, self._rfft_out1)
         rfftn(self._rfft_in2, self._rfft_out2)
 
@@ -226,7 +225,7 @@ fft_njit = partial(
 #     return np.fft.irfftn(a, s, axes, norm)
 
 
-# @fft_njit
+@fft_njit
 def rfftn(
     ain,
     aout,
@@ -238,7 +237,7 @@ def rfftn(
     r2c(ain, aout, axes, forward, fct, nthreads)
 
 
-# @fft_njit
+@fft_njit
 def irfftn(
     ain,
     aout,
