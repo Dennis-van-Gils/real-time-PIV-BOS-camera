@@ -11,7 +11,7 @@ VM: Displacement vector map
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "08-08-2023"
+__date__ = "20-09-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
@@ -22,6 +22,7 @@ import concurrent.futures
 import numpy as np
 import numpy.typing as npt
 from skimage.io import imread
+from scipy import fft as sp_fft
 
 # from dvg_fftw_convolve2d import FFTW_Convolver_Full2D
 from dvg_rocketfftw_convolve2d import FFTW_Convolver_Full2D
@@ -54,7 +55,7 @@ IW_OVERLAP = 0.5  # IW overlap fraction [0 - 1]
 # Number of concurrent workers. Each worker will process a chunk of all the IWs
 # over which the 2D correlations are calculated. The chunks will get (near)
 # evenly divided over all workers.
-N_WORKERS = 1
+N_WORKERS = 16
 
 N_FFTW_THREADS = 1
 
@@ -292,17 +293,42 @@ if __name__ == "__main__":
             fftw_workers = lfftw[stage_idx]
 
             # ------------------------------------------------------------------
+            #   Calculate shapes for upcoming fftconvolve
+            # ------------------------------------------------------------------
+            # TODO: Optimize. Right now is very lazy copy-paste from obsolete
+            # class `dvg_rocketfftw_convolve2d.FFTW_Convolver_Full2D`
+
+            s1 = (IW_size, IW_size)
+            s2 = (IW_size, IW_size)
+            shape = (IW_size * 2 - 1, IW_size * 2 - 1)
+
+            # Speed up FFT by padding to optimal size.
+            fshape = (
+                sp_fft.next_fast_len(shape[0]),
+                sp_fft.next_fast_len(shape[1]),
+            )
+            fshape_out = (fshape[0], fshape[1] // 2 + 1)
+
+            # Slice corresponding to the 'full' convolution elements to be
+            # finally returned as convolution result
+            fslice = tuple([slice(sz) for sz in shape])
+
+            # ------------------------------------------------------------------
             #   Walk over all interrogation windows and compute the 2D
             #   correlation maps
             # ------------------------------------------------------------------
 
             # (Near) evenly distribute all IWs over all workers
-            IWs_slices = []
+            # IWs_slices = []
+            idx_starts = np.zeros(N_WORKERS, dtype=int)
+            idx_stops = np.zeros(N_WORKERS, dtype=int)
             N_IWs = lIW_params[stage_idx][2]
             for i in range(N_WORKERS):
                 idx_start = int(np.floor(N_IWs / N_WORKERS * i))
                 idx_stop = int(np.floor(N_IWs / N_WORKERS * (i + 1)))
-                IWs_slices.append(slice(idx_start, idx_stop))
+                # IWs_slices.append(slice(idx_start, idx_stop))
+                idx_starts[i] = idx_start
+                idx_stops[i] = idx_stop
 
             p = (
                 stage_idx,
@@ -330,8 +356,13 @@ if __name__ == "__main__":
                     executor.submit(
                         process_IWs,
                         *p,
-                        fftw=fftw_workers[worker_idx],
-                        IWs_slice=IWs_slices[worker_idx],
+                        # fftw=fftw_workers[worker_idx],
+                        # IWs_slice=IWs_slices[worker_idx],
+                        IWs_start=idx_starts[worker_idx],
+                        IWs_stop=idx_stops[worker_idx],
+                        fshape=fshape,
+                        fshape_out=fshape_out,
+                        fslice=fslice,
                     )
                 )
 

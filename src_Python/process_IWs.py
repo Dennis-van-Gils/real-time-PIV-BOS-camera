@@ -3,16 +3,24 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "08-08-2023"
+__date__ = "20-09-2023"
 __version__ = "1.0"
+
+from functools import partial
 
 import numpy as np
 import numpy.typing as npt
-from numba import njit
+from numba import njit, jit, prange
 from scipy.signal import fftconvolve  # Only used for code validation
 
 # from dvg_fftw_convolve2d import FFTW_Convolver_Full2D
-from dvg_rocketfftw_convolve2d import FFTW_Convolver_Full2D
+# from dvg_rocketfftw_convolve2d import FFTW_Convolver_Full2D
+from rocket_fft import r2c, c2r
+from rocket_fft import numpy_like, scipy_like
+
+# numpy_like()
+scipy_like()
+
 from my_fun import lookup_IW_idx, all_smaller_or_equal_to
 
 # import line_profiler
@@ -221,6 +229,10 @@ def obtain_IWs_from_image(
 
 
 # @profile
+@njit(
+    cache=True,
+    nogil=True,
+)
 def process_IWs(
     # fmt: off
     stage_idx  : int,
@@ -241,8 +253,13 @@ def process_IWs(
     IW_shifts_x: npt.NDArray[np.int32],    # in-place operation, debug output
     IW_shifts_y: npt.NDArray[np.int32],    # in-place operation, debug output
     C_maps     : npt.NDArray[np.float32],  # in-place output
-    fftw       : FFTW_Convolver_Full2D,
-    IWs_slice  : slice = slice(None),
+    # fftw       : FFTW_Convolver_Full2D,    # TODO: exchange class object -> plain, because we can't @jit now
+    # IWs_slice  : slice = slice(None),
+    IWs_start  : int,
+    IWs_stop   : int,
+    fshape     : tuple[int, int],
+    fshape_out : tuple[int, int],
+    fslice     : tuple[slice, slice],
 ):
     # fmt: on
     """In-place operation on:
@@ -263,11 +280,16 @@ def process_IWs(
     multiple concurrent tasks. Defaults to all IWs when omitted.
     """
 
+    """
     idx_start = 0 if IWs_slice.start is None else IWs_slice.start
     idx_stop = C_maps.shape[0] if IWs_slice.stop is None else IWs_slice.stop
     idx_step = 1 if IWs_slice.step is None else IWs_slice.step
+    """
 
-    for IW_idx in range(idx_start, idx_stop, idx_step):
+    idx_start = IWs_start
+    idx_stop = IWs_stop
+
+    for IW_idx in range(idx_start, idx_stop):
         IW_A_, IW_B = obtain_IWs_from_image(
             IW_idx,
             stage_idx,
@@ -299,4 +321,94 @@ def process_IWs(
         else:
             # Perform 2D cross-correlation
             # C_maps[IW_idx, :, :] = fftconvolve(IW_B, IW_A_, mode="full")
-            C_maps[IW_idx, :, :] = fftw.convolve(IW_B, IW_A_)
+            # C_maps[IW_idx, :, :] = fftw.convolve(IW_B, IW_A_)
+
+            # TODO: Move allocation ahead of time and out of loop
+            _rfft_in1 = np.zeros(fshape, dtype="float32")
+            _rfft_in2 = np.zeros(fshape, dtype="float32")
+            _rfft_out1 = np.zeros(fshape_out, dtype="complex64")
+            _rfft_out2 = np.zeros(fshape_out, dtype="complex64")
+            _irfft_in = np.zeros(fshape_out, dtype="complex64")
+            _irfft_out = np.zeros(fshape, dtype="float32")
+
+            in1 = IW_B
+            in2 = IW_A_
+
+            # Zero padding and forwards Fourier transformation
+            _rfft_in1[: in1.shape[0], : in1.shape[1]] = in1
+            _rfft_in2[: in2.shape[0], : in2.shape[1]] = in2
+
+            # Low-level rocket-fft
+            # """
+            rfftn(_rfft_in1, _rfft_out1)
+            rfftn(_rfft_in2, _rfft_out2)
+
+            # Convolution and backwards Fourier transformation
+            fast_multiply(_rfft_out1, _rfft_out2, _irfft_in)
+            irfftn(_irfft_in, _irfft_out, forward=False)
+            result = _irfft_out
+            # """
+
+            # Return the 'full' elements
+            C_maps[IW_idx, :, :] = result[fslice]
+
+
+# ------------------------------------------------------------------------------
+#   fast_multiply
+# ------------------------------------------------------------------------------
+
+
+@njit(
+    "(complex64[:, ::1], complex64[:, ::1], complex64[:, ::1])",
+    nogil=True,
+    cache=True,
+)
+def fast_multiply(
+    in1: npt.NDArray[np.complex64],
+    in2: npt.NDArray[np.complex64],
+    out: npt.NDArray[np.complex64],
+):
+    """
+    * In-place operation on `out`.
+    * Faster version of `out = np.multiply(in1, in2)`.
+    * Not parallelized.
+    """
+    for i in range(in1.shape[0]):
+        for j in range(in1.shape[1]):
+            out[i, j] = in1[i, j] * in2[i, j]
+
+
+# ------------------------------------------------------------------------------
+#   rocket_fftw
+# ------------------------------------------------------------------------------
+
+
+fft_njit = partial(
+    njit,
+    cache=True,
+    nogil=True,
+)
+
+
+@fft_njit
+def rfftn(
+    ain,
+    aout,
+    axes=np.array([0, 1], dtype=np.int64),
+    forward=True,
+    fct=np.float32(1.0),
+    nthreads=np.int64(1),
+):
+    r2c(ain, aout, axes, forward, fct, nthreads)
+
+
+@fft_njit
+def irfftn(
+    ain,
+    aout,
+    axes=np.array([0, 1], dtype=np.int64),
+    forward=True,
+    fct=np.float32(1.0),
+    nthreads=np.int64(1),
+):
+    c2r(ain, aout, axes, forward, fct, nthreads)
