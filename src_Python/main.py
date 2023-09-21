@@ -11,7 +11,7 @@ VM: Displacement vector map
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "20-09-2023"
+__date__ = "21-09-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
@@ -22,10 +22,9 @@ import concurrent.futures
 import numpy as np
 import numpy.typing as npt
 from skimage.io import imread
-from scipy import fft as sp_fft
 
 # from dvg_fftw_convolve2d import FFTW_Convolver_Full2D
-from dvg_rocketfftw_convolve2d import FFTW_Convolver_Full2D
+from dvg_rocketfft_convolve2d import FFT_Convolver_Full2D
 from my_fun import (
     get_filename_from_full_path,
     remove_mean_background,
@@ -57,7 +56,7 @@ IW_OVERLAP = 0.5  # IW overlap fraction [0 - 1]
 # evenly divided over all workers.
 N_WORKERS = 16
 
-N_FFTW_THREADS = 1
+N_FFT_THREADS = 1
 
 # Info: Release GIL in pyFFTW also when argument `threads=1`.
 # https://github.com/pyFFTW/pyFFTW/commit/0fed0706aaa6898913d4e8716d7eb3f9a4a1351d
@@ -147,10 +146,10 @@ if __name__ == "__main__":
     lVM_dy: list[npt.NDArray[np.float32]] = []      # NDArray shape (N_IWs, )
     # fmt: on
 
-    # List of pyFFTW calculation instances per stage of the multigrid. In
-    # addition, each stage will have a multiple of identical pyFFTW instances
+    # List of FFT calculation instances per stage of the multigrid. In
+    # addition, each stage will have a multiple of identical FFT instances
     # equal to the number of concurrent workers set in `N_WORKERS`.
-    lfftw: list[list[FFTW_Convolver_Full2D]] = []
+    lfft: list[list[FFT_Convolver_Full2D]] = []
 
     N_stages = len(IW_SIZES)
     for stage_idx, IW_size in enumerate(IW_SIZES):
@@ -197,16 +196,16 @@ if __name__ == "__main__":
         lVM_dx.append(np.zeros(N_IWs, dtype=np.float32))
         lVM_dy.append(np.zeros(N_IWs, dtype=np.float32))
 
-        # Create pyFFTW calculation objects
-        fftw_workers = []
+        # Create FFT calculation objects
+        fft_workers = []
         for worker_idx in range(N_WORKERS):
-            fftw_workers.append(
-                FFTW_Convolver_Full2D(
-                    (IW_size, IW_size),
-                    fftw_threads=N_FFTW_THREADS,
+            fft_workers.append(
+                FFT_Convolver_Full2D(
+                    IW_size,
+                    fft_threads=N_FFT_THREADS,
                 )
             )
-        lfftw.append(fftw_workers)
+        lfft.append(fft_workers)
 
     # --------------------------------------------------------------------------
     #   Walk over all image pairs
@@ -290,28 +289,7 @@ if __name__ == "__main__":
             VM_grid_y = lVM_grid_y[stage_idx]
             VM_dx = lVM_dx[stage_idx]
             VM_dy = lVM_dy[stage_idx]
-            fftw_workers = lfftw[stage_idx]
-
-            # ------------------------------------------------------------------
-            #   Calculate shapes for upcoming fftconvolve
-            # ------------------------------------------------------------------
-            # TODO: Optimize. Right now is very lazy copy-paste from obsolete
-            # class `dvg_rocketfftw_convolve2d.FFTW_Convolver_Full2D`
-
-            s1 = (IW_size, IW_size)
-            s2 = (IW_size, IW_size)
-            shape = (IW_size * 2 - 1, IW_size * 2 - 1)
-
-            # Speed up FFT by padding to optimal size.
-            fshape = (
-                sp_fft.next_fast_len(shape[0]),
-                sp_fft.next_fast_len(shape[1]),
-            )
-            fshape_out = (fshape[0], fshape[1] // 2 + 1)
-
-            # Slice corresponding to the 'full' convolution elements to be
-            # finally returned as convolution result
-            fslice = tuple([slice(sz) for sz in shape])
+            fft_workers = lfft[stage_idx]
 
             # ------------------------------------------------------------------
             #   Walk over all interrogation windows and compute the 2D
@@ -319,16 +297,12 @@ if __name__ == "__main__":
             # ------------------------------------------------------------------
 
             # (Near) evenly distribute all IWs over all workers
-            # IWs_slices = []
-            idx_starts = np.zeros(N_WORKERS, dtype=int)
-            idx_stops = np.zeros(N_WORKERS, dtype=int)
+            IWs_slices = []
             N_IWs = lIW_params[stage_idx][2]
             for i in range(N_WORKERS):
                 idx_start = int(np.floor(N_IWs / N_WORKERS * i))
                 idx_stop = int(np.floor(N_IWs / N_WORKERS * (i + 1)))
-                # IWs_slices.append(slice(idx_start, idx_stop))
-                idx_starts[i] = idx_start
-                idx_stops[i] = idx_stop
+                IWs_slices.append(slice(idx_start, idx_stop))
 
             p = (
                 stage_idx,
@@ -356,39 +330,13 @@ if __name__ == "__main__":
                     executor.submit(
                         process_IWs,
                         *p,
-                        # fftw=fftw_workers[worker_idx],
-                        # IWs_slice=IWs_slices[worker_idx],
-                        IWs_start=idx_starts[worker_idx],
-                        IWs_stop=idx_stops[worker_idx],
-                        fshape=fshape,
-                        fshape_out=fshape_out,
-                        fslice=fslice,
+                        fft=fft_workers[worker_idx],
+                        IWs_slice=IWs_slices[worker_idx],
                     )
                 )
 
             # Wait for all tasks to complete
             concurrent.futures.wait(futures)
-
-            # process_IWs(
-            #     stage_idx,
-            #     A_,
-            #     B,
-            #     lIW_params[stage_idx - 1],
-            #     lVM_dx[stage_idx - 1],
-            #     lVM_dy[stage_idx - 1],
-            #     A_IW_grid_x,
-            #     A_IW_grid_y,
-            #     A_IW_lims_x,
-            #     A_IW_lims_y,
-            #     B_IW_grid_x,
-            #     B_IW_grid_y,
-            #     B_IW_lims_x,
-            #     B_IW_lims_y,
-            #     IW_shifts_x,
-            #     IW_shifts_y,
-            #     C_maps,
-            #     fftw,
-            # )
 
             # ------------------------------------------------------------------
             #   Compute displacement vectors
