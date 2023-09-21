@@ -207,6 +207,30 @@ if __name__ == "__main__":
             )
         lfft.append(fft_workers)
 
+    # Force-trigger an eager numba compilation to take the compilation time of
+    # function `process_IWs()` out of the timeit results.
+    process_IWs(
+        0,
+        np.zeros((1, 1), dtype=np.float32),
+        np.zeros((1, 1), dtype=np.float32),
+        lIW_params[0],
+        lVM_dx[0],
+        lVM_dy[0],
+        lA_IW_grid_x[0],
+        lA_IW_grid_y[0],
+        lA_IW_lims_x[0],
+        lA_IW_lims_y[0],
+        lB_IW_grid_x[0],
+        lB_IW_grid_y[0],
+        lB_IW_lims_x[0],
+        lB_IW_lims_y[0],
+        lIW_shifts_x[0],
+        lIW_shifts_y[0],
+        lC_maps[0],
+        lfft[0][0],
+        slice(0, 0),
+    )
+
     # --------------------------------------------------------------------------
     #   Walk over all image pairs
     # --------------------------------------------------------------------------
