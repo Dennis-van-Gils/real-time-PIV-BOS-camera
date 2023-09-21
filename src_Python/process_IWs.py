@@ -8,23 +8,19 @@ __version__ = "1.0"
 
 import numpy as np
 import numpy.typing as npt
-from numba import njit
+import numba as nb
 from scipy.signal import fftconvolve  # Only used for code validation
 
 # from dvg_fftw_convolve2d import FFTW_Convolver_Full2D
 from dvg_rocketfft_convolve2d import FFT_Convolver_Full2D
-
 from my_fun import lookup_IW_idx, all_smaller_or_equal_to
-
-# import line_profiler
-# profile = line_profiler.LineProfiler()
 
 # ------------------------------------------------------------------------------
 #   obtain_IWs_from_image
 # ------------------------------------------------------------------------------
 
 
-@njit(
+@nb.njit(
     "Tuple((float32[:, :], float32[:, :])) \
         (int32, int32, \
         float32[:, ::1], float32[:, ::1], \
@@ -221,8 +217,7 @@ def obtain_IWs_from_image(
 # ------------------------------------------------------------------------------
 
 
-# @profile
-@njit(
+@nb.njit(
     cache=True,
     nogil=True,
 )

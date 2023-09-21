@@ -17,11 +17,7 @@ __version__ = "1.0.0"
 
 import numpy as np
 import numpy.typing as npt
-
-import numba
-from numba import njit
-from numba.experimental import jitclass
-
+import numba as nb
 import rocket_fft
 
 rocket_fft.scipy_like()
@@ -31,7 +27,7 @@ rocket_fft.scipy_like()
 # ------------------------------------------------------------------------------
 
 
-@njit(
+@nb.njit(
     "(complex64[:, ::1], complex64[:, ::1], complex64[:, ::1])",
     nogil=True,
     cache=True,
@@ -57,19 +53,19 @@ def fast_multiply(
 
 # fmt: off
 spec = [
-    ("fft_threads", numba.int64),
-    ("full_slice_stop", numba.int64),
-    ("_rfft_in1" , numba.float32[:, ::1]),
-    ("_rfft_in2" , numba.float32[:, ::1]),
-    ("_rfft_out1", numba.complex64[:, ::1]),
-    ("_rfft_out2", numba.complex64[:, ::1]),
-    ("_irfft_in" , numba.complex64[:, ::1]),
-    ("_irfft_out", numba.float32[:, ::1]),
+    ("fft_threads", nb.int64),
+    ("full_slice_stop", nb.int64),
+    ("_rfft_in1" , nb.float32[:, ::1]),
+    ("_rfft_in2" , nb.float32[:, ::1]),
+    ("_rfft_out1", nb.complex64[:, ::1]),
+    ("_rfft_out2", nb.complex64[:, ::1]),
+    ("_irfft_in" , nb.complex64[:, ::1]),
+    ("_irfft_out", nb.float32[:, ::1]),
 ]
 # fmt: on
 
 
-@jitclass(spec=spec)  # type: ignore
+@nb.experimental.jitclass(spec=spec)  # type: ignore
 class FFT_Convolver_Full2D:
     """Manages a fast-Fourier transform (FFT) convolution on 2D input arrays
     `in1` and `in2` as passed to method `convolve()`, which will return the
@@ -162,7 +158,7 @@ class FFT_Convolver_Full2D:
 # ------------------------------------------------------------------------------
 
 
-@njit(
+@nb.njit(
     "(float32[:, ::1], complex64[:, ::1], int64)",
     cache=True,
     nogil=True,
@@ -174,7 +170,7 @@ def rfftn(ain, aout, nthreads=np.int64(1)):
     rocket_fft.r2c(ain, aout, axes, forward, fct, nthreads)
 
 
-@njit(
+@nb.njit(
     "(complex64[:, ::1], float32[:, ::1], int64)",
     cache=True,
     nogil=True,

@@ -3,14 +3,14 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "07-08-2023"
+__date__ = "21-09-2023"
 __version__ = "1.0"
 
 import os
 
 import numpy as np
 import numpy.typing as npt
-from numba import jit, njit, prange
+import numba as nb
 
 # ------------------------------------------------------------------------------
 #   get_filename_from_full_path
@@ -26,7 +26,7 @@ def get_filename_from_full_path(p: str):
 # ------------------------------------------------------------------------------
 
 
-@njit(
+@nb.njit(
     "(float32[:, ::1], )",
     parallel=True,
     cache=True,
@@ -51,13 +51,13 @@ def remove_mean_background(img: npt.NDArray[np.float32]):
     """
 
     sigma = 0  # sum
-    for y in prange(img.shape[0]):
-        for x in prange(img.shape[1]):
+    for y in nb.prange(img.shape[0]):
+        for x in nb.prange(img.shape[1]):
             sigma += img[y, x]
     mu = sigma / img.size  # mean
 
-    for y in prange(img.shape[0]):
-        for x in prange(img.shape[1]):
+    for y in nb.prange(img.shape[0]):
+        for x in nb.prange(img.shape[1]):
             img[y, x] -= mu
 
 
@@ -66,7 +66,7 @@ def remove_mean_background(img: npt.NDArray[np.float32]):
 # ------------------------------------------------------------------------------
 
 
-@njit(
+@nb.njit(
     cache=True,
     nogil=True,
 )
@@ -198,7 +198,7 @@ def create_IW_grid(
 # ------------------------------------------------------------------------------
 
 
-@njit(
+@nb.njit(
     "(int32)(int32, int32, Tuple((int32, float32, int32, int32, int32)))",
     cache=True,
     nogil=True,
@@ -231,7 +231,7 @@ def lookup_IW_idx(
 # ------------------------------------------------------------------------------
 
 
-@njit(
+@nb.njit(
     "float32[:, :](float32[:, :], )",
     parallel=False,  # Can't parallelize
     cache=True,
@@ -256,7 +256,7 @@ def fliplrud(img: npt.NDArray[np.float32]) -> npt.NDArray[np.float32]:
 # ------------------------------------------------------------------------------
 
 
-@njit(
+@nb.njit(
     "Tuple((float32, float32))(float32[:, :], int32, int32)",
     cache=True,
     nogil=True,
@@ -300,7 +300,7 @@ def subpx_3pgf_2D(
 # ------------------------------------------------------------------------------
 
 
-@njit(
+@nb.njit(
     "float32(float32[:, :],)",
     # parallel=True,  # Not possible
     cache=True,
@@ -327,7 +327,7 @@ def fast_max(in1: npt.NDArray[np.float32]) -> np.float32:
 # ------------------------------------------------------------------------------
 
 
-@njit(
+@nb.njit(
     "boolean(float32[:, :], float32)",
     # parallel=True,  # Not possible
     cache=True,
@@ -356,7 +356,7 @@ def all_smaller_or_equal_to(
 # ------------------------------------------------------------------------------
 
 
-@njit(
+@nb.njit(
     "(float32[:, :, :],)",
     parallel=True,
     cache=True,
@@ -367,7 +367,7 @@ def normalize_C_maps(C_maps: npt.NDArray[np.float32]):
     NOTE: It is not mandatory to normalize the correlations maps for the peak
     finding algorithm to work correctly. Normalizing wastes cpu time.
     """
-    for IW_idx in prange(C_maps.shape[0]):
+    for IW_idx in nb.prange(C_maps.shape[0]):
         C = C_maps[IW_idx, :, :]
         if np.isnan(C[0, 0]):
             # Nothing sensible to normalize
@@ -381,7 +381,7 @@ def normalize_C_maps(C_maps: npt.NDArray[np.float32]):
 # ------------------------------------------------------------------------------
 
 
-@njit(
+@nb.njit(
     "(float32[:, :, :], int32[::1], int32[::1], float32[::1], float32[::1], boolean)",
     parallel=True,
     cache=True,
@@ -398,7 +398,7 @@ def compute_displacement_vectors_from_C_maps(
     """In-place operation on `VM_dx` and `VM_dy`.
     NOTE: The passed correlation maps do not have to be normalized for the peak
     finding algorithm to work correctly. Normalizing wastes cpu time."""
-    for IW_idx in prange(C_maps.shape[0]):
+    for IW_idx in nb.prange(C_maps.shape[0]):
         C = C_maps[IW_idx, :, :]
 
         if np.isnan(C[0, 0]):
