@@ -218,14 +218,21 @@ if __name__ == "__main__":
     s2 = (64, 64)  # shape 2
 
     # Create black images containing a white bar
-    w = 8  # width fraction of the white bar
+    w = 4  # width fraction of the white bar
+    h = 4  # height fraction of the white bar
     m1 = [x // 2 for x in s1]  # middle 1
     m2 = [x // 2 for x in s2]  # middle 2
 
     A = np.zeros(s1, dtype=np.float32)
     B = np.zeros(s2, dtype=np.float32)
-    A[:, m1[1] - s1[1] // w : m1[1] + s1[1] // w] = 1
-    B[m2[0] - s2[0] // w : m2[0] + s2[0] // w, :] = 1
+    A[
+        m1[0] - s1[0] // h : m1[0] + s1[0] // h,
+        m1[1] - s1[1] // w : m1[1] + s1[1] // w,
+    ] = 1
+    B[
+        m2[0] - s2[0] // w : m2[0] + s2[0] // w,
+        m2[1] - s2[1] // h : m2[1] + s2[1] // h,
+    ] = 1
 
     fft = FFT_Convolver2D_Full(A.shape, B.shape, fft_threads=1)
 
