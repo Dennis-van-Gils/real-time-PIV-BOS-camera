@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 DO NOT USE: Suffers from edge effects, because we do not zero-pad.
-Performs lightning-fast convolutions on 2D input arrays.
+Performs lightning-fast convolutions.
 
 The convolution is based on the fast-Fourier transform (FFT) as performed by the
 excellent `fftw` (http://www.fftw.org) library. It will plan the transformations
@@ -84,15 +84,15 @@ meaningful and usable output matrix.
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "07-08-2023"
+__date__ = "22-09-2023"
 __version__ = "1.0.0"
 # pylint: disable=invalid-name, missing-function-docstring
 
 import sys
 import numpy as np
 import numpy.typing as npt
+import numba as nb
 import pyfftw
-from numba import njit, prange
 
 # ------------------------------------------------------------------------------
 #   fast_multiply
@@ -112,7 +112,7 @@ shape           fast_multiply   fast_multiply_p
 """
 
 
-@njit(
+@nb.njit(
     "(complex64[:, ::1], complex64[:, ::1], complex64[:, ::1])",
     nogil=True,
     cache=True,
@@ -132,7 +132,7 @@ def fast_multiply(
             out[i, j] = in1[i, j] * in2[i, j]
 
 
-@njit(
+@nb.njit(
     "(complex64[:, ::1], complex64[:, ::1], complex64[:, ::1])",
     nogil=True,
     cache=True,
@@ -147,113 +147,19 @@ def fast_multiply_p(
     * In-place operation on `out`.
     * Faster version of `out = np.multiply(in1, in2)`.
     * Parallelized. Only beneficial for `shape >~ (256, 256)`. Use
-    `fast_multiply_o()` when shape is smaller.
+      `fast_multiply()` when shape is smaller.
     """
-    for i in prange(in1.shape[0]):
-        for j in prange(in1.shape[1]):
+    for i in nb.prange(in1.shape[0]):
+        for j in nb.prange(in1.shape[1]):
             out[i, j] = in1[i, j] * in2[i, j]
 
 
 # ------------------------------------------------------------------------------
-#   FFTW_Convolver_Full2D
+#   fast_fftshift
 # ------------------------------------------------------------------------------
 
 
-class FFTW_Convolver_Full2D:
-    """Manages a fast-Fourier transform (FFT) convolution on 2D input arrays
-    `in1` and `in2` as passed to method `convolve()`, which will return the
-    result as a contiguous C-style `numpy.ndarray` containing the 'full'
-    convolution elements.
-
-    Here, we demand both `in1` and `in2` to be of equal size for calculation
-    speed improvements.
-
-    Args:
-        s (tuple):
-            Shape of the upcoming input arrays `in1` and `in2` passed to method
-            `convolve()`.
-
-        fftw_threads (int, optional):
-            Number of threads to use for the FFT transformations. When set to
-            > 1, the Python GIL will not be invoked.
-
-            Default: 5
-    """
-
-    def __init__(self, s: tuple, fftw_threads: int = 5):
-        # Example: s = (64, 64)
-        # s_out    evaluates to (64, 33)
-
-        self.s = s
-        s_out = (s[0], s[1] // 2 + 1)
-
-        # Create the FFTW plans
-        # fmt: off
-        self._rfft_in1  = pyfftw.zeros_aligned(s    , dtype="float32")
-        self._rfft_in2  = pyfftw.zeros_aligned(s    , dtype="float32")
-        self._rfft_out1 = pyfftw.empty_aligned(s_out, dtype="complex64")
-        self._rfft_out2 = pyfftw.empty_aligned(s_out, dtype="complex64")
-        self._irfft_in  = pyfftw.empty_aligned(s_out, dtype="complex64")
-        self._irfft_out = pyfftw.empty_aligned(s    , dtype="float32")
-        # fmt: on
-
-        print("Creating FFTW plans for convolution...", end="")
-        sys.stdout.flush()
-
-        p = {
-            "axes": (0, 1),
-            "flags": ("FFTW_MEASURE",),
-            "threads": fftw_threads,
-        }
-        self._fftw_rfft1 = pyfftw.FFTW(self._rfft_in1, self._rfft_out1, **p)
-        self._fftw_rfft2 = pyfftw.FFTW(self._rfft_in2, self._rfft_out2, **p)
-        self._fftw_irfft = pyfftw.FFTW(
-            self._irfft_in,
-            self._irfft_out,
-            direction="FFTW_BACKWARD",
-            **p,
-        )
-
-        print(" done.")
-
-    # --------------------------------------------------------------------------
-    #   convolve
-    # --------------------------------------------------------------------------
-
-    def convolve(
-        self, in1: npt.NDArray[np.float32], in2: npt.NDArray[np.float32]
-    ) -> npt.NDArray[np.float32]:
-        """Performs the FFT convolution on input arrays `in1` and `in2` and
-        returns the result as a contiguous C-style `numpy.ndarray` containing
-        the 'full' convolution elements.
-
-        Returns:
-            The full convolution results as a 2D numpy array with a shape
-            equal to `in1`.
-
-        NOTE: `in1` and `in2` do not necessarily have to be C-contiguous,
-        because they will, internal to this method, get copied into C-contiguous
-        arrays during the zero-padding operation.
-        NOTE: The output matrix is C-contiguous.
-        """
-
-        # Perform FFT convolution
-        # -----------------------
-        # Forwards Fourier transformation
-        self._rfft_in1[:] = in1
-        self._rfft_in2[:] = in2
-        self._fftw_rfft1()
-        self._fftw_rfft2()
-
-        # Convolution and backwards Fourier transformation
-        fast_multiply(self._rfft_out1, self._rfft_out2, self._irfft_in)
-        result = self._fftw_irfft()
-
-        # Return the 'full' elements
-        return fast_fftshift(result)
-
-
-@njit(
+@nb.njit(
     "float32[:, :](float32[:, :])",
     nogil=True,
     cache=True,
@@ -274,37 +180,167 @@ def fast_fftshift(C):
     return shifted
 
 
-if __name__ == "__main__":
-    # TRY CuPy:
-    # https://www.appsloveworld.com/numpy/100/83/how-to-do-100000-times-2d-fft-in-a-faster-way-using-python
+# ------------------------------------------------------------------------------
+#   FFT_Convolver2D_Full
+# ------------------------------------------------------------------------------
 
+
+class FFT_Convolver2D_Full:
+    """Manages a fast-Fourier transform (FFT) convolution on 2D input arrays
+    `in1` and `in2` to be passed to method `convolve()`, which will return the
+    result as a contiguous C-style `numpy.ndarray` containing the 'full'
+    convolution elements.
+
+    Here, we demand both `in1` and `in2` to be of equal size for calculation
+    speed improvements.
+
+    Args:
+        s1 (tuple[int, int]):
+            Shape of the upcoming input array `in1` to be passed to method
+            `convolve()`.
+
+        s2 (tuple[int, int]):
+            Shape of the upcoming input array `in2` to be passed to method
+            `convolve()`.
+
+        fft_threads (int, optional):
+            Number of threads to use for each individual FFT transformation.
+            When set to > 1, the Python GIL will not be invoked.
+
+            Default: 1
+    """
+
+    def __init__(
+        self,
+        s1: tuple[int, ...],
+        s2: tuple[int, ...],
+        fft_threads: int = 1,
+    ):
+        # Example:   s1 = (64, 64), s2 = (64, 64)
+        # s_out      evaluates to (64, 33)
+
+        # Ensure at least 1 thread
+        fft_threads = int(np.maximum(fft_threads, 1))
+
+        # fmt: off
+        # Allocate C-contiguous arrays to speed up calculations
+        s_out = (s1[0], s1[1] // 2 + 1)
+        self._rfft_in1  = pyfftw.zeros_aligned(s1   , dtype="float32")
+        self._rfft_in2  = pyfftw.zeros_aligned(s1   , dtype="float32")
+        self._rfft_out1 = pyfftw.empty_aligned(s_out, dtype="complex64")
+        self._rfft_out2 = pyfftw.empty_aligned(s_out, dtype="complex64")
+        self._irfft_in  = pyfftw.empty_aligned(s_out, dtype="complex64")
+        self._irfft_out = pyfftw.empty_aligned(s1   , dtype="float32")
+        # fmt: on
+
+        # Create the FFTW plans
+        print("Creating FFTW plans for convolution...", end="")
+        sys.stdout.flush()
+
+        p = {
+            "axes": (0, 1),
+            "flags": ("FFTW_MEASURE",),
+            "threads": fft_threads,
+        }
+        self._fftw_rfft1 = pyfftw.FFTW(self._rfft_in1, self._rfft_out1, **p)
+        self._fftw_rfft2 = pyfftw.FFTW(self._rfft_in2, self._rfft_out2, **p)
+        self._fftw_irfft = pyfftw.FFTW(
+            self._irfft_in,
+            self._irfft_out,
+            direction="FFTW_BACKWARD",
+            **p,
+        )
+
+        print(" done.")
+
+    # --------------------------------------------------------------------------
+    #   convolve
+    # --------------------------------------------------------------------------
+
+    def convolve(
+        self,
+        in1: npt.NDArray[np.float32],
+        in2: npt.NDArray[np.float32],
+    ) -> npt.NDArray[np.float32]:
+        """Performs the FFT convolution on input arrays `in1` and `in2` and
+        returns the result as a contiguous C-style `numpy.ndarray` containing
+        the 'full' convolution elements.
+
+        Returns:
+            The full convolution results as a 2D numpy array with a shape
+            equal to `in1`.
+
+        NOTE: `in1` and `in2` do not necessarily have to be C-contiguous because
+        they will, internal to this method, get copied into pre-allocated
+        C-contiguous arrays during the zero-padding operation.
+        NOTE: The output array is C-contiguous.
+        """
+
+        # Forwards Fourier transformations
+        self._rfft_in1[:] = in1
+        self._rfft_in2[:] = in2
+        self._fftw_rfft1()
+        self._fftw_rfft2()
+
+        # Convolution and backwards Fourier transformation
+        fast_multiply(self._rfft_out1, self._rfft_out2, self._irfft_in)
+        result = self._fftw_irfft()
+
+        # Return the 'full' elements
+        return fast_fftshift(result)
+
+
+# ------------------------------------------------------------------------------
+#   Main (timeit and demo)
+# ------------------------------------------------------------------------------
+
+if __name__ == "__main__":
     import timeit
-    from scipy.signal import windows
     import matplotlib.pyplot as plt
 
-    def gaussian_kernel(n, std, normalised=False):
-        """
-        Generates a n x n matrix with a centered gaussian
-        of standard deviation std centered on it. If normalised,
-        its volume equals 1."""
-        gaussian1D = windows.gaussian(n, std)
-        gaussian2D = np.outer(gaussian1D, gaussian1D)
-        if normalised:
-            gaussian2D /= 2 * np.pi * (std**2)
-        return gaussian2D
+    s1 = (64, 64)  # shape 1
+    s2 = (64, 64)  # shape 2
 
-    if 0:
-        size_A = 64
-        A = gaussian_kernel(size_A, size_A / 8)
-        B = gaussian_kernel(size_A, size_A / 2)
+    # Create black images containing a white bar
+    w = 4  # width fraction of the white bar
+    h = 4  # height fraction of the white bar
+    m1 = [x // 2 for x in s1]  # middle 1
+    m2 = [x // 2 for x in s2]  # middle 2
 
-        fftw_1 = FFTW_Convolver_Full2D(A.shape, fftw_threads=1)
-        C = fftw_1.convolve(A, B)
+    A = np.zeros(s1, dtype=np.float32)
+    B = np.zeros(s2, dtype=np.float32)
+    A[
+        m1[0] - s1[0] // h : m1[0] + s1[0] // h,
+        m1[1] - s1[1] // w : m1[1] + s1[1] // w,
+    ] = 1
+    B[
+        m2[0] - s2[0] // w : m2[0] + s2[0] // w,
+        m2[1] - s2[1] // h : m2[1] + s2[1] // h,
+    ] = 1
 
-        plt.figure(1)
-        plt.imshow(A, cmap="gray")
-        plt.figure(2)
-        plt.imshow(B, cmap="gray")
-        plt.figure(3)
-        plt.imshow(C, cmap="gray")
-        plt.show()
+    fft = FFT_Convolver2D_Full(A.shape, B.shape, fft_threads=1)
+
+    # Timeit
+    loop = int(1e3)
+    result = timeit.timeit(
+        "fft.convolve(A, B)",
+        setup=lambda: fft.convolve(A, B),
+        globals=globals(),
+        number=loop,
+    )
+    result = result / loop * 1000
+    print(f"{result:.2f} [ms] per iter")
+
+    # Plot
+    C = fft.convolve(A, B)
+
+    p = {"cmap": "jet", "interpolation": "none"}
+    fig, axs = plt.subplots(1, 3, figsize=(12, 4))
+    axs[0].imshow(A, **p)
+    axs[1].imshow(B, **p)
+    axs[2].imshow(C, **p)
+    fig.suptitle("dvg_fftconvolver_pyfftw")
+    axs[0].title.set_text("A")
+    axs[1].title.set_text("B")
+    axs[2].title.set_text("convolve(A, B)")
+    plt.show()
