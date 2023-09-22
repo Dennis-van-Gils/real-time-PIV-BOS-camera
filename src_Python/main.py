@@ -24,7 +24,7 @@ import numpy.typing as npt
 from skimage.io import imread
 
 # from dvg_fftw_convolve2d import FFTW_Convolver_Full2D
-from dvg_rocketfft_convolve2d import FFT_Convolver_Full2D
+from dvg_fftconvolver_rocketfft import FFT_Convolver2D_Full
 from my_fun import (
     get_filename_from_full_path,
     remove_mean_background,
@@ -149,7 +149,7 @@ if __name__ == "__main__":
     # List of FFT calculation instances per stage of the multigrid. In
     # addition, each stage will have a multiple of identical FFT instances
     # equal to the number of concurrent workers set in `N_WORKERS`.
-    lfft: list[list[FFT_Convolver_Full2D]] = []
+    lfft: list[list[FFT_Convolver2D_Full]] = []
 
     N_stages = len(IW_SIZES)
     for stage_idx, IW_size in enumerate(IW_SIZES):
@@ -200,8 +200,9 @@ if __name__ == "__main__":
         fft_workers = []
         for worker_idx in range(N_WORKERS):
             fft_workers.append(
-                FFT_Convolver_Full2D(
-                    IW_size,
+                FFT_Convolver2D_Full(
+                    (IW_size, IW_size),
+                    (IW_size, IW_size),
                     fft_threads=N_FFT_THREADS,
                 )
             )

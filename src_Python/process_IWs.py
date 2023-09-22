@@ -12,7 +12,7 @@ import numba as nb
 from scipy.signal import fftconvolve  # Only used for code validation
 
 # from dvg_fftw_convolve2d import FFTW_Convolver_Full2D
-from dvg_rocketfft_convolve2d import FFT_Convolver_Full2D
+from dvg_fftconvolver_rocketfft import FFT_Convolver2D_Full
 from my_fun import lookup_IW_idx, all_smaller_or_equal_to
 
 # ------------------------------------------------------------------------------
@@ -241,7 +241,7 @@ def process_IWs(
     IW_shifts_x: npt.NDArray[np.int32],    # in-place operation, debug output
     IW_shifts_y: npt.NDArray[np.int32],    # in-place operation, debug output
     C_maps     : npt.NDArray[np.float32],  # in-place output
-    fft        : FFT_Convolver_Full2D,
+    fft        : FFT_Convolver2D_Full,
     IWs_slice  : slice = slice(None),
 ):
     # fmt: on

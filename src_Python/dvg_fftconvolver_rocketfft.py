@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Performs lightning-fast convolutions on 2D input arrays.
-All code is fully jitted and running in NoPython mode.
+"""Performs lightning-fast convolutions.
+All code is fully jitted by `numba` and running in `No Python` mode.
 
 Rocket-FFT:
 https://github.com/styfenschaer/rocket-fft
@@ -11,7 +11,7 @@ https://numba.discourse.group/t/rocket-fft-a-numba-extension-supporting-numpy-ff
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "21-09-2023"
+__date__ = "22-09-2023"
 __version__ = "1.0.0"
 # pylint: disable=invalid-name, missing-function-docstring
 
@@ -48,34 +48,37 @@ def fast_multiply(
 
 
 # ------------------------------------------------------------------------------
-#   FFT_Convolver_Full2D
+#   FFT_Convolver2D_Full
 # ------------------------------------------------------------------------------
 
 # fmt: off
 spec = [
     ("fft_threads", nb.int64),
-    ("full_slice_stop", nb.int64),
-    ("_rfft_in1" , nb.float32[:, ::1]),
-    ("_rfft_in2" , nb.float32[:, ::1]),
-    ("_rfft_out1", nb.complex64[:, ::1]),
-    ("_rfft_out2", nb.complex64[:, ::1]),
-    ("_irfft_in" , nb.complex64[:, ::1]),
-    ("_irfft_out", nb.float32[:, ::1]),
+    ("_slice_full", nb.types.UniTuple(nb.types.slice2_type, 2)),
+    ("_rfft_in1"  , nb.float32  [:, ::1]),
+    ("_rfft_in2"  , nb.float32  [:, ::1]),
+    ("_rfft_out1" , nb.complex64[:, ::1]),
+    ("_rfft_out2" , nb.complex64[:, ::1]),
+    ("_irfft_in"  , nb.complex64[:, ::1]),
+    ("_irfft_out" , nb.float32  [:, ::1]),
 ]
 # fmt: on
 
 
 @nb.experimental.jitclass(spec=spec)  # type: ignore
-class FFT_Convolver_Full2D:
+class FFT_Convolver2D_Full:
     """Manages a fast-Fourier transform (FFT) convolution on 2D input arrays
-    `in1` and `in2` as passed to method `convolve()`, which will return the
+    `in1` and `in2` to be passed to method `convolve()`, which will return the
     result as a `numpy.ndarray` containing the 'full' convolution elements.
-    Arrays `in1` and `in2` are each of size NxN.
 
     Args:
-        N (int):
-            NxN shape of the upcoming input arrays `in1` and `in2` passed to
-            method `convolve()`.
+        s1 (tuple[int, int]):
+            Shape of the upcoming input array `in1` to be passed to method
+            `convolve()`.
+
+        s2 (tuple[int, int]):
+            Shape of the upcoming input array `in2` to be passed to method
+            `convolve()`.
 
         fft_threads (int, optional):
             Number of threads to use for each individual FFT transformation.
@@ -83,28 +86,35 @@ class FFT_Convolver_Full2D:
             Default: 1
     """
 
-    def __init__(self, N: int, fft_threads: int = 1):
-        # Example:   N = 64
+    def __init__(
+        self,
+        s1: tuple[int, ...],
+        s2: tuple[int, ...],
+        fft_threads: int = 1,
+    ):
+        # Example:   s1 = (64, 64), s2 = (64, 64)
         # shape      evaluates to (127, 127)
         # fshape     evaluates to (128, 128)
         # fshape_out evaluates to (128, 65)
-        # fslice     evaluates to ((0:127), (0:127))
+        # slice_full evaluates to ((0:127), (0:127))
 
+        # Ensure at least 1 thread
         self.fft_threads = np.int64(np.maximum(fft_threads, 1))
 
-        # Speed up FFT by padding to optimal size
-        shape = (N * 2 - 1, N * 2 - 1)
+        # Speed up FFT by zero-padding to optimal size
+        shape = (s1[0] + s2[0] - 1, s1[1] + s2[1] - 1)
         fshape = (
             rocket_fft.good_size(np.int64(shape[0]), real=True),
             rocket_fft.good_size(np.int64(shape[1]), real=True),
         )
         fshape_out = (fshape[0], fshape[1] // 2 + 1)
 
-        # Slice stop-point corresponding to the 'full' convolution elements to
-        # be finally returned as convolution result
-        self.full_slice_stop = shape[0]
+        # Slice corresponding to the 'full' convolution elements to be
+        # finally returned as convolution result
+        self._slice_full = (slice(shape[0]), slice(shape[1]))
 
         # fmt: off
+        # Allocate C-contiguous arrays to speed up calculations
         self._rfft_in1  = np.zeros(fshape    , dtype="float32")
         self._rfft_in2  = np.zeros(fshape    , dtype="float32")
         self._rfft_out1 = np.zeros(fshape_out, dtype="complex64")
@@ -128,12 +138,13 @@ class FFT_Convolver_Full2D:
 
         Returns:
             The full convolution results as a 2D numpy array with a shape
-            equal to `in1 + in2 - 1`.
+            equal to: `(in1.shape[0] + in2.shape[0] - 1, in1.shape[1] +
+            in2.shape[1] - 1)`.
 
-        NOTE: `in1` and `in2` do not necessarily have to be C-contiguous,
-        because they will, internal to this method, get copied into C-contiguous
-        arrays during the zero-padding operation.
-        NOTE: The output matrix is not contiguous.
+        NOTE: `in1` and `in2` do not necessarily have to be C-contiguous because
+        they will, internal to this method, get copied into pre-allocated
+        C-contiguous arrays during the zero-padding operation.
+        NOTE: The output array is not contiguous.
         """
 
         # Zero padding and forwards Fourier transformation
@@ -147,10 +158,9 @@ class FFT_Convolver_Full2D:
         # Convolution and backwards Fourier transformation
         fast_multiply(self._rfft_out1, self._rfft_out2, self._irfft_in)
         irfftn(self._irfft_in, self._irfft_out, nthreads=self.fft_threads)
-        result = self._irfft_out
 
         # Return the 'full' elements
-        return result[0 : self.full_slice_stop, 0 : self.full_slice_stop]
+        return self._irfft_out[self._slice_full]
 
 
 # ------------------------------------------------------------------------------
@@ -180,3 +190,53 @@ def irfftn(ain, aout, nthreads=np.int64(1)):
     forward = False
     fct = np.float32(1.0)
     rocket_fft.c2r(ain, aout, axes, forward, fct, nthreads)
+
+
+# ------------------------------------------------------------------------------
+#   Main (timeit and demo)
+# ------------------------------------------------------------------------------
+
+
+if __name__ == "__main__":
+    import timeit
+    import matplotlib.pyplot as plt
+
+    s1 = (64, 64)  # shape 1
+    s2 = (64, 64)  # shape 2
+
+    # Create black images containing a white bar
+    w = 8  # width fraction of the white bar
+    m1 = [x // 2 for x in s1]  # middle 1
+    m2 = [x // 2 for x in s2]  # middle 2
+
+    A = np.zeros(s1, dtype=np.float32)
+    B = np.zeros(s2, dtype=np.float32)
+    A[:, m1[1] - s1[1] // w : m1[1] + s1[1] // w] = 1
+    B[m2[0] - s2[0] // w : m2[0] + s2[0] // w, :] = 1
+
+    fft = FFT_Convolver2D_Full(A.shape, B.shape, fft_threads=1)
+
+    # Timeit
+    loop = int(1e3)
+    result = timeit.timeit(
+        "fft.convolve(A, B)",
+        setup=lambda: fft.convolve(A, B),
+        globals=globals(),
+        number=loop,
+    )
+    result = result / loop * 1000
+    print(f"{result:.2f} [ms] per iter")
+
+    # Plot
+    C = fft.convolve(A, B)
+
+    p = {"cmap": "jet", "interpolation": "none"}
+    fig, axs = plt.subplots(1, 3, figsize=(12, 4))
+    axs[0].imshow(A, **p)
+    axs[1].imshow(B, **p)
+    axs[2].imshow(C, **p)
+    fig.suptitle("dvg_fftconvolver_rocketfft")
+    axs[0].title.set_text("A")
+    axs[1].title.set_text("B")
+    axs[2].title.set_text("convolve(A, B)")
+    plt.show()
