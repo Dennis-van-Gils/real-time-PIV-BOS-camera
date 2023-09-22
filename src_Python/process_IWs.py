@@ -3,7 +3,7 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "21-09-2023"
+__date__ = "22-09-2023"
 __version__ = "1.0"
 
 import numpy as np
@@ -11,9 +11,23 @@ import numpy.typing as npt
 import numba as nb
 from scipy.signal import fftconvolve  # Only used for code validation
 
-# from dvg_fftw_convolve2d import FFTW_Convolver_Full2D
-from dvg_fftconvolver_rocketfft import FFT_Convolver2D_Full
 from my_fun import lookup_IW_idx, all_smaller_or_equal_to
+import config as C
+
+if C.FFT_LIB == C.FFT_LIBS.PYFFTW:
+    from dvg_fftconvolver_pyfftw import FFT_Convolver2D_Full
+elif C.FFT_LIB == C.FFT_LIBS.ROCKETFFT:
+    from dvg_fftconvolver_rocketfft import FFT_Convolver2D_Full
+else:
+    from dvg_fftconvolver_rocketfft import FFT_Convolver2D_Full
+
+
+def conditional_decorator(dec, condition):
+    def decorator(func):
+        return dec(func) if condition else func
+
+    return decorator
+
 
 # ------------------------------------------------------------------------------
 #   obtain_IWs_from_image
@@ -217,9 +231,12 @@ def obtain_IWs_from_image(
 # ------------------------------------------------------------------------------
 
 
-@nb.njit(
-    cache=True,
-    nogil=True,
+@conditional_decorator(
+    nb.njit(
+        cache=True,
+        nogil=True,
+    ),
+    C.FFT_LIB == C.FFT_LIBS.ROCKETFFT,
 )
 def process_IWs(
     # fmt: off
@@ -299,5 +316,4 @@ def process_IWs(
         else:
             # Perform 2D cross-correlation
             # C_maps[IW_idx, :, :] = fftconvolve(IW_B, IW_A_, mode="full")
-            # C_maps[IW_idx, :, :] = fftw.convolve(IW_B, IW_A_)
             C_maps[IW_idx, :, :] = fft.convolve(IW_B, IW_A_)

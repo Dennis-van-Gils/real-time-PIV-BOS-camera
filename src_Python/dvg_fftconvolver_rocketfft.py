@@ -20,11 +20,22 @@ import numpy.typing as npt
 import numba as nb
 import rocket_fft
 
-rocket_fft.scipy_like()
-
 # ------------------------------------------------------------------------------
 #   fast_multiply
 # ------------------------------------------------------------------------------
+
+"""Timeit results on computer Onera:
+
+                [ms] per iter
+shape           fast_multiply   fast_multiply_p
+(32, 32)        --> 0.00102         0.01334
+(64, 64)        --> 0.00222         0.01491
+(128, 128)      --> 0.00718         0.02000
+(256, 256)      --> 0.02753         0.03023
+(512, 512)          0.10537     --> 0.06094
+(1024, 1024)        0.78878     --> 0.40209
+(2048, 2048)        4.00985     --> 3.85964
+"""
 
 
 @nb.njit(
@@ -44,6 +55,28 @@ def fast_multiply(
     """
     for i in range(in1.shape[0]):
         for j in range(in1.shape[1]):
+            out[i, j] = in1[i, j] * in2[i, j]
+
+
+@nb.njit(
+    "(complex64[:, ::1], complex64[:, ::1], complex64[:, ::1])",
+    nogil=True,
+    cache=True,
+    parallel=True,
+)
+def fast_multiply_p(
+    in1: npt.NDArray[np.complex64],
+    in2: npt.NDArray[np.complex64],
+    out: npt.NDArray[np.complex64],
+):
+    """
+    * In-place operation on `out`.
+    * Faster version of `out = np.multiply(in1, in2)`.
+    * Parallelized. Only beneficial for `shape >~ (256, 256)`. Use
+      `fast_multiply()` when shape is smaller.
+    """
+    for i in nb.prange(in1.shape[0]):
+        for j in nb.prange(in1.shape[1]):
             out[i, j] = in1[i, j] * in2[i, j]
 
 
@@ -147,11 +180,11 @@ class FFT_Convolver2D_Full:
         NOTE: The output array is not contiguous.
         """
 
-        # Zero padding and forwards Fourier transformation
+        # Zero padding
         self._rfft_in1[: in1.shape[0], : in1.shape[1]] = in1
         self._rfft_in2[: in2.shape[0], : in2.shape[1]] = in2
 
-        # Forward Fourier transformations
+        # Forwards Fourier transformations
         rfftn(self._rfft_in1, self._rfft_out1, nthreads=self.fft_threads)
         rfftn(self._rfft_in2, self._rfft_out2, nthreads=self.fft_threads)
 
@@ -240,3 +273,58 @@ if __name__ == "__main__":
     axs[1].title.set_text("B")
     axs[2].title.set_text("convolve(A, B)")
     plt.show()
+
+    # Timeit different `fast_multiply()` schemes
+    if 0:
+        shapes = (
+            (32, 32),
+            (64, 64),
+            (128, 128),
+            (256, 256),
+            (512, 512),
+            (1024, 1024),
+            (2048, 2048),
+        )
+        results1 = []
+        results2 = []
+        loop = int(1e3)
+
+        print("Timeit different `fast_multiply()` schemes:")
+        for shape in shapes:
+            print(f"  shape: {shape}")
+            # fmt: off
+            np.random.seed(0)
+            a = (np.random.uniform(-1, 1, shape) +
+                 np.random.uniform( 1, 1, shape) * 1.0j)
+            b = (np.random.uniform(-1, 1, shape) +
+                 np.random.uniform( 1, 1, shape) * 1.0j)
+            # fmt: on
+            a = np.asarray(a, dtype=np.complex64)
+            b = np.asarray(b, dtype=np.complex64)
+            out = np.empty(a.shape, dtype=a.dtype)
+
+            result = timeit.timeit(
+                "fast_multiply(a, b, out)",
+                setup=lambda: fast_multiply(a, b, out),
+                globals=globals(),
+                number=loop,
+            )
+            result = result / loop * 1000
+            results1.append(result)
+
+            result = timeit.timeit(
+                "fast_multiply_p(a, b, out)",
+                setup=lambda: fast_multiply_p(a, b, out),
+                globals=globals(),
+                number=loop,
+            )
+            result = result / loop * 1000
+            results2.append(result)
+
+        print("\n")
+        print("                [ms] per iter")
+        print("shape           fast_multiply   fast_multiply_p")
+        for i in range(len(shapes)):
+            print(
+                f"{str(shapes[i]):16s}{results1[i]:<16.5f}{results2[i]:<16.5f}"
+            )

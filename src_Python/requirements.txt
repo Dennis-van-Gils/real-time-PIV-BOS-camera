@@ -4,5 +4,6 @@ icc_rt
 scipy
 matplotlib
 pyfftw
+rocket-fft
 scikit-image
 imagecodecs 

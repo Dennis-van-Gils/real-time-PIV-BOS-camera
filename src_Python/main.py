@@ -11,7 +11,7 @@ VM: Displacement vector map
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "21-09-2023"
+__date__ = "22-09-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
@@ -23,8 +23,6 @@ import numpy as np
 import numpy.typing as npt
 from skimage.io import imread
 
-# from dvg_fftw_convolve2d import FFTW_Convolver_Full2D
-from dvg_fftconvolver_rocketfft import FFT_Convolver2D_Full
 from my_fun import (
     get_filename_from_full_path,
     remove_mean_background,
@@ -35,6 +33,14 @@ from my_fun import (
     compute_displacement_vectors_from_C_maps,
 )
 from process_IWs import process_IWs
+import config as C
+
+if C.FFT_LIB == C.FFT_LIBS.PYFFTW:
+    from dvg_fftconvolver_pyfftw import FFT_Convolver2D_Full
+elif C.FFT_LIB == C.FFT_LIBS.ROCKETFFT:
+    from dvg_fftconvolver_rocketfft import FFT_Convolver2D_Full
+else:
+    from dvg_fftconvolver_rocketfft import FFT_Convolver2D_Full
 
 DEBUG = False  # Print debug info to terminal?
 SHOW_CORRELATION_MAPS = False
@@ -58,8 +64,6 @@ N_WORKERS = 16
 
 N_FFT_THREADS = 1
 
-# Info: Release GIL in pyFFTW also when argument `threads=1`.
-# https://github.com/pyFFTW/pyFFTW/commit/0fed0706aaa6898913d4e8716d7eb3f9a4a1351d
 
 # ------------------------------------------------------------------------------
 #   Main
