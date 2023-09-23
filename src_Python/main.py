@@ -287,12 +287,8 @@ if __name__ == "__main__":
         # Read images
         A = imread(fn1, as_gray=True)
         B = imread(fn2, as_gray=True)
-
-        # Enforce type and order
         A = np.asarray(A, dtype=np.float32, order="C")
         B = np.asarray(B, dtype=np.float32, order="C")
-
-        # Mean background removal
         remove_mean_background(A)
         remove_mean_background(B)
 
@@ -303,79 +299,63 @@ if __name__ == "__main__":
         # identical data because of the window overlapping.
         A_ = np.asarray(fliplrud(A), order="C")
 
-        # ----------------------------------------------------------------------
-        #   Walk over all multigrid stages
-        # ----------------------------------------------------------------------
-
         # Display info
         print(f"done in {perf_counter() - t_0:.3f}, ", end="")
         sys.stdout.flush()
         t_0 = perf_counter()
 
+        # ----------------------------------------------------------------------
+        #   Walk over all multigrid stages
+        # ----------------------------------------------------------------------
+
         for stage_idx, IW_size in enumerate(cfg.IW_SIZES):
-            # Short-hand variables
-            A_IW_grid_x = lA_IW_grid_x[stage_idx]
-            A_IW_grid_y = lA_IW_grid_y[stage_idx]
-            A_IW_lims_x = lA_IW_lims_x[stage_idx]
-            A_IW_lims_y = lA_IW_lims_y[stage_idx]
-            B_IW_grid_x = lB_IW_grid_x[stage_idx]
-            B_IW_grid_y = lB_IW_grid_y[stage_idx]
-            B_IW_lims_x = lB_IW_lims_x[stage_idx]
-            B_IW_lims_y = lB_IW_lims_y[stage_idx]
-            IW_shifts_x = lIW_shifts_x[stage_idx]
-            IW_shifts_y = lIW_shifts_y[stage_idx]
-            C_maps = lC_maps[stage_idx]
-            VM_grid_x = lVM_grid_x[stage_idx]
-            VM_grid_y = lVM_grid_y[stage_idx]
-            VM_dx = lVM_dx[stage_idx]
-            VM_dy = lVM_dy[stage_idx]
-            fft_workers = lfft[stage_idx]
-
-            # ------------------------------------------------------------------
-            #   Walk over all interrogation windows and compute the 2D
-            #   correlation maps
-            # ------------------------------------------------------------------
-
-            # (Near) evenly distribute all IWs over all workers
-            IWs_slices = []
             N_IWs = lIW_params[stage_idx][2]
-            for i in range(cfg.N_WORKERS):
-                idx_start = int(np.floor(N_IWs / cfg.N_WORKERS * i))
-                idx_stop = int(np.floor(N_IWs / cfg.N_WORKERS * (i + 1)))
-                IWs_slices.append(slice(idx_start, idx_stop))
 
-            p = (
-                stage_idx,
-                A_,
-                B,
-                lIW_params[stage_idx - 1],
-                lVM_dx[stage_idx - 1],
-                lVM_dy[stage_idx - 1],
-                A_IW_grid_x,
-                A_IW_grid_y,
-                A_IW_lims_x,
-                A_IW_lims_y,
-                B_IW_grid_x,
-                B_IW_grid_y,
-                B_IW_lims_x,
-                B_IW_lims_y,
-                IW_shifts_x,
-                IW_shifts_y,
-                C_maps,
-            )
+            # ------------------------------------------------------------------
+            #   Walk over all interrogation windows
+            # ------------------------------------------------------------------
 
+            # Evenly distribute the IWs over all concurrent workers
+            IWs_slices = []
+            for worker_idx in range(cfg.N_WORKERS):
+                IWs_slices.append(
+                    slice(
+                        int(np.floor(N_IWs / cfg.N_WORKERS * worker_idx)),
+                        int(np.floor(N_IWs / cfg.N_WORKERS * (worker_idx + 1))),
+                    )
+                )
+
+            # Spawn workers, each performing 2D convolutions on a slice of IWs
+            # fmt: off
             futures = []
             for worker_idx in range(cfg.N_WORKERS):
                 futures.append(
                     executor.submit(
                         process_IWs,
-                        *p,
-                        fft=fft_workers[worker_idx],
-                        IWs_slice=IWs_slices[worker_idx],
+                        stage_idx,
+                        A_,
+                        B,
+                        lIW_params  [stage_idx - 1],
+                        lVM_dx      [stage_idx - 1],
+                        lVM_dy      [stage_idx - 1],
+                        lA_IW_grid_x[stage_idx],
+                        lA_IW_grid_y[stage_idx],
+                        lA_IW_lims_x[stage_idx],
+                        lA_IW_lims_y[stage_idx],
+                        lB_IW_grid_x[stage_idx],
+                        lB_IW_grid_y[stage_idx],
+                        lB_IW_lims_x[stage_idx],
+                        lB_IW_lims_y[stage_idx],
+                        lIW_shifts_x[stage_idx],
+                        lIW_shifts_y[stage_idx],
+                        lC_maps     [stage_idx],
+                        lfft        [stage_idx][worker_idx],
+                        IWs_slices  [worker_idx],
                     )
                 )
+            # fmt: on
 
-            # Wait for all tasks to complete
+            # Wait for all workers to complete
             concurrent.futures.wait(futures)
 
             # ------------------------------------------------------------------
@@ -385,15 +365,18 @@ if __name__ == "__main__":
             # It is not necessary to normalize the correlation maps
             # normalize_C_maps(C_maps)  # Not necessary, adds overhead
 
+            # fmt: off
             compute_displacement_vectors_from_C_maps(
-                C_maps,
-                IW_shifts_x,
-                IW_shifts_y,
-                VM_dx,
-                VM_dy,
+                lC_maps     [stage_idx],
+                lIW_shifts_x[stage_idx],
+                lIW_shifts_y[stage_idx],
+                lVM_dx      [stage_idx],
+                lVM_dy      [stage_idx],
                 perform_subpixel_fitting=(stage_idx == N_stages - 1),
             )
+            # fmt: on
 
+        # Display info
         duration = perf_counter() - t_0
         print(f"{duration:.3f} sec")
 
@@ -402,7 +385,8 @@ if __name__ == "__main__":
         # ----------------------------------------------------------------------
 
         for stage_idx, IW_size in enumerate(cfg.IW_SIZES):
-            N_IWs = lIW_params[stage_idx][2]
+            # fmt: off
+            N_IWs       = lIW_params  [stage_idx][2]
             A_IW_grid_x = lA_IW_grid_x[stage_idx]
             A_IW_grid_y = lA_IW_grid_y[stage_idx]
             A_IW_lims_x = lA_IW_lims_x[stage_idx]
@@ -413,11 +397,12 @@ if __name__ == "__main__":
             B_IW_lims_y = lB_IW_lims_y[stage_idx]
             IW_shifts_x = lIW_shifts_x[stage_idx]
             IW_shifts_y = lIW_shifts_y[stage_idx]
-            C_maps = lC_maps[stage_idx]
-            VM_grid_x = lVM_grid_x[stage_idx]
-            VM_grid_y = lVM_grid_y[stage_idx]
-            VM_dx = lVM_dx[stage_idx]
-            VM_dy = lVM_dy[stage_idx]
+            C_maps      = lC_maps     [stage_idx]
+            VM_grid_x   = lVM_grid_x  [stage_idx]
+            VM_grid_y   = lVM_grid_y  [stage_idx]
+            VM_dx       = lVM_dx      [stage_idx]
+            VM_dy       = lVM_dy      [stage_idx]
+            # fmt: on
 
             if SHOW_CORRELATION_MAPS and LOAD_MPL:
                 # Reset any existing plot of the correlation map, because the IW
