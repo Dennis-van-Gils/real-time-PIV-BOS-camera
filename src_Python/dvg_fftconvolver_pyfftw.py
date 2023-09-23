@@ -146,8 +146,8 @@ class FFT_Convolver2D_Full:
         # fmt: on
 
         # Create the FFTW plans
-        print("Creating FFTW plans for convolution...", end="")
-        sys.stdout.flush()
+        # print("Creating FFTW plans for convolution...", end="")
+        # sys.stdout.flush()
 
         p = {
             "axes": (0, 1),
@@ -163,7 +163,7 @@ class FFT_Convolver2D_Full:
             **p,
         )
 
-        print(" done.")
+        # print(" done.")
 
     # --------------------------------------------------------------------------
     #   convolve
