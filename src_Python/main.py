@@ -15,6 +15,8 @@ __date__ = "23-09-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
+import sys
+import platform
 from time import perf_counter
 import concurrent.futures
 
@@ -58,6 +60,21 @@ if LOAD_MPL:
 # ------------------------------------------------------------------------------
 
 if __name__ == "__main__":
+    # Display info
+    print(f"Running on computer `{platform.node()}`")
+    print(f"  CPU: {platform.processor()}")
+    print(f"  OS : {platform.system()}")
+    print("\nConfiguration")
+    print(f"  FFT LIB      : {cfg.FFT_LIB.name}")
+    print(f"  N_WORKERS    : {cfg.N_WORKERS}")
+    print(f"  N_FFT_THREADS: {cfg.N_FFT_THREADS}")
+    print(f"  IW_SIZES     : {cfg.IW_SIZES}")
+    print(f"  IW_OVERLAP   : {cfg.IW_OVERLAP}\n")
+    print("Setting up... ", end="")
+    sys.stdout.flush()
+    t_0 = perf_counter()
+
+    # List of image files
     img_files = cfg.IMG_FILES
     N_img_files = len(img_files)
 
@@ -206,6 +223,9 @@ if __name__ == "__main__":
         slice(0, 0),
     )
 
+    # Display info
+    print(f"done in {perf_counter() - t_0:.3f} sec\n")
+
     # --------------------------------------------------------------------------
     #   Walk over all image pairs
     # --------------------------------------------------------------------------
@@ -247,6 +267,12 @@ if __name__ == "__main__":
         #   Image preparation
         # ----------------------------------------------------------------------
 
+        # Display info
+        print("Reading, processing... ", end="")
+        sys.stdout.flush()
+        t_0 = perf_counter()
+
+        # Read images
         A = imread(fn1, as_gray=True)
         B = imread(fn2, as_gray=True)
 
@@ -269,6 +295,9 @@ if __name__ == "__main__":
         #   Walk over all multigrid stages
         # ----------------------------------------------------------------------
 
+        # Display info
+        print(f"done in {perf_counter() - t_0:.3f}, ", end="")
+        sys.stdout.flush()
         t_0 = perf_counter()
 
         for stage_idx, IW_size in enumerate(cfg.IW_SIZES):
@@ -354,7 +383,7 @@ if __name__ == "__main__":
             )
 
         duration = perf_counter() - t_0
-        print(f"Finished in {duration:.3f} s")
+        print(f"{duration:.3f} sec")
 
         # ----------------------------------------------------------------------
         #   Debugging output

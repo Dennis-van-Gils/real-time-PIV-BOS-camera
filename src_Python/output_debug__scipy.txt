@@ -1,7 +1,18 @@
-Creating FFTW plans for convolution... done.
-Creating FFTW plans for convolution... done.
+Running on computer `Onera`
+  CPU: AMD64 Family 23 Model 113 Stepping 0, AuthenticAMD
+  OS : Windows
+
+Configuration
+  FFT LIB      : SCIPY
+  N_WORKERS    : 12
+  N_FFT_THREADS: 1
+  IW_SIZES     : [64, 32]
+  IW_OVERLAP   : 0.5
+
+Setting up... done in 3.274 sec
+
 01_A.png
-Finished in 1.034 s
+Reading, processing... done in 0.022, 0.202 sec
 IW: 0 of 1301 @px 32, 32
    A_xlim [   0,   63]
    A_ylim [   0,   63]
