@@ -128,10 +128,10 @@ class FFT_Convolver2D_Full:
 
         # Speed up FFT by zero-padding to optimal size
         shape = (s1[0] + s2[0] - 1, s1[1] + s2[1] - 1)
-        fshape = (
+        fshape: tuple[int, int] = (
             sp_fft.next_fast_len(np.int64(shape[0]), real=True),
             sp_fft.next_fast_len(np.int64(shape[1]), real=True),
-        )
+        )  # type: ignore
         fshape_out = (fshape[0], fshape[1] // 2 + 1)
 
         # Slice corresponding to the 'full' convolution elements to be
@@ -174,18 +174,18 @@ class FFT_Convolver2D_Full:
         self._rfft_in2[: in2.shape[0], : in2.shape[1]] = in2
 
         # Forwards Fourier transformations
-        _rfft_out1 = sp_fft.rfft2(
+        _rfft_out1: npt.NDArray[np.complex64] = sp_fft.rfft2(
             self._rfft_in1, overwrite_x=True, workers=self.fft_threads
-        )
-        _rfft_out2 = sp_fft.rfft2(
+        )  # type: ignore
+        _rfft_out2: npt.NDArray[np.complex64] = sp_fft.rfft2(
             self._rfft_in2, overwrite_x=True, workers=self.fft_threads
-        )
+        )  # type: ignore
 
         # Convolution and backwards Fourier transformation
         fast_multiply(_rfft_out1, _rfft_out2, self._irfft_in)
-        _irfft_out = sp_fft.irfft2(
+        _irfft_out: npt.NDArray[np.float32] = sp_fft.irfft2(
             self._irfft_in, overwrite_x=True, workers=self.fft_threads
-        )
+        )  # type: ignore
 
         # Return the 'full' elements
         return _irfft_out[self._slice_full]
