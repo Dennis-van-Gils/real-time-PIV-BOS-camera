@@ -20,7 +20,7 @@ from enum import IntEnum
 class FFT_LIBS(IntEnum):
     PYFFTW = 0
     ROCKETFFT = 1
-    # SCIPY = 2
+    SCIPY = 2
 
 
 # ------------------------------------------------------------------------------

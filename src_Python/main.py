@@ -38,6 +38,8 @@ if cfg.FFT_LIB == cfg.FFT_LIBS.PYFFTW:
     from dvg_fftconvolver_pyfftw import FFT_Convolver2D_Full
 elif cfg.FFT_LIB == cfg.FFT_LIBS.ROCKETFFT:
     from dvg_fftconvolver_rocketfft import FFT_Convolver2D_Full
+elif cfg.FFT_LIB == cfg.FFT_LIBS.SCIPY:
+    from dvg_fftconvolver_scipy import FFT_Convolver2D_Full
 else:
     from dvg_fftconvolver_rocketfft import FFT_Convolver2D_Full
 
