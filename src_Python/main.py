@@ -11,11 +11,10 @@ VM: Displacement vector map
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "22-09-2023"
+__date__ = "23-09-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
-import glob
 from time import perf_counter
 import concurrent.futures
 
@@ -33,11 +32,11 @@ from my_fun import (
     compute_displacement_vectors_from_C_maps,
 )
 from process_IWs import process_IWs
-import config as C
+import config as cfg
 
-if C.FFT_LIB == C.FFT_LIBS.PYFFTW:
+if cfg.FFT_LIB == cfg.FFT_LIBS.PYFFTW:
     from dvg_fftconvolver_pyfftw import FFT_Convolver2D_Full
-elif C.FFT_LIB == C.FFT_LIBS.ROCKETFFT:
+elif cfg.FFT_LIB == cfg.FFT_LIBS.ROCKETFFT:
     from dvg_fftconvolver_rocketfft import FFT_Convolver2D_Full
 else:
     from dvg_fftconvolver_rocketfft import FFT_Convolver2D_Full
@@ -52,43 +51,12 @@ if LOAD_MPL:
 
     mpl.use("TkAgg")
 
-# Holds the IW sizes for the multigrid analysis. Powers of two are advised with
-# each subsequent IW size the exact half of the previous IW size.
-IW_SIZES = []  # [px]
-IW_OVERLAP = 0.5  # IW overlap fraction [0 - 1]
-
-# Number of concurrent workers. Each worker will process a chunk of all the IWs
-# over which the 2D correlations are calculated. The chunks will get (near)
-# evenly divided over all workers.
-N_WORKERS = 16
-
-N_FFT_THREADS = 1
-
-
 # ------------------------------------------------------------------------------
 #   Main
 # ------------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    piv_set = 0
-
-    if piv_set == 0:
-        path = r"../test_imgs/PIV_rising_vortex_plume/*.png"
-        IW_SIZES = [64, 32]
-        quiver_size = 3
-        color_div = 14
-    elif piv_set == 1:
-        path = r"../test_imgs/swirling_vortices/*.tif"
-        IW_SIZES = [256, 128, 64, 32]
-        quiver_size = 3
-        color_div = 24
-    else:
-        path = r"../test_imgs/4th_PIV-Challenge_Case_E/*.tif"
-        IW_SIZES = [64, 32]
-        quiver_size = 8
-        color_div = 4
-
-    img_files = glob.glob(path)
+    img_files = cfg.IMG_FILES
     N_img_files = len(img_files)
 
     if DEBUG:  # Overrule: Only process the first image pair
@@ -152,11 +120,11 @@ if __name__ == "__main__":
 
     # List of FFT calculation instances per stage of the multigrid. In
     # addition, each stage will have a multiple of identical FFT instances
-    # equal to the number of concurrent workers set in `N_WORKERS`.
+    # equal to the number of concurrent workers set in `cfg.N_WORKERS`.
     lfft: list[list[FFT_Convolver2D_Full]] = []
 
-    N_stages = len(IW_SIZES)
-    for stage_idx, IW_size in enumerate(IW_SIZES):
+    N_stages = len(cfg.IW_SIZES)
+    for stage_idx, IW_size in enumerate(cfg.IW_SIZES):
         # Create interrogation windows
         (
             IW_grid_x,
@@ -166,10 +134,10 @@ if __name__ == "__main__":
             N_IWs,
             N_IWs_x,
             N_IWs_y,
-        ) = create_IW_grid(img_w, img_h, IW_size, IW_OVERLAP)
+        ) = create_IW_grid(img_w, img_h, IW_size, cfg.IW_OVERLAP)
 
         # Populate lists
-        lIW_params.append((IW_size, IW_OVERLAP, N_IWs, N_IWs_x, N_IWs_y))
+        lIW_params.append((IW_size, cfg.IW_OVERLAP, N_IWs, N_IWs_x, N_IWs_y))
 
         lIW_grid_x.append(np.copy(IW_grid_x))
         lIW_grid_y.append(np.copy(IW_grid_y))
@@ -202,12 +170,12 @@ if __name__ == "__main__":
 
         # Create FFT calculation objects
         fft_workers = []
-        for worker_idx in range(N_WORKERS):
+        for worker_idx in range(cfg.N_WORKERS):
             fft_workers.append(
                 FFT_Convolver2D_Full(
                     (IW_size, IW_size),
                     (IW_size, IW_size),
-                    fft_threads=N_FFT_THREADS,
+                    fft_threads=cfg.N_FFT_THREADS,
                 )
             )
         lfft.append(fft_workers)
@@ -240,7 +208,7 @@ if __name__ == "__main__":
     #   Walk over all image pairs
     # --------------------------------------------------------------------------
 
-    executor = concurrent.futures.ThreadPoolExecutor(max_workers=N_WORKERS)
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=cfg.N_WORKERS)
 
     for file_idx in range(0, N_img_files - 1, 2):
         fn1 = img_files[file_idx]
@@ -301,7 +269,7 @@ if __name__ == "__main__":
 
         t_0 = perf_counter()
 
-        for stage_idx, IW_size in enumerate(IW_SIZES):
+        for stage_idx, IW_size in enumerate(cfg.IW_SIZES):
             # Short-hand variables
             A_IW_grid_x = lA_IW_grid_x[stage_idx]
             A_IW_grid_y = lA_IW_grid_y[stage_idx]
@@ -328,9 +296,9 @@ if __name__ == "__main__":
             # (Near) evenly distribute all IWs over all workers
             IWs_slices = []
             N_IWs = lIW_params[stage_idx][2]
-            for i in range(N_WORKERS):
-                idx_start = int(np.floor(N_IWs / N_WORKERS * i))
-                idx_stop = int(np.floor(N_IWs / N_WORKERS * (i + 1)))
+            for i in range(cfg.N_WORKERS):
+                idx_start = int(np.floor(N_IWs / cfg.N_WORKERS * i))
+                idx_stop = int(np.floor(N_IWs / cfg.N_WORKERS * (i + 1)))
                 IWs_slices.append(slice(idx_start, idx_stop))
 
             p = (
@@ -354,7 +322,7 @@ if __name__ == "__main__":
             )
 
             futures = []
-            for worker_idx in range(N_WORKERS):
+            for worker_idx in range(cfg.N_WORKERS):
                 futures.append(
                     executor.submit(
                         process_IWs,
@@ -390,7 +358,7 @@ if __name__ == "__main__":
         #   Debugging output
         # ----------------------------------------------------------------------
 
-        for stage_idx, IW_size in enumerate(IW_SIZES):
+        for stage_idx, IW_size in enumerate(cfg.IW_SIZES):
             N_IWs = lIW_params[stage_idx][2]
             A_IW_grid_x = lA_IW_grid_x[stage_idx]
             A_IW_grid_y = lA_IW_grid_y[stage_idx]
@@ -528,7 +496,7 @@ if __name__ == "__main__":
             # VM_dx[M < 0.5] = np.nan
             # VM_dy[M < 0.5] = np.nan
 
-            colors = M / color_div
+            colors = M / cfg.COLOR_DIV
             colormap = mpl.cm.jet  # type: ignore
 
             if not (plt.fignum_exists("VM")):  # type: ignore
@@ -549,7 +517,7 @@ if __name__ == "__main__":
                 h_title = plt.title(f"{get_filename_from_full_path(fn1)}")  # type: ignore
 
             h_imshow.set_data(A)  # type: ignore
-            h_quiver.set_UVC(VM_dx * quiver_size, VM_dy * quiver_size)  # type: ignore
+            h_quiver.set_UVC(VM_dx * cfg.QUIVER_SIZE, VM_dy * cfg.QUIVER_SIZE)  # type: ignore
             h_quiver.set_color(colormap(colors))  # type: ignore
             h_title.set_text(f"{get_filename_from_full_path(fn1)}")  # type: ignore
 

@@ -3,7 +3,7 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "22-09-2023"
+__date__ = "23-09-2023"
 __version__ = "1.0"
 
 import numpy as np
@@ -12,11 +12,11 @@ import numba as nb
 from scipy.signal import fftconvolve  # Only used for code validation
 
 from my_fun import lookup_IW_idx, all_smaller_or_equal_to
-import config as C
+import config as cfg
 
-if C.FFT_LIB == C.FFT_LIBS.PYFFTW:
+if cfg.FFT_LIB == cfg.FFT_LIBS.PYFFTW:
     from dvg_fftconvolver_pyfftw import FFT_Convolver2D_Full
-elif C.FFT_LIB == C.FFT_LIBS.ROCKETFFT:
+elif cfg.FFT_LIB == cfg.FFT_LIBS.ROCKETFFT:
     from dvg_fftconvolver_rocketfft import FFT_Convolver2D_Full
 else:
     from dvg_fftconvolver_rocketfft import FFT_Convolver2D_Full
@@ -236,7 +236,7 @@ def obtain_IWs_from_image(
         cache=True,
         nogil=True,
     ),
-    C.FFT_LIB == C.FFT_LIBS.ROCKETFFT,
+    cfg.FFT_LIB == cfg.FFT_LIBS.ROCKETFFT,
 )
 def process_IWs(
     # fmt: off
