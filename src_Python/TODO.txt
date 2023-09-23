@@ -1,43 +1,48 @@
 2D PIV BOS
 
+
 TODO
 ----
 
-x 1) Collect all correlation maps `C` into pre-allocated matrix for later sub-pixel fitting.
+- Try Cupy
+
+- Try OpenCV instead of skimage.io for image processing
+
+- Fix the terminal debug output. Turn into a function being called at the end of the script.
+
+
+FINISHED TODO
+-------------
+
+- Collect all correlation maps `C` into pre-allocated matrix for later sub-pixel fitting.
 DONE, speed improved
 
-x 2) Sub-pixel fitting only makes sense at last `iIW_size` step (lowest IW size).
+- Sub-pixel fitting only makes sense at last `iIW_size` step (lowest IW size).
 DONE, speed improved
 
-x 3) Sub-pixel fitting can now run fully jitted and parallel
+- Sub-pixel fitting can run fully jitted and parallel
 DONE, speed improved
 
-x 4) DITCH ALL list append. Turn them into a pre-allocated list of numpy arrays where we will write directly into.
+- DITCH ALL list append. Turn them into a pre-allocated list of numpy arrays where we will write directly into.
 DONE, speed improved
 
-x 5) Flip complete second image left-to-right and up-to-down (fliplrud) ahead of time. Then take subsets out of this.
+- Flip complete second image left-to-right and up-to-down (fliplrud) ahead of time. Then take subsets out of this.
+DONE, speed improved
+
+- Fix incorrect [-2] indexing with (stage_idx - 1)
 DONE
 
-x 6) Fix incorrect [-2] indexing with (stage_idx - 1)
-DONE
-
-x 7) In 2D-convolve, try the passed array length, instead of 'fastlen'
+- In 2D-convolve, try the passed array length, instead of 'fastlen'
 DONE. Outcome: zero-padding to fastlen is needed for correct results. Without zero-padding the results suffer from edge defects, though it is faster.
 
-8) Try Cupy
-
-x 9) Linearize matrices. Not longer (IW_idx_x, IW_idx_y) but step through using (IW_idx)
+- Linearize matrices. Not longer (IW_idx_x, IW_idx_y) but step through using (IW_idx)
 DONE, speed improved
 
-x 10) Fix the terminal debug output. Perhaps as a function being called at the end of the script.
-DONE
-
-11) Try OpenCV instead of skimage.io for image processing
-
-x 12) Examine possible speed up of `convolve2d()`. Timeit.
+- Examine possible speed up of `convolve2d()`. Timeit.
 DONE, speed improved
 
-13) Parallelize by dividing pool of all IWs into chunks to be processed in separate parallel threads
+- `if fast_max(IW_A_) <= 0` can be changed to exit early.
+DONE, speed improved
 
-x 14) `if fast_max(IW_A_) <= 0` can be changed to exit early. Speed improvement.
-DONE
+- Parallelize by dividing pool of all IWs into chunks to be processed in separate parallel threads
+DONE, speed improved
