@@ -15,11 +15,13 @@ __date__ = "23-09-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
+import os
 import sys
 import platform
-from time import perf_counter
 import concurrent.futures
+from time import perf_counter
 
+import psutil
 import numpy as np
 import numpy.typing as npt
 from skimage.io import imread
@@ -60,6 +62,16 @@ if LOAD_MPL:
 # ------------------------------------------------------------------------------
 
 if __name__ == "__main__":
+    # Set maximum process priority in the OS
+    try:
+        proc = psutil.Process(os.getpid())
+        if os.name == "nt":  # Windows
+            proc.nice(psutil.HIGH_PRIORITY_CLASS)
+        else:  # Other
+            proc.nice(10)
+    except:  # pylint: disable=bare-except
+        print("Warning: Could not set process to high priority.")
+
     # Display info
     print(f"Running on computer `{platform.node()}`")
     print(f"  CPU: {platform.processor()}")

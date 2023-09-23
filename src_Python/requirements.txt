@@ -1,3 +1,4 @@
+psutil
 numpy
 numba
 icc_rt
