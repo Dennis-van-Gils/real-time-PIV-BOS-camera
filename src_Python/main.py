@@ -11,7 +11,7 @@ VM: Displacement vector map
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "23-09-2023"
+__date__ = "24-09-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
@@ -406,18 +406,19 @@ if __name__ == "__main__":
 
             if SHOW_CORRELATION_MAPS and LOAD_MPL:
                 # Reset any existing plot of the correlation map, because the IW
-                # size has changed and plotting on top of imshow needs a rescale.
+                # size has changed. Plotting on top of imshow needs a rescale.
                 if plt.fignum_exists("C_map"):  # type: ignore
                     plt.close("C_map")  # type: ignore
 
-                # Plotting requires normalizing correlation maps for easy comparison
+                # Plotting requires normalizing correlation maps for easy
+                # comparison
                 normalize_C_maps(C_maps)
 
             for IW_idx in range(N_IWs):
                 # NOTE: Information on potentially zeroed-out sections inside
                 # `IW_A` and `IW_B` is not stored nor accessible here.
-                # Variables `zero_out_L/R/U/D` have not been stored to memory to
-                # save on cpu time.
+                # Variables `zero_out_L/R/U/D` have not been committed to memory
+                # to save on cpu time.
 
                 # Short-hand variables
                 IW_px_x = A_IW_grid_x[IW_idx]
@@ -426,21 +427,16 @@ if __name__ == "__main__":
                 shift_y = IW_shifts_y[IW_idx]
                 C = C_maps[IW_idx]
 
-                # TODO: For proper debugging, I should store the found correlations
-                # peaks in a list of arrays, too. Now, I will have to calculate
-                # `peak_x` and `peak_y` backwards again.
+                # We have to backwards calculate `peak_x` and `peak_y` again,
+                # because they were not committed to memory to save on cpu time.
+                # They represent the correlation map indices of the correlation
+                # peak. We assume zero-padding was used for the FFT operations.
                 dx = VM_dx[IW_idx]
                 dy = VM_dy[IW_idx]
                 shift_x = IW_shifts_x[IW_idx]
                 shift_y = IW_shifts_y[IW_idx]
-                qx = 1 if (C.shape[0] % 2) == 0 else 0
-                qy = 1 if (C.shape[1] % 2) == 0 else 0
-                peak_x = (
-                    dx + C.shape[1] // 2 - qx - shift_x
-                )  # TODO: store & get,
-                peak_y = (
-                    dy + C.shape[0] // 2 - qy - shift_y
-                )  # do not calc again
+                peak_x = dx + C.shape[1] // 2 - shift_x
+                peak_y = dy + C.shape[0] // 2 - shift_y
 
                 if DEBUG:
                     print(
@@ -507,9 +503,9 @@ if __name__ == "__main__":
                         # plt.show(block=False)  # type: ignore
                         # plt.show()  # type: ignore
 
-        # --------------------------------------------------------------------------
+        # ----------------------------------------------------------------------
         #   Show original image A with unfiltered vector map on top
-        # --------------------------------------------------------------------------
+        # ----------------------------------------------------------------------
 
         if LOAD_MPL:
             grid_x = lVM_grid_x[-1]

@@ -3,7 +3,7 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "21-09-2023"
+__date__ = "24-09-2023"
 __version__ = "1.0"
 
 import os
@@ -421,6 +421,7 @@ def compute_displacement_vectors_from_C_maps(
                 peak_x, peak_y = subpx_3pgf_2D(C, peak_x, peak_y)
 
             # Calculate displacement vector
+            """ This block is commented out. We assume zero-padding was used.
             # `qx` and `qy` are toggles for +1 or +0. They depend on whether
             # zero-padding was used for the 2D FFTW convolution (+0) or not
             # (+1).
@@ -428,8 +429,11 @@ def compute_displacement_vectors_from_C_maps(
             # Without zero-padding: fast but edge defects, evenly shape matrix
             qx = 1 if (C.shape[0] % 2) == 0 else 0  # even / odd correction
             qy = 1 if (C.shape[1] % 2) == 0 else 0  # even / odd correction
-            dx = peak_x - C.shape[1] // 2 + qx + IW_shifts_x[IW_idx]
-            dy = peak_y - C.shape[0] // 2 + qy + IW_shifts_y[IW_idx]
+            dx = peak_x - C.shape[1] // 2 + IW_shifts_x[IW_idx] + qx
+            dy = peak_y - C.shape[0] // 2 + IW_shifts_y[IW_idx] + qy
+            """
+            dx = peak_x - C.shape[1] // 2 + IW_shifts_x[IW_idx]
+            dy = peak_y - C.shape[0] // 2 + IW_shifts_y[IW_idx]
 
         # Store result in displacement vector map
         VM_dx[IW_idx] = dx
