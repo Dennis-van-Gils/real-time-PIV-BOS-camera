@@ -8,8 +8,6 @@ TODO
 
 - Try OpenCV instead of skimage.io for image processing
 
-- Fix the terminal debug output. Turn into a function being called at the end of the script.
-
 
 FINISHED TODO
 -------------
@@ -46,3 +44,6 @@ DONE, speed improved
 
 - Parallelize by dividing pool of all IWs into chunks to be processed in separate parallel threads
 DONE, speed improved
+
+- Fix the terminal debug output. Turn into a function being called at the end of the script.
+DONE, minor speed improvement

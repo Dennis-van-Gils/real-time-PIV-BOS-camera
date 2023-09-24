@@ -9,10 +9,10 @@ Configuration
   IW_SIZES     : [64, 32]
   IW_OVERLAP   : 0.5
 
-Setting up... done in 3.274 sec
+Setting up... done in 3.332 sec
 
 01_A.png
-Reading, processing... done in 0.022, 0.202 sec
+Reading, processing... done in 0.021, 0.194 sec
 IW: 0 of 1301 @px 32, 32
    A_xlim [   0,   63]
    A_ylim [   0,   63]

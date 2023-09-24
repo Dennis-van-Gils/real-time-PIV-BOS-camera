@@ -23,6 +23,10 @@ class FFT_LIBS(IntEnum):
     SCIPY = 2
 
 
+DEBUG = False  # Print debug info to terminal?
+SHOW_CORRELATION_MAPS = False  # When True, also requires `LOAD_MPL = True`
+LOAD_MPL = True  # Load matplotlib into memory and show vector map results?
+
 # ------------------------------------------------------------------------------
 #   User-configurable settings
 # ------------------------------------------------------------------------------
