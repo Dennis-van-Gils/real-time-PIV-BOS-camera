@@ -49,8 +49,8 @@ IW_OVERLAP = 0.5
 #     TODO: descr
 FFT_LIB = FFT_LIBS.ROCKETFFT
 
-# Number of concurrent workers. Each worker will spawn a separate process
-# (concurrent multiprocessing) that will process a chunk of all available IWs
+# Number of concurrent workers. Each worker will spawn a separate thread
+# (concurrent multithreading) that will process a chunk of all available IWs
 # over which the 2D FFT correlations are to be calculated. The chunks will get
 # evenly divided over the specified number of workers. Limit it to the number
 # of available logical CPU processors.

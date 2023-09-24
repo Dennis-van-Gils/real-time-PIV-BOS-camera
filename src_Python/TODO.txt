@@ -4,6 +4,10 @@
 TODO
 ----
 
+- Change `ThreadPoolExecutor` to `ProcessPoolExecutor` and check for possible performance increase. Requires shared memory pool.
+  https://mingze-gao.com/posts/python-shared-memory-in-multiprocessing/
+  https://santhalakshminarayana.github.io/blog/super-fast-python-multi-processing
+
 - Try Cupy
 
 - Try OpenCV instead of skimage.io for image processing

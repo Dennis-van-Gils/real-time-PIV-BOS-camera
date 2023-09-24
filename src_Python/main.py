@@ -94,7 +94,7 @@ if __name__ == "__main__":
     img_h, img_w = A.shape
 
     # --------------------------------------------------------------------------
-    #   Init
+    #   Init - preallocate
     # --------------------------------------------------------------------------
 
     # Preallocate and populate lists for the upcoming multigrid analysis.
@@ -149,6 +149,10 @@ if __name__ == "__main__":
     # equal to the number of concurrent workers set in `cfg.N_WORKERS`.
     lfft: list[list[FFT_Convolver2D_Full]] = []
 
+    # --------------------------------------------------------------------------
+    #   Init - populate
+    # --------------------------------------------------------------------------
+
     N_stages = len(cfg.IW_SIZES)
     for stage_idx, IW_size in enumerate(cfg.IW_SIZES):
         # Create interrogation windows
@@ -184,7 +188,8 @@ if __name__ == "__main__":
         lIW_shifts_y.append(np.zeros(N_IWs, dtype=np.int32))
 
         C_maps = np.empty(
-            (N_IWs, IW_size * 2 - 1, IW_size * 2 - 1), dtype=np.float32
+            (N_IWs, IW_size * 2 - 1, IW_size * 2 - 1),
+            dtype=np.float32,
         )
         C_maps[:] = np.nan
         lC_maps.append(C_maps)
