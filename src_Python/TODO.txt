@@ -8,6 +8,10 @@ TODO
   https://mingze-gao.com/posts/python-shared-memory-in-multiprocessing/
   https://santhalakshminarayana.github.io/blog/super-fast-python-multi-processing
 
+- Examine the GIL lock and release
+  https://www.maartenbreddels.com/perf/jupyter/python/tracing/gil/2021/01/14/Tracing-the-Python-GIL.html
+  viztracer -o output.html --ignore_frozen -m main
+
 - Try Cupy
 
 - Try OpenCV instead of skimage.io for image processing
