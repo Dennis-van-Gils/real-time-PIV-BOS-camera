@@ -4,10 +4,6 @@
 TODO
 ----
 
-- Change `ThreadPoolExecutor` to `ProcessPoolExecutor` and check for possible performance increase. Requires shared memory pool.
-  https://mingze-gao.com/posts/python-shared-memory-in-multiprocessing/
-  https://santhalakshminarayana.github.io/blog/super-fast-python-multi-processing
-
 - Examine the GIL lock and release
   https://www.maartenbreddels.com/perf/jupyter/python/tracing/gil/2021/01/14/Tracing-the-Python-GIL.html
   viztracer -o output.html --ignore_frozen -m main
@@ -55,3 +51,8 @@ DONE, speed improved
 
 - Fix the terminal debug output. Turn into a function being called at the end of the script.
 DONE, minor speed improvement
+
+- Change `ThreadPoolExecutor` to `ProcessPoolExecutor` and check for possible performance increase. Requires shared memory pool.
+  https://mingze-gao.com/posts/python-shared-memory-in-multiprocessing/
+  https://santhalakshminarayana.github.io/blog/super-fast-python-multi-processing
+DON'T, threads are working just fine reaching efficient 100% CPU load

@@ -12,7 +12,6 @@ __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
 # pylint: disable=missing-function-docstring
 
-import os
 import glob
 from enum import IntEnum
 
@@ -52,17 +51,15 @@ FFT_LIB = FFT_LIBS.ROCKETFFT
 # Number of concurrent workers. Each worker will spawn a separate thread
 # (concurrent multithreading) that will process a chunk of all available IWs
 # over which the 2D FFT correlations are to be calculated. The chunks will get
-# evenly divided over the specified number of workers. Limit it to the number
-# of available logical CPU processors.
-N_CPUS = os.cpu_count()
-if N_CPUS is not None:
-    N_WORKERS = N_CPUS
-else:
-    N_WORKERS = 1
+# evenly divided over the specified number of workers.
+# NOTE: This number is not limited by the number of logical CPU processors: The
+# workers are running in concurrent threads, not concurrent processes.
+# NOTE: 32 seems to be sufficient to reach maximum speed.
+N_WORKERS = 32
 
-# Number of threads to use for each single FFT operation. It is advised to stick
-# to 1 thread per FFT operation, because the IWs it will operate on are
-# generally too small of a size to benefit from multiple threads.
+# Number of threads to use for each single FFT operation.
+# NOTE: Leave it to 1 thread per FFT operation, because the IWs it will operate
+# on are generally too small of a size to benefit from multiple threads.
 N_FFT_THREADS = 1
 
 # Plot esthetics
