@@ -323,6 +323,40 @@ def fast_max(in1: npt.NDArray[np.float32]) -> np.float32:
 
 
 # ------------------------------------------------------------------------------
+#   fast_magnitude
+# ------------------------------------------------------------------------------
+
+
+@nb.njit(
+    "float32[:](float32[:], float32[:])",
+    parallel=False,  # Setting to True is detrimental for this use-case
+    cache=True,
+    nogil=True,
+)
+def fast_magnitude(
+    in1: npt.NDArray[np.float32],
+    in2: npt.NDArray[np.float32],
+) -> npt.NDArray[np.float32]:
+    """Numba-accelerated version of
+    `M = np.sqrt(np.square(in1) + np.square(in2))`.
+
+    NOTE: Don't use. Turns out native numpy outperforms this numba version.
+    Timeit results on computer Onera
+    --------------------------------
+    fast_magnitude: 0.00681 ms per iter
+    np_magnitude  : 0.00527 ms per iter
+    """
+
+    # Below block is commented out, because it was tested to be even slower
+    # than `return np.sqrt(np.square(in1) + np.square(in2))`:
+    # M = np.empty(in1.shape, dtype=np.float32)
+    # for i in nb.prange(in1.shape[0]):
+    #    M[i] = np.sqrt(np.square(in1[i]) + np.square(in2[i]))
+
+    return np.sqrt(np.square(in1) + np.square(in2))
+
+
+# ------------------------------------------------------------------------------
 #   all_smaller_or_equal_to
 # ------------------------------------------------------------------------------
 
@@ -529,3 +563,28 @@ if __name__ == "__main__":
             number=loop,
         )
         print(f"fast_max      : {result / loop * 1000:.5f} ms per iter")
+
+    if 1:
+        test_shape = 4096
+        in1 = np.random.randn(test_shape)
+        in2 = np.random.randn(test_shape)
+        in1 = np.asarray(in1, dtype=np.float32)
+        in2 = np.asarray(in2, dtype=np.float32)
+
+        loop = int(1e3)
+        result = timeit.timeit(
+            "fast_magnitude(in1, in2)",
+            setup=lambda: fast_magnitude(in1, in2),
+            globals=globals(),
+            number=loop,
+        )
+        print(f"fast_magnitude: {result / loop * 1000:.5f} ms per iter")
+
+        loop = int(1e3)
+        result = timeit.timeit(
+            "np.sqrt(np.square(in1) + np.square(in2))",
+            setup=lambda: np.sqrt(np.square(in1) + np.square(in2)),
+            globals=globals(),
+            number=loop,
+        )
+        print(f"np_magnitude  : {result / loop * 1000:.5f} ms per iter")
