@@ -88,10 +88,11 @@ if __name__ == "__main__":
     if cfg.DEBUG:  # Overrule: Only process the first image pair
         N_img_files = 2
 
-    # Read first image to get image width and height
+    # Read first image to get image width, height and bit depth
     A = imread(img_files[0], as_gray=True)
-    A = np.asarray(A, dtype=np.float32, order="C")
     img_h, img_w = A.shape
+    img_bit_depth = A[0, 0].nbytes * 8
+    img_max_value = 2**img_bit_depth - 1
 
     # --------------------------------------------------------------------------
     #   Init - preallocate
@@ -289,6 +290,8 @@ if __name__ == "__main__":
         B = imread(fn2, as_gray=True)
         A = np.asarray(A, dtype=np.float32, order="C")
         B = np.asarray(B, dtype=np.float32, order="C")
+        A = A / img_max_value
+        B = B / img_max_value
         remove_mean_background(A)
         remove_mean_background(B)
 
