@@ -3,7 +3,7 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "24-09-2023"
+__date__ = "27-09-2023"
 __version__ = "1.0"
 
 import os
@@ -324,9 +324,10 @@ def fast_max(in1: npt.NDArray[np.float32]) -> np.float32:
 
 # ------------------------------------------------------------------------------
 #   fast_magnitude
+#   NOTE: Don't use. Turns out native numpy outperforms this numba version.
 # ------------------------------------------------------------------------------
 
-
+'''
 @nb.njit(
     "float32[:](float32[:], float32[:])",
     parallel=False,  # Setting to True is detrimental for this use-case
@@ -354,7 +355,7 @@ def fast_magnitude(
     #    M[i] = np.sqrt(np.square(in1[i]) + np.square(in2[i]))
 
     return np.sqrt(np.square(in1) + np.square(in2))
-
+'''
 
 # ------------------------------------------------------------------------------
 #   all_smaller_or_equal_to
