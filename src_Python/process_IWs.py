@@ -307,7 +307,9 @@ def process_IWs(
             IW_shifts_y,
         )
 
-        if all_smaller_or_equal_to(IW_A_, 0):
+        if all_smaller_or_equal_to(IW_A_, 0) or all_smaller_or_equal_to(
+            IW_B, 0
+        ):
             # No details are present in the IW images. All pixels are below
             # or at the mean background --> Save computation time.
             # TODO: Make this a user config threshold? Is <= 0 even correct?
