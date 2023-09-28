@@ -437,7 +437,7 @@ if __name__ == "__main__":
                     np.zeros(VM_dy.shape),
                     angles="xy",
                     scale_units="xy",
-                    scale=2,
+                    scale=1,  # Scales down by `scale`
                     # color="r",
                     color=colormap(colors),
                     linewidths=1,
@@ -453,6 +453,7 @@ if __name__ == "__main__":
             plt.pause(0.0001)  # type: ignore
 
             if cfg.DEBUG:
+                plt.savefig("output_VM.png", dpi=300, bbox_inches="tight")  # type: ignore
                 plt.waitforbuttonpress()  # type: ignore
                 # plt.show()  # type: ignore
 
