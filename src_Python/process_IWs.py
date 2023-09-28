@@ -3,13 +3,12 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "23-09-2023"
+__date__ = "28-09-2023"
 __version__ = "1.0"
 
 import numpy as np
 import numpy.typing as npt
 import numba as nb
-from scipy.signal import fftconvolve  # Only used for code validation
 
 from my_fun import lookup_IW_idx, all_smaller_or_equal_to
 import config as cfg
@@ -319,5 +318,4 @@ def process_IWs(
 
         else:
             # Perform 2D cross-correlation
-            # C_maps[IW_idx, :, :] = fftconvolve(IW_B, IW_A_, mode="full")
             C_maps[IW_idx, :, :] = fft.convolve(IW_B, IW_A_)
