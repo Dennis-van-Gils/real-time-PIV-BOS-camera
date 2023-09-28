@@ -15,6 +15,32 @@ __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
 import glob
 from enum import IntEnum
 
+"""
+import configparser
+
+CONFIG_FILE = "config.ini"
+
+
+def parse_int_list(str_in):
+    try:
+        return list(int(k.strip()) for k in str_in[1:-1].split(","))
+    except Exception as err:
+        raise configparser.ParsingError(str_in) from None
+
+
+parser = configparser.ConfigParser()
+parser.read(CONFIG_FILE)
+
+try:
+    IW_sizes = parse_int_list(parser["Processing"]["IW_sizes"])
+except Exception as err:
+    print("ERROR while trying to parse configuration file `config.txt`.")
+    raise err
+
+print(IW_sizes)
+print(parser["Source"]["image_path"])
+"""
+
 
 class FFT_LIBS(IntEnum):
     PYFFTW = 0
