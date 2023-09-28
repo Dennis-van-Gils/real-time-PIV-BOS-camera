@@ -11,7 +11,7 @@ VM: Displacement vector map
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "24-09-2023"
+__date__ = "28-09-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
@@ -156,7 +156,9 @@ if __name__ == "__main__":
 
     N_stages = len(cfg.IW_SIZES)
     for stage_idx, IW_size in enumerate(cfg.IW_SIZES):
-        # Create interrogation windows
+        # Create interrogation windows. Only the last multigrid stage will have
+        # window overlapping applied to it.
+        IW_overlap = cfg.IW_OVERLAP if stage_idx == N_stages - 1 else 0.0
         (
             IW_grid_x,
             IW_grid_y,
@@ -165,10 +167,10 @@ if __name__ == "__main__":
             N_IWs,
             N_IWs_x,
             N_IWs_y,
-        ) = create_IW_grid(img_w, img_h, IW_size, cfg.IW_OVERLAP)
+        ) = create_IW_grid(img_w, img_h, IW_size, IW_overlap)
 
         # Populate lists
-        lIW_params.append((IW_size, cfg.IW_OVERLAP, N_IWs, N_IWs_x, N_IWs_y))
+        lIW_params.append((IW_size, IW_overlap, N_IWs, N_IWs_x, N_IWs_y))
 
         lIW_grid_x.append(np.copy(IW_grid_x))
         lIW_grid_y.append(np.copy(IW_grid_y))

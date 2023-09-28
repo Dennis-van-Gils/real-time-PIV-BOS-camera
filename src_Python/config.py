@@ -30,11 +30,13 @@ LOAD_MPL = True  # Load matplotlib into memory and show vector map results?
 #   User-configurable settings
 # ------------------------------------------------------------------------------
 
-# Holds the IW sizes for the multigrid analysis. Powers of two are advised with
-# each subsequent IW size the exact half of the previous IW size.
+# List of square interrogation window sizes in [px] for the multigrid analysis.
+# Use powers of two with each subsequent IW size the exact half of the previous
+# IW size.
 IW_SIZES = [64, 32]  # [px]
 
-# IW overlap fraction [0 - 1]
+# Interrogation window overlap fraction [0 - 1]. Only the last multigrid stage
+# will have window overlapping applied to it.
 IW_OVERLAP = 0.5
 
 # FFT library to be used for 2D correlations.
