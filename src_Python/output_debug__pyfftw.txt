@@ -4,15 +4,15 @@ Running on computer `Onera`
 
 Configuration
   FFT LIB      : PYFFTW
-  N_WORKERS    : 12
+  N_WORKERS    : 32
   N_FFT_THREADS: 1
   IW_SIZES     : [64, 32]
   IW_OVERLAP   : 0.5
 
-Setting up... done in 0.159 sec
+Setting up... done in 0.167 sec
 
 01_A.png
-Reading, processing... done in 0.022, 0.277 sec
+Reading, processing... done in 0.023, 0.317 sec
 IW: 0 of 1301 @px 32, 32
    A_xlim [   0,   63]
    A_ylim [   0,   63]
@@ -6903,15 +6903,11 @@ IW: 1083 of 1301 @px 1088, 832
    A_ylim [ 800,  863]
    B_xlim [1056, 1119]
    B_ylim [ 800,  863]
-     peak   @ +63.0, +63.0
-     dx, dy =  +0.0,  +0.0
 IW: 1084 of 1301 @px 1120, 832
    A_xlim [1088, 1151]
    A_ylim [ 800,  863]
    B_xlim [1088, 1151]
    B_ylim [ 800,  863]
-     peak   @ +63.0, +63.0
-     dx, dy =  +0.0,  +0.0
 IW: 1085 of 1301 @px 1152, 832
    A_xlim [1120, 1183]
    A_ylim [ 800,  863]
@@ -7165,15 +7161,11 @@ IW: 1125 of 1301 @px 1088, 864
    A_ylim [ 832,  895]
    B_xlim [1056, 1119]
    B_ylim [ 832,  895]
-     peak   @ +63.0, +63.0
-     dx, dy =  +0.0,  +0.0
 IW: 1126 of 1301 @px 1120, 864
    A_xlim [1088, 1151]
    A_ylim [ 832,  895]
    B_xlim [1088, 1151]
    B_ylim [ 832,  895]
-     peak   @ +63.0, +63.0
-     dx, dy =  +0.0,  +0.0
 IW: 1127 of 1301 @px 1152, 864
    A_xlim [1120, 1183]
    A_ylim [ 832,  895]
@@ -11673,8 +11665,6 @@ IW: 447 of 5354 @px 368, 96
    A_ylim [  80,  111]
    B_xlim [ 350,  381]
    B_ylim [  77,  108]
-     peak   @ +31.0, +31.0
-     dx, dy =  -2.0,  -3.0
 IW: 448 of 5354 @px 384, 96
    parent IW 95
    shift  -2, -3
@@ -14758,8 +14748,6 @@ IW: 828 of 5354 @px 1024, 160
    A_ylim [ 144,  175]
    B_xlim [1012, 1043]
    B_ylim [ 141,  172]
-     peak   @ +31.0, +31.0
-     dx, dy =  +4.0,  -3.0
 IW: 829 of 5354 @px 1040, 160
    parent IW 200
    shift  +0, +0
@@ -19905,8 +19893,6 @@ IW: 1455 of 5354 @px 176, 288
    A_ylim [ 272,  303]
    B_xlim [ 157,  188]
    B_ylim [ 272,  303]
-     peak   @ +31.0, +31.0
-     dx, dy =  -3.0,  +0.0
 IW: 1456 of 5354 @px 192, 288
    parent IW 341
    shift  -3, +0
@@ -21888,8 +21874,6 @@ IW: 1686 of 5354 @px 1152, 320
    A_ylim [ 304,  335]
    B_xlim [1138, 1169]
    B_ylim [ 306,  337]
-     peak   @ +31.0, +31.0
-     dx, dy =  +2.0,  +2.0
 IW: 1687 of 5354 @px 1168, 320
    parent IW 414
    shift  +0, +0
@@ -26236,8 +26220,6 @@ IW: 2198 of 5354 @px 1184, 416
    A_ylim [ 400,  431]
    B_xlim [1169, 1200]
    B_ylim [ 402,  433]
-     peak   @ +30.9, +31.0
-     dx, dy =  +0.9,  +2.0
 IW: 2199 of 5354 @px 1200, 416
    parent IW 541
    shift  +0, +0
@@ -27596,8 +27578,6 @@ IW: 2358 of 5354 @px 1024, 448
    A_ylim [ 432,  463]
    B_xlim [1008, 1039]
    B_ylim [ 431,  462]
-     peak   @ +31.0, +31.0
-     dx, dy =  -0.0,  -1.0
 IW: 2359 of 5354 @px 1040, 448
    parent IW 578
    shift  -1, +1
@@ -29140,8 +29120,6 @@ IW: 2538 of 5354 @px 1184, 480
    A_ylim [ 464,  495]
    B_xlim [1167, 1198]
    B_ylim [ 466,  497]
-     peak   @ +31.0, +31.0
-     dx, dy =  -1.0,  +2.0
 IW: 2539 of 5354 @px 1200, 480
    parent IW 625
    shift  +0, +0
@@ -33015,8 +32993,6 @@ IW: 2999 of 5354 @px 400, 576
    A_ylim [ 560,  591]
    B_xlim [ 385,  416]
    B_ylim [ 562,  593]
-     peak   @ +31.0, +30.8
-     dx, dy =  +1.0,  +1.8
 IW: 3000 of 5354 @px 416, 576
    parent IW 726
    shift  +1, +2
@@ -36517,8 +36493,6 @@ IW: 3425 of 5354 @px 416, 656
    A_ylim [ 640,  671]
    B_xlim [ 400,  431]
    B_ylim [ 636,  667]
-     peak   @ +31.0, +31.0
-     dx, dy =  +0.0,  -4.0
 IW: 3426 of 5354 @px 432, 656
    parent IW 853
    shift  +0, -5
@@ -37584,8 +37558,6 @@ IW: 3552 of 5354 @px 1088, 672
    A_ylim [ 656,  687]
    B_xlim [1071, 1102]
    B_ylim [ 655,  686]
-     peak   @ +31.0, +31.0
-     dx, dy =  -1.0,  -1.0
 IW: 3553 of 5354 @px 1104, 672
    parent IW 874
    shift  -2, +0
@@ -38347,8 +38319,6 @@ IW: 3647 of 5354 @px 1248, 688
    A_ylim [ 672,  703]
    B_xlim [1232, 1263]
    B_ylim [ 672,  703]
-     peak   @ +31.0, +31.0
-     dx, dy =  -0.0,  +0.0
 IW: 3648 of 5354 @px 1264, 688
    parent IW 921
    shift  +0, +0
@@ -39040,8 +39010,6 @@ IW: 3732 of 5354 @px 1248, 704
    A_ylim [ 688,  719]
    B_xlim [1232, 1263]
    B_ylim [ 688,  719]
-     peak   @ +31.0, +31.0
-     dx, dy =  -0.0,  -0.0
 IW: 3733 of 5354 @px 1264, 704
    parent IW 921
    shift  +0, +0
@@ -40354,8 +40322,6 @@ IW: 3892 of 5354 @px 1088, 736
    A_ylim [ 720,  751]
    B_xlim [1072, 1103]
    B_ylim [ 719,  750]
-     peak   @ +31.0, +31.0
-     dx, dy =  -0.0,  -1.0
 IW: 3893 of 5354 @px 1104, 736
    parent IW 958
    shift  +0, +0
@@ -43791,8 +43757,6 @@ IW: 4315 of 5354 @px 1056, 816
    A_ylim [ 800,  831]
    B_xlim [1041, 1072]
    B_ylim [ 800,  831]
-     peak   @ +31.0, +31.0
-     dx, dy =  +1.0,  -0.0
 IW: 4316 of 5354 @px 1072, 816
    parent IW 1083
    shift  +0, +0
@@ -44478,8 +44442,6 @@ IW: 4400 of 5354 @px 1056, 832
    A_ylim [ 816,  847]
    B_xlim [1041, 1072]
    B_ylim [ 816,  847]
-     peak   @ +31.0, +31.0
-     dx, dy =  +1.0,  +0.0
 IW: 4401 of 5354 @px 1072, 832
    parent IW 1083
    shift  +0, +0
@@ -45163,8 +45125,6 @@ IW: 4485 of 5354 @px 1056, 848
    A_ylim [ 832,  863]
    B_xlim [1040, 1071]
    B_ylim [ 833,  864]
-     peak   @ +31.0, +31.0
-     dx, dy =  -0.0,  +1.0
 IW: 4486 of 5354 @px 1072, 848
    parent IW 1125
    shift  +0, +0
@@ -45179,8 +45139,6 @@ IW: 4487 of 5354 @px 1088, 848
    A_ylim [ 832,  863]
    B_xlim [1072, 1103]
    B_ylim [ 832,  863]
-     peak   @ +31.0, +31.0
-     dx, dy =  -0.0,  -0.0
 IW: 4488 of 5354 @px 1104, 848
    parent IW 1126
    shift  +0, +0
@@ -45188,8 +45146,6 @@ IW: 4488 of 5354 @px 1104, 848
    A_ylim [ 832,  863]
    B_xlim [1088, 1119]
    B_ylim [ 832,  863]
-     peak   @ +31.0, +31.0
-     dx, dy =  -0.0,  +0.0
 IW: 4489 of 5354 @px 1120, 848
    parent IW 1126
    shift  +0, +0
@@ -45456,8 +45412,6 @@ IW: 4526 of 5354 @px 352, 864
    A_ylim [ 848,  879]
    B_xlim [ 337,  368]
    B_ylim [ 849,  880]
-     peak   @ +31.0, +31.0
-     dx, dy =  +1.0,  +1.0
 IW: 4527 of 5354 @px 368, 864
    parent IW 1103
    shift  +1, +1
@@ -45866,8 +45820,6 @@ IW: 4572 of 5354 @px 1088, 864
    A_ylim [ 848,  879]
    B_xlim [1072, 1103]
    B_ylim [ 848,  879]
-     peak   @ +31.0, +31.0
-     dx, dy =  -0.0,  +0.0
 IW: 4573 of 5354 @px 1104, 864
    parent IW 1126
    shift  +0, +0
@@ -45875,8 +45827,6 @@ IW: 4573 of 5354 @px 1104, 864
    A_ylim [ 848,  879]
    B_xlim [1088, 1119]
    B_ylim [ 848,  879]
-     peak   @ +31.0, +31.0
-     dx, dy =  -0.0,  +0.0
 IW: 4574 of 5354 @px 1120, 864
    parent IW 1126
    shift  +0, +0
@@ -50243,8 +50193,6 @@ IW: 5125 of 5354 @px 416, 976
    A_ylim [ 960,  991]
    B_xlim [ 401,  432]
    B_ylim [ 958,  989]
-     peak   @ +31.0, +31.0
-     dx, dy =  +1.0,  -2.0
 IW: 5126 of 5354 @px 432, 976
    parent IW 1273
    shift  -1, -3
@@ -50892,8 +50840,6 @@ IW: 5208 of 5354 @px 384, 992
    A_ylim [ 976, 1007]
    B_xlim [ 368,  399]
    B_ylim [ 976, 1007]
-     peak   @ +31.0, +30.9
-     dx, dy =  +0.0,  -0.1
 IW: 5209 of 5354 @px 400, 992
    parent IW 1272
    shift  +1, -2
@@ -50910,8 +50856,6 @@ IW: 5210 of 5354 @px 416, 992
    A_ylim [ 976, 1007]
    B_xlim [ 401,  432]
    B_ylim [ 974, 1005]
-     peak   @ +31.0, +30.9
-     dx, dy =  +1.0,  -2.1
 IW: 5211 of 5354 @px 432, 992
    parent IW 1273
    shift  -1, -3
@@ -51223,8 +51167,6 @@ IW: 5245 of 5354 @px 976, 992
    A_ylim [ 976, 1007]
    B_xlim [ 960,  991]
    B_ylim [ 976, 1007]
-     peak   @ +31.0, +31.0
-     dx, dy =  -0.0,  -0.0
 IW: 5246 of 5354 @px 992, 992
    parent IW 1290
    shift  +0, +0
@@ -51232,8 +51174,6 @@ IW: 5246 of 5354 @px 992, 992
    A_ylim [ 976, 1007]
    B_xlim [ 976, 1007]
    B_ylim [ 976, 1007]
-     peak   @ +31.0, +31.0
-     dx, dy =  +0.0,  -0.0
 IW: 5247 of 5354 @px 1008, 992
    parent IW 1291
    shift  +0, +0
@@ -51884,8 +51824,6 @@ IW: 5330 of 5354 @px 976, 1008
    A_ylim [ 992, 1023]
    B_xlim [ 960,  991]
    B_ylim [ 992, 1023]
-     peak   @ +31.0, +31.0
-     dx, dy =  -0.0,  -0.0
 IW: 5331 of 5354 @px 992, 1008
    parent IW 1290
    shift  +0, +0
@@ -51893,8 +51831,6 @@ IW: 5331 of 5354 @px 992, 1008
    A_ylim [ 992, 1023]
    B_xlim [ 976, 1007]
    B_ylim [ 992, 1023]
-     peak   @ +31.0, +31.0
-     dx, dy =  -0.0,  -0.0
 IW: 5332 of 5354 @px 1008, 1008
    parent IW 1291
    shift  +0, +0
