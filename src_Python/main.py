@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Image processing algorithm for 2D Particle Imaging Velocimetry (PIV) and
-Background Oriented Schlieren (BOS)
+"""Image processing algorithm for 2D Particle imaging velocimetry (PIV) and
+Background-oriented Schlieren (BOS)
 
 Used abbrevations
 -----------------
@@ -11,7 +11,7 @@ VM: Displacement vector map
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "28-09-2023"
+__date__ = "29-09-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
@@ -26,6 +26,20 @@ import numpy as np
 import numpy.typing as npt
 from skimage.io import imread
 
+# The import order is important. We must handle the user configuration first.
+import init_config as cfg
+
+# Parse command line arguments.
+# Expecting None or the filename of the configuration file to read in.
+if len(sys.argv) > 1:
+    config_filename = sys.argv[1]
+else:
+    config_filename = None
+cfg.read_file(config_filename)
+
+# Now we can import the remaining modules
+from process_IWs import process_IWs
+from output_debug_info import output_debug_info
 from my_fun import (
     get_filename_from_full_path,
     remove_mean_background,
@@ -33,9 +47,6 @@ from my_fun import (
     fliplrud,
     compute_displacement_vectors_from_C_maps,
 )
-from process_IWs import process_IWs
-from output_debug_info import output_debug_info
-import config as cfg
 
 if cfg.FFT_LIB == cfg.FFT_LIBS.PYFFTW:
     from dvg_fftconvolver_pyfftw import FFT_Convolver2D_Full
@@ -72,6 +83,7 @@ if __name__ == "__main__":
     print(f"  CPU: {platform.processor()}")
     print(f"  OS : {platform.system()}")
     print("\nConfiguration")
+    print(f"  MODE         : {cfg.MODE.name}")
     print(f"  FFT LIB      : {cfg.FFT_LIB.name}")
     print(f"  N_WORKERS    : {cfg.N_WORKERS}")
     print(f"  N_FFT_THREADS: {cfg.N_FFT_THREADS}")
@@ -82,7 +94,7 @@ if __name__ == "__main__":
     t_0 = perf_counter()
 
     # List of image files
-    img_files = cfg.IMG_FILES
+    img_files = cfg.IMAGE_FILES
     N_img_files = len(img_files)
 
     if cfg.DEBUG:  # Overrule: Only process the first image pair

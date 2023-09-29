@@ -3,16 +3,13 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "24-09-2023"
+__date__ = "29-09-2023"
 __version__ = "1.0"
 
 import numpy as np
 
-from my_fun import (
-    lookup_IW_idx,
-    normalize_C_maps,
-)
-import config as cfg
+from my_fun import lookup_IW_idx, normalize_C_maps
+import init_config as cfg
 
 if cfg.LOAD_MPL:
     import matplotlib as mpl
