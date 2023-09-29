@@ -159,28 +159,3 @@ def parse_int_list(str_in):
         return list(int(k.strip()) for k in str_in[1:-1].split(","))
     except Exception as err:
         raise configparser.ParsingError(str_in) from None
-
-
-""""
-# ------------------------------------------------------------------------------
-#   Predefined image sets used for developing this library
-# ------------------------------------------------------------------------------
-
-_img_set = 0
-
-if _img_set == 0:
-    IMG_PATH = r"../test_imgs/PIV_rising_vortex_plume/*.png"
-    IW_SIZES = [64, 32]
-    QUIVER_SIZE = 2
-    COLOR_DIV = 14
-elif _img_set == 1:
-    IMG_PATH = r"../test_imgs/swirling_vortices/*.tif"
-    IW_SIZES = [128, 64, 32]
-    QUIVER_SIZE = 1
-    COLOR_DIV = 24
-else:
-    IMG_PATH = r"../test_imgs/4th_PIV-Challenge_Case_E/*.tif"
-    IW_SIZES = [64, 32]
-    QUIVER_SIZE = 8
-    COLOR_DIV = 4
-"""

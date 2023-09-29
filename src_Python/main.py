@@ -259,7 +259,9 @@ if __name__ == "__main__":
 
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=cfg.N_WORKERS)
 
-    for file_idx in range(0, N_img_files - 1, 2):
+    for file_idx in range(
+        0, N_img_files - 1, 2 if cfg.MODE == cfg.MODES.PIV2 else 1
+    ):
         fn1 = img_files[file_idx]
         fn2 = img_files[file_idx + 1]
         print(get_filename_from_full_path(fn1))
