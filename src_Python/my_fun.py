@@ -565,6 +565,7 @@ if __name__ == "__main__":
         )
         print(f"fast_max      : {result / loop * 1000:.5f} ms per iter")
 
+    """
     if 1:
         test_shape = 4096
         in1 = np.random.randn(test_shape)
@@ -589,3 +590,4 @@ if __name__ == "__main__":
             number=loop,
         )
         print(f"np_magnitude  : {result / loop * 1000:.5f} ms per iter")
+    """
