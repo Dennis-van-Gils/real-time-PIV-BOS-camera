@@ -11,7 +11,7 @@ Example usage for `main.py`:
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "29-09-2023"
+__date__ = "02-10-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
@@ -20,6 +20,14 @@ import enum
 import glob
 import configparser
 import numpy as np
+
+# [Debugging]
+# Print debug info to the terminal? Slow!
+DEBUG = False
+# When True, also requires `load_mpl = True`. Slow!
+SHOW_CORRELATION_MAPS = False
+# Load matplotlib into memory and show vector map results?
+LOAD_MPL = True
 
 
 class IMAGE_SOURCES(enum.IntEnum):
@@ -60,11 +68,6 @@ FFT_LIB = FFT_LIBS.ROCKETFFT
 N_WORKERS = 32
 N_FFT_THREADS = 1
 
-# [Debugging]
-DEBUG = False
-SHOW_CORRELATION_MAPS = False
-LOAD_MPL = True
-
 
 # ------------------------------------------------------------------------------
 #   read_file
@@ -81,6 +84,7 @@ def read_file(filename=None):
         filename = filedialog.askopenfilename(
             title="Select configuration file to open",
             filetypes=(("Configuration files", "*.ini"), ("All files", "*.*")),
+            initialfile="config.ini",
         )
 
         if filename in (None, ""):
@@ -138,15 +142,27 @@ def read_file(filename=None):
     N_FFT_THREADS = np.maximum(parser.getint("Advanced", "N_FFT_threads"), 1)
 
     # [Debugging]
+    # Try reading optional keywords. Use defaults when keywords don't exist.
     global DEBUG
     global SHOW_CORRELATION_MAPS
     global LOAD_MPL
 
-    DEBUG = parser.getboolean("Debugging", "debug")
-    SHOW_CORRELATION_MAPS = parser.getboolean(
-        "Debugging", "show_correlation_maps"
-    )
-    LOAD_MPL = parser.getboolean("Debugging", "load_mpl")
+    try:
+        DEBUG = parser.getboolean("Debugging", "debug")
+    except (configparser.NoSectionError, configparser.NoOptionError):
+        pass  # Remain silent and use default as specified at the top
+
+    try:
+        SHOW_CORRELATION_MAPS = parser.getboolean(
+            "Debugging", "show_correlation_maps"
+        )
+    except (configparser.NoSectionError, configparser.NoOptionError):
+        pass
+
+    try:
+        LOAD_MPL = parser.getboolean("Debugging", "load_mpl")
+    except (configparser.NoSectionError, configparser.NoOptionError):
+        pass
 
 
 # ------------------------------------------------------------------------------
