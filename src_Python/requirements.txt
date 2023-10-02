@@ -6,5 +6,6 @@ scipy
 matplotlib
 pyfftw
 rocket-fft
-scikit-image
+opencv-python
+opencv-contrib-python
 imagecodecs 

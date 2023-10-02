@@ -24,7 +24,7 @@ from time import perf_counter
 import psutil
 import numpy as np
 import numpy.typing as npt
-from skimage.io import imread
+import cv2
 
 # The import order is important. We must handle the user configuration first.
 import init_config as cfg
@@ -95,10 +95,10 @@ if __name__ == "__main__":
 
     # Read the first image to get image width, height and bit depth
     if cfg.IMAGE_SOURCE == cfg.IMAGE_SOURCES.DISK:
-        A = imread(cfg.IMAGE_FILES[0], as_gray=True)
+        A = cv2.imread(cfg.IMAGE_FILES[0], cv2.IMREAD_GRAYSCALE)
     else:
         # TODO: capture from camera
-        A = imread(cfg.IMAGE_FILES[0], as_gray=True)
+        A = cv2.imread(cfg.IMAGE_FILES[0], cv2.IMREAD_GRAYSCALE)
 
     img_h, img_w = A.shape
     img_bit_depth = A[0, 0].nbytes * 8
@@ -336,12 +336,12 @@ if __name__ == "__main__":
             if cfg.IMAGE_SOURCE == cfg.IMAGE_SOURCES.DISK:
                 fn_B = cfg.IMAGE_FILES[frame_idx + 1]
                 frame_title = get_filename_from_full_path(fn_B)
-                B = imread(fn_B, as_gray=True)
+                B = cv2.imread(fn_B, cv2.IMREAD_GRAYSCALE)
             else:
                 # TODO: capture from camera
                 fn_B = cfg.IMAGE_FILES[frame_idx + 1]
                 frame_title = get_filename_from_full_path(fn_B)
-                B = imread(fn_B, as_gray=True)
+                B = cv2.imread(fn_B, cv2.IMREAD_GRAYSCALE)
 
         elif cfg.MODE == cfg.MODES.PIV2:
             # Particle image velocimetry using image pairs
@@ -350,15 +350,15 @@ if __name__ == "__main__":
                 fn_A = cfg.IMAGE_FILES[frame_idx]
                 fn_B = cfg.IMAGE_FILES[frame_idx + 1]
                 frame_title = get_filename_from_full_path(fn_B)
-                A = imread(fn_A, as_gray=True)
-                B = imread(fn_B, as_gray=True)
+                A = cv2.imread(fn_A, cv2.IMREAD_GRAYSCALE)
+                B = cv2.imread(fn_B, cv2.IMREAD_GRAYSCALE)
             else:
                 # TODO: capture from camera
                 fn_A = cfg.IMAGE_FILES[frame_idx]
                 fn_B = cfg.IMAGE_FILES[frame_idx + 1]
                 frame_title = get_filename_from_full_path(fn_B)
-                A = imread(fn_A, as_gray=True)
-                B = imread(fn_B, as_gray=True)
+                A = cv2.imread(fn_A, cv2.IMREAD_GRAYSCALE)
+                B = cv2.imread(fn_B, cv2.IMREAD_GRAYSCALE)
 
             A = np.asarray(A, dtype=np.float32, order="C")
             A = A / img_max_value
@@ -370,12 +370,12 @@ if __name__ == "__main__":
             if cfg.IMAGE_SOURCE == cfg.IMAGE_SOURCES.DISK:
                 fn_B = cfg.IMAGE_FILES[frame_idx + 1]
                 frame_title = get_filename_from_full_path(fn_B)
-                B = imread(fn_B, as_gray=True)
+                B = cv2.imread(fn_B, cv2.IMREAD_GRAYSCALE)
             else:
                 # TODO: capture from camera
                 fn_B = cfg.IMAGE_FILES[frame_idx + 1]
                 frame_title = get_filename_from_full_path(fn_B)
-                B = imread(fn_B, as_gray=True)
+                B = cv2.imread(fn_B, cv2.IMREAD_GRAYSCALE)
 
         B = np.asarray(B, dtype=np.float32, order="C")
         B = B / img_max_value

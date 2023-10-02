@@ -10,8 +10,6 @@ TODO
 
 - Try Cupy
 
-- Try OpenCV instead of skimage.io for image processing
-
 
 FINISHED TODO
 -------------
@@ -56,3 +54,6 @@ DONE, minor speed improvement
   https://mingze-gao.com/posts/python-shared-memory-in-multiprocessing/
   https://santhalakshminarayana.github.io/blog/super-fast-python-multi-processing
 DON'T, threads are working just fine reaching efficient 100% CPU load
+
+- Use OpenCV instead of skimage.io for image processing
+DONE
