@@ -52,6 +52,7 @@ class FFT_LIBS(enum.IntEnum):
 IMAGE_SOURCE = IMAGE_SOURCES.WEBCAM
 IMAGE_PATH = ""
 IMAGE_FILES: list[str] = []  # Will be derived from `IMAGE_PATH`
+N_IMAGES = 0  # Will be derived from `IMAGE_PATH`
 CAMERA_ID = 0
 
 # [Processing]
@@ -105,6 +106,7 @@ def read_file(filename=None):
     global IMAGE_SOURCE
     global IMAGE_PATH
     global IMAGE_FILES
+    global N_IMAGES
     global CAMERA_ID
 
     IMAGE_SOURCE = getattr(
@@ -114,6 +116,12 @@ def read_file(filename=None):
     IMAGE_PATH = parser["Source"]["image_path"]
     if IMAGE_SOURCE == IMAGE_SOURCES.DISK:
         IMAGE_FILES = glob.glob(IMAGE_PATH)
+        N_IMAGES = len(IMAGE_FILES)
+        if N_IMAGES < 2:
+            raise Exception(
+                "Less than 2 images found in the supplied image path "
+                f'"{IMAGE_PATH}".\nExiting.'
+            )
     CAMERA_ID = parser.getint("Source", "camera_id")
 
     # [Processing]

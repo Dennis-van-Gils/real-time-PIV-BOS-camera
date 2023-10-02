@@ -11,7 +11,7 @@ VM: Displacement vector map
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "29-09-2023"
+__date__ = "02-10-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
@@ -93,18 +93,48 @@ if __name__ == "__main__":
     sys.stdout.flush()
     t_0 = perf_counter()
 
-    # List of image files
-    img_files = cfg.IMAGE_FILES
-    N_img_files = len(img_files)
+    # Read the first image to get image width, height and bit depth
+    if cfg.IMAGE_SOURCE == cfg.IMAGE_SOURCES.DISK:
+        A = imread(cfg.IMAGE_FILES[0], as_gray=True)
+    else:
+        # TODO: capture from camera
+        A = imread(cfg.IMAGE_FILES[0], as_gray=True)
 
-    if cfg.DEBUG:  # Overrule: Only process the first image pair
-        N_img_files = 2
-
-    # Read first image to get image width, height and bit depth
-    A = imread(img_files[0], as_gray=True)
     img_h, img_w = A.shape
     img_bit_depth = A[0, 0].nbytes * 8
     img_max_value = 2**img_bit_depth - 1
+
+    A = np.asarray(A, dtype=np.float32, order="C")
+    A = A / img_max_value
+    remove_mean_background(A)
+
+    # Prevent 'possibly unbound variable' warnings
+    B = np.zeros_like(A)
+    A_ = np.zeros_like(A)
+
+    if cfg.MODE == cfg.MODES.PIV:
+        # Particle image velocimetry using equidistantly timed frames
+        #   (frame_0, frame_1), (frame_1, frame_2), (frame_2, frame_3), ...
+
+        # Directly copy frame `A` into `B` to init the upcoming loop
+        B = np.copy(A)
+
+    elif cfg.MODE == cfg.MODES.PIV2:
+        # Particle image velocimetry using image pairs
+        #   (frame_0, frame_1), (frame_2, frame_3), (frame_4, frame_5), ...
+        pass  # No extra steps needed
+
+    elif cfg.MODE == cfg.MODES.BOS:
+        # Background-oriented Schlieren
+        #   (frame_0, frame_1), (frame_0, frame_2), (frame_0, frame_3), ...
+        #
+        # The first frame (frame_0 == `A`) should contain the quiescent
+        # background consisting of a fine grained noise pattern, used from now
+        # on to cross-correlate all subsequent frames `B` against.
+
+        # Flip the image of frame `A` left-to-right and up-to-down ahead of time
+        # as needed for the upcoming 2D cross-correlation done via convolution.
+        A_ = np.asarray(fliplrud(A), order="C")
 
     # --------------------------------------------------------------------------
     #   Init - preallocate
@@ -254,18 +284,18 @@ if __name__ == "__main__":
     print(f"done in {perf_counter() - t_0:.3f} sec\n")
 
     # --------------------------------------------------------------------------
-    #   Walk over all image pairs
+    #   Walk over all images from disk / acquire images from the camera
     # --------------------------------------------------------------------------
 
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=cfg.N_WORKERS)
 
-    for file_idx in range(
-        0, N_img_files - 1, 2 if cfg.MODE == cfg.MODES.PIV2 else 1
-    ):
-        fn1 = img_files[file_idx]
-        fn2 = img_files[file_idx + 1]
-        print(get_filename_from_full_path(fn1))
+    # Debugging overrule: Only process the first two images and be done
+    if cfg.DEBUG:
+        cfg.N_IMAGES = 2
 
+    do_run = True
+    frame_idx = 0
+    while do_run:
         # Reset
         for stage_idx in range(N_stages):
             lB_IW_grid_x[stage_idx] = np.copy(lIW_grid_x[stage_idx])
@@ -293,33 +323,79 @@ if __name__ == "__main__":
             """
 
         # ----------------------------------------------------------------------
-        #   Image preparation
+        #   Read and prepare new images
         # ----------------------------------------------------------------------
 
-        # Display info
-        print("Reading, processing... ", end="")
-        sys.stdout.flush()
+        # Read new images
         t_0 = perf_counter()
+        frame_title = ""
+        if cfg.MODE == cfg.MODES.PIV:
+            # Particle image velocimetry using equidistantly timed frames
+            #   (frame_0, frame_1), (frame_1, frame_2), (frame_2, frame_3), ...
+            A = np.copy(B)
+            if cfg.IMAGE_SOURCE == cfg.IMAGE_SOURCES.DISK:
+                fn_B = cfg.IMAGE_FILES[frame_idx + 1]
+                frame_title = get_filename_from_full_path(fn_B)
+                B = imread(fn_B, as_gray=True)
+            else:
+                # TODO: capture from camera
+                fn_B = cfg.IMAGE_FILES[frame_idx + 1]
+                frame_title = get_filename_from_full_path(fn_B)
+                B = imread(fn_B, as_gray=True)
 
-        # Read images
-        A = imread(fn1, as_gray=True)
-        B = imread(fn2, as_gray=True)
-        A = np.asarray(A, dtype=np.float32, order="C")
+        elif cfg.MODE == cfg.MODES.PIV2:
+            # Particle image velocimetry using image pairs
+            #   (frame_0, frame_1), (frame_2, frame_3), (frame_4, frame_5), ...
+            if cfg.IMAGE_SOURCE == cfg.IMAGE_SOURCES.DISK:
+                fn_A = cfg.IMAGE_FILES[frame_idx]
+                fn_B = cfg.IMAGE_FILES[frame_idx + 1]
+                frame_title = get_filename_from_full_path(fn_B)
+                A = imread(fn_A, as_gray=True)
+                B = imread(fn_B, as_gray=True)
+            else:
+                # TODO: capture from camera
+                fn_A = cfg.IMAGE_FILES[frame_idx]
+                fn_B = cfg.IMAGE_FILES[frame_idx + 1]
+                frame_title = get_filename_from_full_path(fn_B)
+                A = imread(fn_A, as_gray=True)
+                B = imread(fn_B, as_gray=True)
+
+            A = np.asarray(A, dtype=np.float32, order="C")
+            A = A / img_max_value
+            remove_mean_background(A)
+
+        elif cfg.MODE == cfg.MODES.BOS:
+            # Background-oriented Schlieren
+            #   (frame_0, frame_1), (frame_0, frame_2), (frame_0, frame_3), ...
+            if cfg.IMAGE_SOURCE == cfg.IMAGE_SOURCES.DISK:
+                fn_B = cfg.IMAGE_FILES[frame_idx + 1]
+                frame_title = get_filename_from_full_path(fn_B)
+                B = imread(fn_B, as_gray=True)
+            else:
+                # TODO: capture from camera
+                fn_B = cfg.IMAGE_FILES[frame_idx + 1]
+                frame_title = get_filename_from_full_path(fn_B)
+                B = imread(fn_B, as_gray=True)
+
         B = np.asarray(B, dtype=np.float32, order="C")
-        A = A / img_max_value
         B = B / img_max_value
-        remove_mean_background(A)
         remove_mean_background(B)
 
-        # Flip the image of frame A left-to-right and up-to-down ahead of time
-        # as needed for the upcoming 2D cross-correlation done via convolution.
-        # Doing this ahead of time instead of doing it inside `process_IWs()`
-        # for each individual IW saves many duplicate `fliplrud()` operations on
-        # identical data because of the window overlapping.
-        A_ = np.asarray(fliplrud(A), order="C")
+        if cfg.MODE in [cfg.MODES.PIV, cfg.MODES.PIV2]:
+            # Flip the image of frame `A` left-to-right and up-to-down ahead of
+            # time as needed for the upcoming 2D cross-correlation done via
+            # convolution. Doing this ahead of time instead of doing it inside
+            # `process_IWs()` for each individual IW saves many duplicate
+            # `fliplrud()` operations on identical data because of the window
+            # overlapping.
+            A_ = np.asarray(fliplrud(A), order="C")
 
         # Display info
-        print(f"done in {perf_counter() - t_0:.3f}, ", end="")
+        print(frame_title)
+        print(
+            f"Reading, processing... done in {perf_counter() - t_0:.3f}, ",
+            end="",
+        )
         sys.stdout.flush()
         t_0 = perf_counter()
 
@@ -458,12 +534,12 @@ if __name__ == "__main__":
                     color=colormap(colors),
                     linewidths=1,
                 )
-                h_title = plt.title(f"{get_filename_from_full_path(fn1)}")  # type: ignore
+                h_title = plt.title(f"{frame_title}")  # type: ignore
 
             h_imshow.set_data(A)  # type: ignore
             h_quiver.set_UVC(VM_dx * cfg.QUIVER_SIZE, VM_dy * cfg.QUIVER_SIZE)  # type: ignore
             h_quiver.set_color(colormap(colors))  # type: ignore
-            h_title.set_text(f"{get_filename_from_full_path(fn1)}")  # type: ignore
+            h_title.set_text(f"{frame_title}")  # type: ignore
 
             plt.draw()  # type: ignore
             plt.pause(0.0001)  # type: ignore
@@ -472,5 +548,18 @@ if __name__ == "__main__":
                 plt.savefig("output_VM.png", dpi=300, bbox_inches="tight")  # type: ignore
                 plt.waitforbuttonpress()  # type: ignore
                 # plt.show()  # type: ignore
+
+        # ----------------------------------------------------------------------
+        #   Are we finished?
+        # ----------------------------------------------------------------------
+
+        frame_step = 2 if cfg.MODE == cfg.MODES.PIV2 else 1
+        frame_idx += frame_step
+
+        if cfg.IMAGE_SOURCE == cfg.IMAGE_SOURCES.DISK:
+            if frame_idx >= cfg.N_IMAGES - 1:
+                do_run = False
+
+        # TODO: Check for key presses
 
     executor.shutdown()
