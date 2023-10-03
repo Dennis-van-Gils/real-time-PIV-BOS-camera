@@ -101,6 +101,7 @@ if __name__ == "__main__":
     remove_mean_background(A)
 
     # Prevent 'possibly unbound variable' warnings
+    B_orig = np.zeros_like(A)
     B = np.zeros_like(A)
     A_ = np.zeros_like(A)
 
@@ -324,7 +325,6 @@ if __name__ == "__main__":
             #   (frame_0, frame_1), (frame_1, frame_2), (frame_2, frame_3), ...
             A = np.copy(B)
             B, frame_title = frame_server.serve(frame_idx + 1)
-            remove_mean_background(B)
 
         elif cfg.MODE == cfg.MODES.PIV2:
             # Particle image velocimetry using image pairs
@@ -332,13 +332,14 @@ if __name__ == "__main__":
             A, frame_title = frame_server.serve(frame_idx)
             B, frame_title = frame_server.serve(frame_idx + 1)
             remove_mean_background(A)
-            remove_mean_background(B)
 
         elif cfg.MODE == cfg.MODES.BOS:
             # Background-oriented Schlieren
             #   (frame_0, frame_1), (frame_0, frame_2), (frame_0, frame_3), ...
             B, frame_title = frame_server.serve(frame_idx + 1)
-            remove_mean_background(B)
+
+        np.copyto(B_orig, B)  # Keep a copy of original `B` for plotting later
+        remove_mean_background(B)
 
         if cfg.MODE in [cfg.MODES.PIV, cfg.MODES.PIV2]:
             # Flip the image of frame `A` left-to-right and up-to-down ahead of
@@ -459,10 +460,64 @@ if __name__ == "__main__":
             )
 
         # ----------------------------------------------------------------------
-        #   Show original image A with unfiltered vector map on top
+        #   Show results
         # ----------------------------------------------------------------------
 
-        if cfg.LOAD_MPL:
+        # TODO: In progress code. Contains hardcoded 'magic' constants.
+        if cfg.MODE in [cfg.MODES.BOS]:
+            IW_size, IW_overlap, N_IWs, N_IWs_x, N_IWs_y = lIW_params[-1]
+            grid_x = lVM_grid_x[-1]
+            grid_y = lVM_grid_y[-1]
+            VM_dx = lVM_dx[-1]
+            VM_dy = lVM_dy[-1]
+
+            # Creates an image filled with zero
+            # intensities with the same dimensions
+            # as the frame
+            mask = np.zeros((N_IWs_y, N_IWs_x, 3), dtype=np.uint8)
+
+            # Computes the magnitude and angle of the 2D vectors
+            VM_dx_2 = np.reshape(VM_dx, (N_IWs_y, N_IWs_x))
+            VM_dy_2 = np.reshape(VM_dy, (N_IWs_y, N_IWs_x))
+            M, angle = cv2.cartToPolar(VM_dx_2, VM_dy_2, angleInDegrees=True)
+
+            # Sets image hue according to the optical flow direction
+            angle = np.nan_to_num(angle)
+            mask[..., 0] = angle / 2
+
+            # Sets image saturation to maximum
+            mask[..., 1] = 255
+
+            # Sets image value according to the optical flow
+            # magnitude (normalized)
+            M = np.nan_to_num(M)
+            # mask[..., 2] = cv2.normalize(M, None, 0, 255, cv2.NORM_MINMAX)
+            mask[..., 2] = np.clip(M * 300, 0, 255)
+
+            # Converts HSV to RGB (BGR) color representation
+            rgb = cv2.cvtColor(mask, cv2.COLOR_HSV2BGR)
+
+            display_resolution = (B.shape[1] // 2, B.shape[0] // 2)
+            cv2.imshow(
+                "BOS",
+                cv2.resize(
+                    rgb,
+                    display_resolution,
+                    interpolation=cv2.INTER_NEAREST,
+                ),
+            )
+            cv2.imshow(
+                "Image",
+                cv2.resize(
+                    B_orig,
+                    display_resolution,
+                    interpolation=cv2.INTER_NEAREST,
+                ),
+            )
+
+            cv2.setWindowTitle("BOS", f"BOS {frame_title}")
+
+        else:
             grid_x = lVM_grid_x[-1]
             grid_y = lVM_grid_y[-1]
             VM_dx = lVM_dx[-1]
@@ -519,13 +574,16 @@ if __name__ == "__main__":
             if frame_idx >= cfg.N_IMAGES - 1:
                 done = True
 
-        # """
         # Check for key presses
+        if cv2.waitKey(1) & 0xFF == ord("q"):
+            break
+
+        # NOTE: Windows only
         if msvcrt.kbhit():
             k = msvcrt.getch()
             if k == b"q":
                 done = True
-        # """
 
+    cv2.destroyAllWindows()
     frame_server.close()
     executor.shutdown()
