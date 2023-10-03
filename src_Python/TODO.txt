@@ -4,6 +4,10 @@
 TODO
 ----
 
+- Print image width, height and bit depth to terminal
+
+- Expand config.ini with desired camera resolution and exposure time (Ximea)
+
 - Examine the GIL lock and release
   https://www.maartenbreddels.com/perf/jupyter/python/tracing/gil/2021/01/14/Tracing-the-Python-GIL.html
   viztracer -o output.html --ignore_frozen -m main

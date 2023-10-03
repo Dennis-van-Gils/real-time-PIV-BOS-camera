@@ -3,7 +3,7 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "29-09-2023"
+__date__ = "03-10-2023"
 __version__ = "1.0"
 
 import numpy as np
@@ -306,6 +306,12 @@ def process_IWs(
             IW_shifts_y,
         )
 
+        # BOS
+        if cfg.MODE == cfg.MODES.BOS:
+            C_maps[IW_idx, :, :] = fft.convolve(IW_B, IW_A_)
+            continue
+
+        # PIV & PIV2
         if all_smaller_or_equal_to(IW_A_, 0) or all_smaller_or_equal_to(
             IW_B, 0
         ):

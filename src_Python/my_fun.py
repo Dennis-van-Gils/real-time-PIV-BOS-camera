@@ -3,23 +3,12 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "27-09-2023"
+__date__ = "03-10-2023"
 __version__ = "1.0"
-
-import os
 
 import numpy as np
 import numpy.typing as npt
 import numba as nb
-
-# ------------------------------------------------------------------------------
-#   get_filename_from_full_path
-# ------------------------------------------------------------------------------
-
-
-def get_filename_from_full_path(p: str):
-    return os.path.normpath(p).split(os.path.sep)[-1]
-
 
 # ------------------------------------------------------------------------------
 #   remove_mean_background
