@@ -1,0 +1,2 @@
+# modify hue channel by adding difference and modulo 180
+hue = np.mod(hue + hue_offset, 180).astype(np.uint8)
