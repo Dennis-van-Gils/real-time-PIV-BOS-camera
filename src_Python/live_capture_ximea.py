@@ -1,52 +1,46 @@
 from ximea import xiapi
 import cv2
-import time
 
-# create instance for first connected camera
-cam = xiapi.Camera()
+cam_xi = xiapi.Camera()
+cam_xi.open_device()
+cam_xi.set_exposure(20000)
+cam_xi.start_acquisition()
 
-# start communication
-print("Opening first camera...")
-cam.open_device()
+# Create instance of Image to store image data and metadata
+img_xi = xiapi.Image()
 
-# settings
-cam.set_exposure(20000)
+# Toggle to enable/disable clipping warning
+show_clipping = True
 
-# create instance of Image to store image data and metadata
-img = xiapi.Image()
-
-# start data acquisition
-print("Starting data acquisition...")
-cam.start_acquisition()
+print("Starting video.")
+print("Press c to toggle clip warning.")
+print("Press q to exit.")
+print(f"Clip warning: {'Enabled' if show_clipping else 'Disabled'}")
 
 try:
-    print("Starting video. Press q to exit.")
-    t0 = time.time()
     while True:
-        # get data and pass them from camera to img
-        cam.get_image(img)
+        cam_xi.get_image(img_xi)
+        img_gray = img_xi.get_image_data_numpy()
 
-        # create numpy array with data from camera. Dimensions of the array are
-        # determined by imgdataformat
-        data = img.get_image_data_numpy()
+        # Recolor clipped intensities as full red
+        img_rgb = cv2.cvtColor(img_gray, cv2.COLOR_GRAY2RGB)
+        clipped_idxs = (img_gray == 255).nonzero()
+        img_rgb[clipped_idxs] = [0, 0, 255]  # bgr
 
-        # show acquired image with time since the beginning of acquisition
-        # font = cv2.FONT_HERSHEY_SIMPLEX
-        # text = "{:5.2f}".format(time.time() - t0)
-        # cv2.putText(data, text, (900, 150), font, 4, (255, 255, 255), 2)
-        cv2.imshow("XiCAM example", data)
+        cv2.imshow("XiCAM viewer", img_rgb if show_clipping else img_gray)
 
-        if cv2.waitKey(1) & 0xFF == ord("q"):
+        key = cv2.waitKey(1) & 0xFF
+        if key == ord("c"):
+            show_clipping = not show_clipping
+            print(f"Clip warning: {'Enabled' if show_clipping else 'Disabled'}")
+
+        elif key == ord("q"):
             break
 
 except KeyboardInterrupt:
     cv2.destroyAllWindows()
 
-# stop data acquisition
 print("Stopping acquisition...")
-cam.stop_acquisition()
-
-# stop communication
-cam.close_device()
-
+cam_xi.stop_acquisition()
+cam_xi.close_device()
 print("Done.")
