@@ -11,6 +11,11 @@ import time
 from datetime import datetime
 
 import cv2
+import numpy as np
+import matplotlib as mpl
+from matplotlib import pyplot as plt
+
+mpl.use("TkAgg")
 
 # ------------------------------------------------------------------------------
 #   User settings
@@ -34,10 +39,13 @@ DISPLAY_SCALING = 125  # Set equal to the display scaling used by Windows [%]
 # Toggle to enable/disable clip warning by painting clipped pixels in red
 do_show_clipped = True
 
+# Toggle to show histogram
+do_show_histogram = False
+
 # Toggle to save acquired frames to disk
 do_save_frames = False
 
-# Toggle reporting frame time intervals to the terminal
+# Toggle to report frame time intervals to the terminal
 do_report_frame_dT = False
 
 # ------------------------------------------------------------------------------
@@ -99,27 +107,33 @@ print(
 print("")
 print("Keypresses registered by video window:")
 print("  c | Toggle clip warning.")
-print("  s | Toggle saving frames to disk.")
-print("  t | Toggle reporting frame dT in [ms].")
+print("  h | Toggle show histogram.")
+print("  s | Toggle save frames to disk.")
+print("  t | Toggle report frame dT in [ms].")
 print("  q | Quit.")
 print("")
 print(f"Clip warning   : {bool(do_show_clipped)}")
-print(f"Saving to disk : {bool(do_save_frames)}")
+print(f"Show histogram : {bool(do_show_histogram)}")
+print(f"Save to disk   : {bool(do_save_frames)}")
 print(f"Report frame dT: {bool(do_report_frame_dT)}")
 
+tick = time.perf_counter()  # [sec]
+prev_tick_histogram = tick
+prev_tick_frame = tick
+frame_t0 = tick
 frame_idx = 0
-frame_t0 = time.perf_counter()  # [sec]
-frame_time = frame_time_prev = frame_t0  # [sec]
 try:
     while True:
         # Acquire frame
         success, img_raw = cap.read()
 
-        frame_time_prev = frame_time
-        frame_time = time.perf_counter() - frame_t0
-        frame_dt = frame_time - frame_time_prev
+        # Timer
+        prev_tick_frame = tick
+        tick = time.perf_counter()
+        frame_time = tick - frame_t0
+        frame_dT = tick - prev_tick_frame
         if do_report_frame_dT:
-            print(f"{frame_dt*1000:.0f}")
+            print(f"{frame_dT*1000:.0f}")
 
         # Turn into grayscale
         img_gray = cv2.cvtColor(img_raw, cv2.COLOR_BGR2GRAY)
@@ -129,7 +143,7 @@ try:
         clipped_idxs = (img_gray == 255).nonzero()
         img_rgb[clipped_idxs] = [0, 0, 255]  # bgr
 
-        # Show
+        # Show image
         cv2.imshow(WINNAME, img_rgb if do_show_clipped else img_gray)
 
         # Correct Windows display scaling issue
@@ -154,15 +168,49 @@ try:
             else:
                 print(f"Failed to save {fn_save}")
 
+        # Histogram
+        if do_show_histogram:
+            hist = cv2.calcHist([img_gray], [0], None, [256], [0, 256])
+            hist = np.asarray(hist, dtype=np.float32) / img_gray.size
+            if not (plt.fignum_exists("hist")):
+                fig = plt.figure("hist")
+                (h_hist,) = plt.plot(hist)
+                plt.title("Histogram")
+                plt.xlim(0, 255)
+                plt.xticks(np.append(np.arange(0, 255, 32), 255))
+                # plt.ylim(0, 1)
+
+            h_hist.set_ydata(hist)  # type: ignore
+
+            # Update ylim every second
+            if tick - prev_tick_histogram >= 1.0:
+                prev_tick_histogram = tick
+                max_hist_pct = np.max(hist) * 100  # [0 - 100] %
+                max_ylim = np.ceil(max_hist_pct / 5) * 5 / 100
+
+                ax = plt.gca()
+                # ax.relim()
+                ax.axes.set_ylim([0, max_ylim])
+                ax.autoscale_view()
+
+            plt.draw()  # type: ignore
+            plt.pause(0.0001)  # type: ignore
+
         # Handle keypresses
         key = cv2.waitKey(1) & 0xFF
         if key == ord("c"):
             do_show_clipped = not do_show_clipped
             print(f"Clip warning   : {bool(do_show_clipped)}")
 
+        elif key == ord("h"):
+            do_show_histogram = not do_show_histogram
+            print(f"Show histogram : {bool(do_show_histogram)}")
+            if (plt.fignum_exists("hist")) and not do_show_histogram:
+                plt.close("hist")
+
         elif key == ord("s"):
             do_save_frames = not do_save_frames
-            print(f"Saving to disk : {bool(do_save_frames)}")
+            print(f"Save to disk   : {bool(do_save_frames)}")
 
         elif key == ord("t"):
             do_report_frame_dT = not do_report_frame_dT
