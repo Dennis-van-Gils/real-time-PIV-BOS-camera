@@ -7,6 +7,7 @@ __date__ = "05-10-2023"
 __version__ = "1.0"
 
 import os
+import sys
 import time
 from datetime import datetime
 
@@ -59,7 +60,10 @@ print("Starting video")
 print("--------------")
 print(f"Camera ID: {CAM_ID}")
 
-cap = cv2.VideoCapture(CAM_ID, cv2.CAP_DSHOW)
+if sys.platform == "win32":
+    cap = cv2.VideoCapture(CAM_ID, cv2.CAP_DSHOW)
+else:
+    cap = cv2.VideoCapture(CAM_ID)
 if not cap.isOpened():
     raise Exception("Could not open camera. Check the set CAM_ID.")
 
