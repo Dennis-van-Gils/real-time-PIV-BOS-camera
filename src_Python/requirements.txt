@@ -9,3 +9,4 @@ rocket-fft
 opencv-python
 opencv-contrib-python
 imagecodecs 
+pyqt6

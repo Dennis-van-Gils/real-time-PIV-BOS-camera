@@ -15,7 +15,10 @@ import numpy as np
 import matplotlib as mpl
 from matplotlib import pyplot as plt
 
-mpl.use("TkAgg")
+# NOTE: Backend `TkAgg` does not work well with the histogram. The matplotlib
+# window steals the keypresses away from `cv2.imshow()`
+# mpl.use("TkAgg")
+mpl.use("QtAgg")  # Preferred above `TkAgg`
 
 # ------------------------------------------------------------------------------
 #   User settings
@@ -172,29 +175,30 @@ try:
         if do_show_histogram:
             hist = cv2.calcHist([img_gray], [0], None, [256], [0, 256])
             hist = np.asarray(hist, dtype=np.float32) / img_gray.size
-            if not (plt.fignum_exists("hist")):
-                fig = plt.figure("hist")
+            if not (plt.fignum_exists("Histogram")):
+                plt.ion()
+                fig = plt.figure("Histogram")
+                fig.canvas.mpl_disconnect(
+                    fig.canvas.manager.key_press_handler_id  # type: ignore
+                )
                 (h_hist,) = plt.plot(hist)
-                plt.title("Histogram")
-                plt.xlim(0, 255)
+                # plt.title("Histogram")
                 plt.xticks(np.append(np.arange(0, 255, 32), 255))
-                # plt.ylim(0, 1)
-
-            h_hist.set_ydata(hist)  # type: ignore
+                plt.xlim(0, 255)
+                plt.show(block=False)
 
             # Update ylim every second
             if tick - prev_tick_histogram >= 1.0:
                 prev_tick_histogram = tick
                 max_hist_pct = np.max(hist) * 100  # [0 - 100] %
                 max_ylim = np.ceil(max_hist_pct / 5) * 5 / 100
-
-                ax = plt.gca()
-                # ax.relim()
+                ax = h_hist.axes  # type: ignore
                 ax.axes.set_ylim([0, max_ylim])
-                ax.autoscale_view()
+                plt.tight_layout()
 
-            plt.draw()  # type: ignore
-            plt.pause(0.0001)  # type: ignore
+            h_hist.set_ydata(hist)  # type: ignore
+            fig.canvas.draw_idle()  # type: ignore
+            # fig.canvas.flush_events()  # Backend `QtAgg` requires this line
 
         # Handle keypresses
         key = cv2.waitKey(1) & 0xFF
@@ -205,8 +209,8 @@ try:
         elif key == ord("h"):
             do_show_histogram = not do_show_histogram
             print(f"Show histogram : {bool(do_show_histogram)}")
-            if (plt.fignum_exists("hist")) and not do_show_histogram:
-                plt.close("hist")
+            if (plt.fignum_exists("Histogram")) and not do_show_histogram:
+                plt.close("Histogram")
 
         elif key == ord("s"):
             do_save_frames = not do_save_frames
