@@ -1,6 +1,15 @@
-from ximea import xiapi
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 import cv2
+from ximea import xiapi
 
+# Toggle to enable/disable clipping warning
+show_clipping = True
+
+# OpenCV window name
+WINNAME = "XiCAM viewer"
+
+# Open video camera
 cam_xi = xiapi.Camera()
 cam_xi.open_device()
 cam_xi.set_exposure(20000)
@@ -8,9 +17,6 @@ cam_xi.start_acquisition()
 
 # Create instance of Image to store image data and metadata
 img_xi = xiapi.Image()
-
-# Toggle to enable/disable clipping warning
-show_clipping = True
 
 print("Starting video.")
 print("Press c to toggle clip warning.")
@@ -27,7 +33,7 @@ try:
         clipped_idxs = (img_gray == 255).nonzero()
         img_rgb[clipped_idxs] = [0, 0, 255]  # bgr
 
-        cv2.imshow("XiCAM viewer", img_rgb if show_clipping else img_gray)
+        cv2.imshow(WINNAME, img_rgb if show_clipping else img_gray)
 
         key = cv2.waitKey(1) & 0xFF
         if key == ord("c"):
@@ -38,8 +44,9 @@ try:
             break
 
 except KeyboardInterrupt:
-    cv2.destroyAllWindows()
+    pass
 
+cv2.destroyAllWindows()
 print("Stopping acquisition...")
 cam_xi.stop_acquisition()
 cam_xi.close_device()
