@@ -11,7 +11,7 @@ Example usage for `main.py`:
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "02-10-2023"
+__date__ = "06-10-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
@@ -54,6 +54,7 @@ IMAGE_PATH = ""
 IMAGE_FILES: list[str] = []  # Will be derived from `IMAGE_PATH`
 N_IMAGES = 0  # Will be derived from `IMAGE_PATH`
 CAMERA_ID = 0
+WANTED_RESOLUTION = [1280, 720]
 
 # [Processing]
 MODE = MODES.BOS
@@ -108,6 +109,7 @@ def read_file(filename=None):
     global IMAGE_FILES
     global N_IMAGES
     global CAMERA_ID
+    global WANTED_RESOLUTION
 
     IMAGE_SOURCE = getattr(
         IMAGE_SOURCES,
@@ -123,6 +125,7 @@ def read_file(filename=None):
                 f'"{IMAGE_PATH}".\nExiting.'
             )
     CAMERA_ID = parser.getint("Source", "camera_id")
+    WANTED_RESOLUTION = parse_int_list(parser["Source"]["wanted_resolution"])
 
     # [Processing]
     global MODE
@@ -171,6 +174,51 @@ def read_file(filename=None):
         LOAD_MPL = parser.getboolean("Debugging", "load_mpl")
     except (configparser.NoSectionError, configparser.NoOptionError):
         pass
+
+
+# ------------------------------------------------------------------------------
+#   read_file_live_capture
+# ------------------------------------------------------------------------------
+
+
+def read_file_live_capture(filename=None):
+    if filename in (None, ""):
+        import tkinter as tk
+        from tkinter import filedialog
+
+        root = tk.Tk()
+        root.withdraw()
+        filename = filedialog.askopenfilename(
+            title="Select configuration file to open",
+            filetypes=(("Configuration files", "*.ini"), ("All files", "*.*")),
+            initialfile="live_capture_config.ini",
+        )
+
+        if filename in (None, ""):
+            print(
+                "WARNING: No configuration file was selected. Using default "
+                "parameters."
+            )
+            return
+
+    if not os.path.isfile(filename):
+        raise FileNotFoundError(f"Could not open `{filename}`.")
+
+    print(f"Reading configuration file: {filename}")
+    parser = configparser.ConfigParser()
+    parser.read(filename)
+
+    # [Source]
+    global IMAGE_SOURCE
+    global CAMERA_ID
+    global WANTED_RESOLUTION
+
+    IMAGE_SOURCE = getattr(
+        IMAGE_SOURCES,
+        parser["Source"]["image_source"].upper(),
+    )
+    CAMERA_ID = parser.getint("Source", "camera_id")
+    WANTED_RESOLUTION = parse_int_list(parser["Source"]["wanted_resolution"])
 
 
 # ------------------------------------------------------------------------------

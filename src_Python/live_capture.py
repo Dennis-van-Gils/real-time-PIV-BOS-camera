@@ -3,7 +3,7 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "05-10-2023"
+__date__ = "06-10-2023"
 __version__ = "1.0"
 
 import os
@@ -16,28 +16,34 @@ import numpy as np
 import matplotlib as mpl
 from matplotlib import pyplot as plt
 
+# The import order is important. We must handle the user configuration first.
+import init_config as cfg
+
+# Parse command line arguments.
+# Expecting None or the filename of the configuration file to read in.
+if len(sys.argv) > 1:
+    config_filename = sys.argv[1]
+else:
+    config_filename = "live_capture_config.ini"
+cfg.read_file_live_capture(config_filename)
+
+# Now we can import the remaining modules
+from FrameServer import FrameServer
+
 # NOTE: Backend `TkAgg` does not work well with the histogram. The matplotlib
 # window steals the keypresses away from `cv2.imshow()`
 # mpl.use("TkAgg")
 mpl.use("QtAgg")  # Preferred above `TkAgg`
 
 # ------------------------------------------------------------------------------
-#   User settings
+#   Settings
 # ------------------------------------------------------------------------------
 
 # OpenCV window name
-WINNAME = "Webcam viewer"
-
-# Camera ID to open
-CAM_ID = 0
-
-# Wanted resolution
-# WANTED_RESOLUTION = (1280, 720)  # 0.9 MPx
-# WANTED_RESOLUTION = (1600, 896)  # 1.4 MPx
-WANTED_RESOLUTION = (1920, 1080)  # 2.1 MPx
+WINNAME = "Live capture"
 
 # Toggle to correct for Windows display scaling issue
-do_adjust_display_scaling = True
+do_adjust_display_scaling = False
 DISPLAY_SCALING = 125  # Set equal to the display scaling used by Windows [%]
 
 # Toggle to enable/disable clip warning by painting clipped pixels in red
@@ -58,47 +64,43 @@ do_report_frame_dT = False
 
 print("Starting video")
 print("--------------")
-print(f"Camera ID: {CAM_ID}")
+print(f"Camera ID: {cfg.CAMERA_ID}")
 
-if sys.platform == "win32":
-    cap = cv2.VideoCapture(CAM_ID, cv2.CAP_DSHOW)
-else:
-    cap = cv2.VideoCapture(CAM_ID)
-if not cap.isOpened():
-    raise Exception("Could not open camera. Check the set CAM_ID.")
+# Set up the frame server
+frame_server = FrameServer()
+frame_server.begin()
 
-# Try obtaining wanted camera settings
-cap.set(cv2.CAP_PROP_SETTINGS, 0)  # Shows the camera controls when available
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, WANTED_RESOLUTION[0])
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, WANTED_RESOLUTION[1])
-# cap.set(cv2.CAP_PROP_SETTINGS, 1)
-# cap.set(cv2.CAP_PROP_AUTO_WB, 0)
-# cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0)
-# cap.set(cv2.CAP_PROP_EXPOSURE, -7)
-# cap.set(cv2.CAP_PROP_EXPOSUREPROGRAM, 0)
-# cap.set(cv2.CAP_PROP_CONTRAST, 31)
-# cap.set(cv2.CAP_PROP_SATURATION, 31)
-# cap.set(cv2.CAP_PROP_GAIN, 127)
-# cap.set(cv2.CAP_PROP_SHARPNESS, 63)
-# cap.set(cv2.CAP_PROP_FOCUS, 0)
-# cap.set(cv2.CAP_PROP_FPS, 30)
+# Experimental: Try adjusting wanted camera settings
+if cfg.IMAGE_SOURCE == cfg.IMAGE_SOURCES.WEBCAM:
+    cap = frame_server.cam_cv2
+    cap.set(cv2.CAP_PROP_SETTINGS, 0)  # Show the camera controls when available
+    # cap.set(cv2.CAP_PROP_SETTINGS, 1)
+    # cap.set(cv2.CAP_PROP_AUTO_WB, 0)
+    # cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0)
+    # cap.set(cv2.CAP_PROP_EXPOSURE, -7)
+    # cap.set(cv2.CAP_PROP_EXPOSUREPROGRAM, 0)
+    # cap.set(cv2.CAP_PROP_CONTRAST, 31)
+    # cap.set(cv2.CAP_PROP_SATURATION, 31)
+    # cap.set(cv2.CAP_PROP_GAIN, 127)
+    # cap.set(cv2.CAP_PROP_SHARPNESS, 63)
+    # cap.set(cv2.CAP_PROP_FOCUS, 0)
+    # cap.set(cv2.CAP_PROP_FPS, 30)
 
 # Obtained settings
-obt_resolution = (
-    int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
-    int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
-)
-obt_fps = cap.get(cv2.CAP_PROP_FPS)
+if cfg.IMAGE_SOURCE == cfg.IMAGE_SOURCES.WEBCAM:
+    obt_fps = frame_server.cam_cv2.get(cv2.CAP_PROP_FPS)
+else:
+    obt_fps = 0.0
 
 # Correct Windows display scaling issue
 if do_adjust_display_scaling:
-    scaled_resolution = [
-        int(x // (DISPLAY_SCALING / 100)) for x in obt_resolution
-    ]
+    scaled_window_w = int(frame_server.img_w // (DISPLAY_SCALING / 100))
+    scaled_window_h = int(frame_server.img_h // (DISPLAY_SCALING / 100))
     cv2.namedWindow(WINNAME, cv2.WINDOW_NORMAL)
-    cv2.resizeWindow(WINNAME, scaled_resolution[0], scaled_resolution[1])
+    cv2.resizeWindow(WINNAME, scaled_window_w, scaled_window_h)
 else:
-    scaled_resolution = obt_resolution
+    scaled_window_w = frame_server.img_w
+    scaled_window_h = frame_server.img_h
 
 # Export folder
 export_folder = datetime.strftime(datetime.now(), r"capture_%Y%m%d_%H%M%S")
@@ -109,7 +111,8 @@ created_export_folder = False
 # ------------------------------------------------------------------------------
 
 print(
-    f"Obtained : {obt_resolution[0]} x {obt_resolution[1]} px^2 @ {obt_fps} fps"
+    f"Obtained : {frame_server.img_w} x {frame_server.img_h} px^2 "
+    f"@ {obt_fps} fps"
 )
 print("")
 print("Keypresses registered by video window:")
@@ -126,28 +129,22 @@ print(f"Report frame dT: {bool(do_report_frame_dT)}")
 
 tick = time.perf_counter()  # [sec]
 prev_tick_histogram = tick
-prev_tick_frame = tick
-frame_t0 = tick
-frame_idx = 0
 try:
     while True:
         # Acquire frame
-        success, img_raw = cap.read()
+        img_gray, frame_title = frame_server.serve()
 
         # Timer
-        prev_tick_frame = tick
         tick = time.perf_counter()
-        frame_time = tick - frame_t0
-        frame_dT = tick - prev_tick_frame
         if do_report_frame_dT:
-            print(f"{frame_dT*1000:.0f}")
+            print(f"{frame_server.frame_dT*1000:.0f}")
 
-        # Turn into grayscale
-        img_gray = cv2.cvtColor(img_raw, cv2.COLOR_BGR2GRAY)
+        # Convert float32 [0 - 1] pixel intensity range to uint8 [0 - 255]
+        img_gray = np.asarray(img_gray * 255, dtype=np.uint8)
 
         # Recolor clipped intensities as full red
         img_rgb = cv2.cvtColor(img_gray, cv2.COLOR_GRAY2RGB)
-        clipped_idxs = (img_gray == 255).nonzero()
+        clipped_idxs = (img_gray >= 254).nonzero()
         img_rgb[clipped_idxs] = [0, 0, 255]  # bgr
 
         # Show image
@@ -155,11 +152,7 @@ try:
 
         # Correct Windows display scaling issue
         if do_adjust_display_scaling:
-            cv2.resizeWindow(
-                WINNAME,
-                scaled_resolution[0],
-                scaled_resolution[1],
-            )
+            cv2.resizeWindow(WINNAME, scaled_window_w, scaled_window_h)
 
         # Save acquired frame to disk
         if do_save_frames:
@@ -168,7 +161,7 @@ try:
                     os.makedirs(export_folder)
                 created_export_folder = True
 
-            filename = f"frame_{frame_idx:06d}_t_{frame_time:.3f}.png"
+            filename = f"{frame_title.replace(' ', '_')}.png"
             fn_save = os.path.join(export_folder, filename)
             if cv2.imwrite(fn_save, img_gray):
                 print(f"Saved {fn_save}")
@@ -227,8 +220,6 @@ try:
         elif key == ord("q"):
             break
 
-        frame_idx += 1
-
 except KeyboardInterrupt:
     pass
 
@@ -238,5 +229,5 @@ except KeyboardInterrupt:
 
 cv2.destroyAllWindows()
 print("\nStopping acquisition... ", end="")
-cap.release()
+frame_server.close()
 print("done.")
