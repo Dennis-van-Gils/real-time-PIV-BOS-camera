@@ -3,7 +3,7 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "03-10-2023"
+__date__ = "13-10-2023"
 __version__ = "1.0"
 
 import numpy as np
@@ -29,6 +29,28 @@ def conditional_decorator(dec, condition):
 
     return decorator
 
+
+# If multigrid IW analysis is enabled, the IW pre-shift in pixels obtained from
+# the larger parent grid gets multiplied with this factor.
+#
+# Naively, one would expect a value of 1.0 to work correctly. However, it is
+# possible that the pre-shift obtained from the larger grid moves one or more of
+# its smaller children IWs too far away from the original parent location. This
+# is troublesome when a large gradient exists inside the parent grid IW (e.g. a
+# large part of the window shifts by a large amount and a minor region shifts
+# hardly). If so, then the subsequent child IW of the 'quiescent' region would
+# not be able to undo the pre-shift: The IW window might have moved too far away
+# such that the true correlation peak has moved out of view. Being unable to
+# "find it's way back home again" would result in blocky patches of incorrect
+# and too large vectors. Setting below factor to, for instance, 0.8 helps the
+# child IWs to find their way back home again.
+#
+# After reading multiple articles: This pre-shift factor < 1.0 approach seems to
+# be the poor man's approach to the otherwise recommended way of increasing the
+# cross-correlation search area of frame B past its set IW size. We can't do
+# that here, because we have numba-optimized the cross-correlation function to
+# always expect equal-sized input arrays.
+MULTIGRID_PRESHIFT_FACTOR = 0.8
 
 # ------------------------------------------------------------------------------
 #   obtain_IWs_from_image
@@ -129,8 +151,12 @@ def obtain_IWs_from_image(
         # Retrieve the pre-shift
         shift_x = prev_VM_dx[parent_IW_idx]
         shift_y = prev_VM_dy[parent_IW_idx]
-        shift_x = np.int32(0) if np.isnan(shift_x) else np.int32(shift_x)
-        shift_y = np.int32(0) if np.isnan(shift_y) else np.int32(shift_y)
+        shift_x = np.int32(
+            0 if np.isnan(shift_x) else shift_x * MULTIGRID_PRESHIFT_FACTOR
+        )
+        shift_y = np.int32(
+            0 if np.isnan(shift_y) else shift_y * MULTIGRID_PRESHIFT_FACTOR
+        )
 
         # Apply the pre-shift to IW B (eager)
         B_IW_grid_x[IW_idx] += shift_x
