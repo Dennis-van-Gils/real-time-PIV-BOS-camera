@@ -504,6 +504,7 @@ if __name__ == "__main__":
                     rgb,
                     display_resolution,
                     interpolation=cv2.INTER_NEAREST,
+                    # interpolation=cv2.INTER_NEAREST,
                 ),
             )
             cv2.imshow(
@@ -516,6 +517,9 @@ if __name__ == "__main__":
             )
 
             cv2.setWindowTitle("BOS", f"BOS {frame_title}")
+
+            fn_export = f"export_{frame_idx:04d}.png"
+            # cv2.imwrite(fn_export, cv2.resize(rgb, display_resolution))
 
         else:
             grid_x = lVM_grid_x[-1]
