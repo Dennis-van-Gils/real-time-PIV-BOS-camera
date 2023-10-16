@@ -11,7 +11,7 @@ VM: Displacement vector map
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "03-10-2023"
+__date__ = "16-10-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
@@ -40,10 +40,10 @@ else:
 cfg.read_file(config_filename)
 
 # Now we can import the remaining modules
-from FrameServer import FrameServer
-from process_IWs import process_IWs
-from output_debug_info import output_debug_info
-from my_fun import (
+from utils.FrameServer import FrameServer
+from utils.process_IWs import process_IWs
+from utils.output_debug_info import output_debug_info
+from utils.my_fun import (
     remove_mean_background,
     create_IW_grid,
     fliplrud,
@@ -51,13 +51,13 @@ from my_fun import (
 )
 
 if cfg.FFT_LIB == cfg.FFT_LIBS.PYFFTW:
-    from dvg_fftconvolver_pyfftw import FFT_Convolver2D_Full
+    from utils.dvg_fftconvolver_pyfftw import FFT_Convolver2D_Full
 elif cfg.FFT_LIB == cfg.FFT_LIBS.ROCKETFFT:
-    from dvg_fftconvolver_rocketfft import FFT_Convolver2D_Full
+    from utils.dvg_fftconvolver_rocketfft import FFT_Convolver2D_Full
 elif cfg.FFT_LIB == cfg.FFT_LIBS.SCIPY:
-    from dvg_fftconvolver_scipy import FFT_Convolver2D_Full
+    from utils.dvg_fftconvolver_scipy import FFT_Convolver2D_Full
 else:
-    from dvg_fftconvolver_rocketfft import FFT_Convolver2D_Full
+    from utils.dvg_fftconvolver_rocketfft import FFT_Convolver2D_Full
 
 if cfg.LOAD_MPL:
     import matplotlib as mpl

@@ -6,7 +6,8 @@
 Example usage for `main.py`:
     import load_config as cfg
     cfg.read_file("config.ini")
-    # `cfg` now contains all user settings
+
+Namespace `cfg` now contains all user settings
 """
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"

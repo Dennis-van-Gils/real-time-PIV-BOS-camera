@@ -3,24 +3,24 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "13-10-2023"
+__date__ = "16-10-2023"
 __version__ = "1.0"
 
 import numpy as np
 import numpy.typing as npt
 import numba as nb
 
-from my_fun import lookup_IW_idx, all_smaller_or_equal_to
+from utils.my_fun import lookup_IW_idx, all_smaller_or_equal_to
 import init_config as cfg
 
 if cfg.FFT_LIB == cfg.FFT_LIBS.PYFFTW:
-    from dvg_fftconvolver_pyfftw import FFT_Convolver2D_Full
+    from utils.dvg_fftconvolver_pyfftw import FFT_Convolver2D_Full
 elif cfg.FFT_LIB == cfg.FFT_LIBS.ROCKETFFT:
-    from dvg_fftconvolver_rocketfft import FFT_Convolver2D_Full
+    from utils.dvg_fftconvolver_rocketfft import FFT_Convolver2D_Full
 elif cfg.FFT_LIB == cfg.FFT_LIBS.SCIPY:
     from dvg_fftconvolver_scipy import FFT_Convolver2D_Full
 else:
-    from dvg_fftconvolver_rocketfft import FFT_Convolver2D_Full
+    from utils.dvg_fftconvolver_rocketfft import FFT_Convolver2D_Full
 
 
 def conditional_decorator(dec, condition):

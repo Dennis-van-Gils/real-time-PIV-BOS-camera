@@ -28,7 +28,7 @@ else:
 cfg.read_file_live_preview(config_filename)
 
 # Now we can import the remaining modules
-from FrameServer import FrameServer
+from utils.FrameServer import FrameServer
 
 # NOTE: Backend `TkAgg` does not work well with the histogram. The matplotlib
 # window steals the keypresses away from `cv2.imshow()`
