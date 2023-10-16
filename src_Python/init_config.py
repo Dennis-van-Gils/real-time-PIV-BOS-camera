@@ -11,7 +11,7 @@ Example usage for `main.py`:
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "13-10-2023"
+__date__ = "16-10-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
@@ -177,11 +177,11 @@ def read_file(filename=None):
 
 
 # ------------------------------------------------------------------------------
-#   read_file_live_capture
+#   read_file_live_preview
 # ------------------------------------------------------------------------------
 
 
-def read_file_live_capture(filename=None):
+def read_file_live_preview(filename=None):
     if filename in (None, ""):
         import tkinter as tk
         from tkinter import filedialog
@@ -191,7 +191,7 @@ def read_file_live_capture(filename=None):
         filename = filedialog.askopenfilename(
             title="Select configuration file to open",
             filetypes=(("Configuration files", "*.ini"), ("All files", "*.*")),
-            initialfile="live_capture_config.ini",
+            initialfile="live_preview.ini",
         )
 
         if filename in (None, ""):

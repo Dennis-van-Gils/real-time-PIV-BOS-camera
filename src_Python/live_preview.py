@@ -3,7 +3,7 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "06-10-2023"
+__date__ = "16-10-2023"
 __version__ = "1.0"
 
 import os
@@ -24,8 +24,8 @@ import init_config as cfg
 if len(sys.argv) > 1:
     config_filename = sys.argv[1]
 else:
-    config_filename = "live_capture_config.ini"
-cfg.read_file_live_capture(config_filename)
+    config_filename = "live_preview.ini"
+cfg.read_file_live_preview(config_filename)
 
 # Now we can import the remaining modules
 from FrameServer import FrameServer
