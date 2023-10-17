@@ -3,7 +3,7 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "16-10-2023"
+__date__ = "17-10-2023"
 __version__ = "1.0"
 
 import os
@@ -40,17 +40,22 @@ mpl.use("QtAgg")  # Preferred above `TkAgg`
 # ------------------------------------------------------------------------------
 
 # OpenCV window name
-WINNAME = "Live capture"
+WINNAME_MAIN = "Live preview"
 
 # Toggle to correct for Windows display scaling issue
-do_adjust_display_scaling = False
 DISPLAY_SCALING = 125  # Set equal to the display scaling used by Windows [%]
+do_adjust_display_scaling = False
 
 # Toggle to enable/disable clip warning by painting clipped pixels in red
 do_show_clipped = True
 
 # Toggle to show histogram
 do_show_histogram = False
+
+# Toggle zoom window
+ZOOM_BLOCKSIZE = 32  # [px]
+WINNAME_ZOOM = f"Zoom {ZOOM_BLOCKSIZE}x{ZOOM_BLOCKSIZE}"
+do_show_zoom = True
 
 # Toggle to save acquired frames to disk
 do_save_frames = False
@@ -96,15 +101,30 @@ else:
 if do_adjust_display_scaling:
     scaled_window_w = int(frame_server.img_w // (DISPLAY_SCALING / 100))
     scaled_window_h = int(frame_server.img_h // (DISPLAY_SCALING / 100))
-    cv2.namedWindow(WINNAME, cv2.WINDOW_NORMAL)
-    cv2.resizeWindow(WINNAME, scaled_window_w, scaled_window_h)
+    cv2.namedWindow(WINNAME_MAIN, cv2.WINDOW_NORMAL)
+    cv2.resizeWindow(WINNAME_MAIN, scaled_window_w, scaled_window_h)
 else:
     scaled_window_w = frame_server.img_w
     scaled_window_h = frame_server.img_h
 
+# Region of interest for zoom window is at dead center of image
+zoom_slice = (
+    slice(
+        frame_server.img_h // 2 - ZOOM_BLOCKSIZE // 2,
+        frame_server.img_h // 2 + ZOOM_BLOCKSIZE // 2,
+    ),
+    slice(
+        frame_server.img_w // 2 - ZOOM_BLOCKSIZE // 2,
+        frame_server.img_w // 2 + ZOOM_BLOCKSIZE // 2,
+    ),
+)
+
 # Export folder
 export_folder = datetime.strftime(datetime.now(), r"capture_%Y%m%d_%H%M%S")
 created_export_folder = False
+
+# Figure numbers
+fignum_histogram = 1
 
 # ------------------------------------------------------------------------------
 #   Acquire frames
@@ -120,12 +140,14 @@ print("  c | Toggle clip warning.")
 print("  h | Toggle show histogram.")
 print("  s | Toggle save frames to disk.")
 print("  t | Toggle report frame dT in [ms].")
+print("  z | Toggle show zoom.")
 print("  q | Quit.")
 print("")
 print(f"Clip warning   : {bool(do_show_clipped)}")
 print(f"Show histogram : {bool(do_show_histogram)}")
 print(f"Save to disk   : {bool(do_save_frames)}")
 print(f"Report frame dT: {bool(do_report_frame_dT)}")
+print(f"Show zoom      : {bool(do_show_zoom)}")
 
 tick = time.perf_counter()  # [sec]
 prev_tick_histogram = tick
@@ -148,11 +170,11 @@ try:
         img_rgb[clipped_idxs] = [0, 0, 255]  # bgr
 
         # Show image
-        cv2.imshow(WINNAME, img_rgb if do_show_clipped else img_gray)
+        cv2.imshow(WINNAME_MAIN, img_rgb if do_show_clipped else img_gray)
 
         # Correct Windows display scaling issue
         if do_adjust_display_scaling:
-            cv2.resizeWindow(WINNAME, scaled_window_w, scaled_window_h)
+            cv2.resizeWindow(WINNAME_MAIN, scaled_window_w, scaled_window_h)
 
         # Save acquired frame to disk
         if do_save_frames:
@@ -168,13 +190,30 @@ try:
             else:
                 print(f"Failed to save {fn_save}")
 
-        # Histogram
+        # ----------------------------------------------------------------------
+        #   Zoom
+        # ----------------------------------------------------------------------
+
+        if do_show_zoom:
+            img_zoom = img_gray[zoom_slice]
+            img_zoom_exploded = cv2.resize(
+                img_zoom,
+                (8 * ZOOM_BLOCKSIZE, 8 * ZOOM_BLOCKSIZE),
+                interpolation=cv2.INTER_NEAREST,
+            )
+            cv2.imshow(WINNAME_ZOOM, img_zoom_exploded)
+
+        # ----------------------------------------------------------------------
+        #   Histogram
+        # ----------------------------------------------------------------------
+
         if do_show_histogram:
             hist = cv2.calcHist([img_gray], [0], None, [256], [0, 256])
             hist = np.asarray(hist, dtype=np.float32) / img_gray.size
-            if not (plt.fignum_exists("Histogram")):
+            if not (plt.fignum_exists(fignum_histogram)):
                 plt.ion()
-                fig = plt.figure("Histogram")
+                fig = plt.figure(fignum_histogram)
+                fig.canvas.manager.set_window_title("Histogram")  # type: ignore
                 fig.canvas.mpl_disconnect(
                     fig.canvas.manager.key_press_handler_id  # type: ignore
                 )
@@ -190,14 +229,17 @@ try:
                 max_hist_pct = np.max(hist) * 100  # [0 - 100] %
                 max_ylim = np.ceil(max_hist_pct / 5) * 5 / 100
                 ax = h_hist.axes  # type: ignore
-                ax.axes.set_ylim([0, max_ylim])
+                ax.axes.set_ylim([0, max_ylim])  # type: ignore
                 plt.tight_layout()
 
             h_hist.set_ydata(hist)  # type: ignore
             fig.canvas.draw_idle()  # type: ignore
             # fig.canvas.flush_events()  # Backend `QtAgg` requires this line
 
-        # Handle keypresses
+        # ----------------------------------------------------------------------
+        #   Handle keypresses
+        # ----------------------------------------------------------------------
+
         key = cv2.waitKey(1) & 0xFF
         if key == ord("c"):
             do_show_clipped = not do_show_clipped
@@ -206,8 +248,8 @@ try:
         elif key == ord("h"):
             do_show_histogram = not do_show_histogram
             print(f"Show histogram : {bool(do_show_histogram)}")
-            if (plt.fignum_exists("Histogram")) and not do_show_histogram:
-                plt.close("Histogram")
+            if (plt.fignum_exists(fignum_histogram)) and not do_show_histogram:
+                plt.close(fignum_histogram)
 
         elif key == ord("s"):
             do_save_frames = not do_save_frames
@@ -216,6 +258,12 @@ try:
         elif key == ord("t"):
             do_report_frame_dT = not do_report_frame_dT
             print(f"Report frame dT: {bool(do_report_frame_dT)}")
+
+        elif key == ord("z"):
+            do_show_zoom = not do_show_zoom
+            print(f"Show zoom      : {bool(do_show_zoom)}")
+            if not do_show_zoom:
+                cv2.destroyWindow(WINNAME_ZOOM)
 
         elif key == ord("q"):
             break
