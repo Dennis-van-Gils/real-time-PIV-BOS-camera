@@ -11,7 +11,7 @@ VM: Displacement vector map
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "16-10-2023"
+__date__ = "18-10-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
@@ -40,9 +40,9 @@ else:
 cfg.read_file(config_filename)
 
 # Now we can import the remaining modules
+from utils import debugging
 from utils.FrameServer import FrameServer
 from utils.process_IWs import process_IWs
-from utils.output_debug_info import output_debug_info
 from utils.my_fun import (
     remove_mean_background,
     create_IW_grid,
@@ -282,7 +282,7 @@ if __name__ == "__main__":
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=cfg.N_WORKERS)
 
     # Debugging overrule: Only process the first two images and be done
-    if cfg.DEBUG:
+    if cfg.DEBUG or cfg.DEBUG_IW_PX is not None:
         cfg.N_IMAGES = 2
 
     done = False
@@ -439,8 +439,32 @@ if __name__ == "__main__":
         #   Debugging output
         # ----------------------------------------------------------------------
 
-        if (cfg.SHOW_CORRELATION_MAPS and cfg.LOAD_MPL) or cfg.DEBUG:
-            output_debug_info(
+        if cfg.DEBUG:
+            debugging.print_info(
+                lIW_params,
+                lA_IW_grid_x,
+                lA_IW_grid_y,
+                lA_IW_lims_x,
+                lA_IW_lims_y,
+                lB_IW_grid_x,
+                lB_IW_grid_y,
+                lB_IW_lims_x,
+                lB_IW_lims_y,
+                lIW_shifts_x,
+                lIW_shifts_y,
+                lC_maps,
+                lVM_grid_x,
+                lVM_grid_y,
+                lVM_dx,
+                lVM_dy,
+            )
+
+        if cfg.DEBUG_IW_PX is not None:
+            debugging.IW_analysis(
+                cfg.DEBUG_IW_PX[0],
+                cfg.DEBUG_IW_PX[1],
+                A,
+                B,
                 lIW_params,
                 lA_IW_grid_x,
                 lA_IW_grid_y,

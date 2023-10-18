@@ -12,7 +12,7 @@ Namespace `cfg` now contains all user settings
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "16-10-2023"
+__date__ = "18-10-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
@@ -22,13 +22,30 @@ import glob
 import configparser
 import numpy as np
 
-# [Debugging]
+# ------------------------------------------------------------------------------
+#   Debugging
+# ------------------------------------------------------------------------------
+
 # Print debug info to the terminal? Slow!
 DEBUG = False
-# When True, also requires `load_mpl = True`. Slow!
-SHOW_CORRELATION_MAPS = False
+
 # Load matplotlib into memory and show vector map results?
 LOAD_MPL = True
+
+# Show detailed IW analysis at the specified pixel location (x, y)?
+# - Specify a tuple as `(x, y)` to show IW analysis.
+# - Set to `None` or empty tuple `()` to skip.
+# DEBUG_IW_PX = (240, 240)
+DEBUG_IW_PX = None
+
+if isinstance(DEBUG_IW_PX, tuple) and len(DEBUG_IW_PX) == 2:
+    LOAD_MPL = True
+else:
+    DEBUG_IW_PX = None
+
+# ------------------------------------------------------------------------------
+#   Enumerations
+# ------------------------------------------------------------------------------
 
 
 class IMAGE_SOURCES(enum.IntEnum):
@@ -47,6 +64,11 @@ class FFT_LIBS(enum.IntEnum):
     PYFFTW = 0
     ROCKETFFT = 1
     SCIPY = 2
+
+
+# ------------------------------------------------------------------------------
+#   Defaults
+# ------------------------------------------------------------------------------
 
 
 # [Source]
@@ -152,29 +174,6 @@ def read_file(filename=None):
     FFT_LIB = getattr(FFT_LIBS, parser["Advanced"]["FFT_lib"].upper())
     N_WORKERS = np.maximum(parser.getint("Advanced", "N_workers"), 1)
     N_FFT_THREADS = np.maximum(parser.getint("Advanced", "N_FFT_threads"), 1)
-
-    # [Debugging]
-    # Try reading optional keywords. Use defaults when keywords don't exist.
-    global DEBUG
-    global SHOW_CORRELATION_MAPS
-    global LOAD_MPL
-
-    try:
-        DEBUG = parser.getboolean("Debugging", "debug")
-    except (configparser.NoSectionError, configparser.NoOptionError):
-        pass  # Remain silent and use default as specified at the top
-
-    try:
-        SHOW_CORRELATION_MAPS = parser.getboolean(
-            "Debugging", "show_correlation_maps"
-        )
-    except (configparser.NoSectionError, configparser.NoOptionError):
-        pass
-
-    try:
-        LOAD_MPL = parser.getboolean("Debugging", "load_mpl")
-    except (configparser.NoSectionError, configparser.NoOptionError):
-        pass
 
 
 # ------------------------------------------------------------------------------
