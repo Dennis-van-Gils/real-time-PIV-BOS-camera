@@ -7,6 +7,7 @@ __date__ = "18-10-2023"
 __version__ = "1.0"
 
 import numpy as np
+import numpy.typing as npt
 
 from utils.my_fun import lookup_IW_idx, normalize_C_maps
 import init_config as cfg
@@ -150,12 +151,14 @@ def IW_analysis(
     lVM_dx,
     lVM_dy,
 ):
-    fig, axs = plt.subplots(1, 2, figsize=(10, 4))
-    ax_A: axes.Axes = axs[0]
-    ax_B: axes.Axes = axs[1]
+    fig_1, axs_1 = plt.subplots(1, 2, figsize=(10, 4), sharex=True, sharey=True)
+    ax_A: axes.Axes = axs_1[0]
+    ax_B: axes.Axes = axs_1[1]
 
     ax_A.imshow(A, interpolation="nearest")
     ax_B.imshow(B, interpolation="nearest")
+
+    fig_2, axs_2 = plt.subplots(len(cfg.IW_SIZES), 3, figsize=(10, 6))
 
     for stage_idx, IW_size in enumerate(cfg.IW_SIZES):
         # fmt: off
@@ -181,9 +184,9 @@ def IW_analysis(
 
         ax_A.add_patch(
             Rectangle(
-                (A_IW_lims_x[IW_idx][0], A_IW_lims_y[IW_idx][0]),
-                A_IW_lims_x[IW_idx][1] - A_IW_lims_x[IW_idx][0],
-                A_IW_lims_y[IW_idx][1] - A_IW_lims_y[IW_idx][0],
+                (A_IW_lims_x[IW_idx, 0], A_IW_lims_y[IW_idx, 0]),
+                A_IW_lims_x[IW_idx, 1] - A_IW_lims_x[IW_idx, 0],
+                A_IW_lims_y[IW_idx, 1] - A_IW_lims_y[IW_idx, 0],
                 edgecolor="r",
                 fill=None,
                 lw=1,
@@ -191,9 +194,9 @@ def IW_analysis(
         )
         ax_B.add_patch(
             Rectangle(
-                (B_IW_lims_x[IW_idx][0], B_IW_lims_y[IW_idx][0]),
-                B_IW_lims_x[IW_idx][1] - B_IW_lims_x[IW_idx][0],
-                B_IW_lims_y[IW_idx][1] - B_IW_lims_y[IW_idx][0],
+                (B_IW_lims_x[IW_idx, 0], B_IW_lims_y[IW_idx, 0]),
+                B_IW_lims_x[IW_idx, 1] - B_IW_lims_x[IW_idx, 0],
+                B_IW_lims_y[IW_idx, 1] - B_IW_lims_y[IW_idx, 0],
                 edgecolor="r",
                 fill=None,
                 lw=1,
@@ -206,8 +209,52 @@ def IW_analysis(
                 VM_grid_y[IW_idx],
                 VM_dx[IW_idx],
                 VM_dy[IW_idx],
+                angles="xy",
+                scale_units="xy",
+                # scale=1,
                 color="r",
+                # units="xy",
+                # width=0.5,
             )
+
+        # Obtain images of IW frame A and IW frame B
+        A_slice = (
+            slice(A_IW_lims_y[IW_idx, 0], A_IW_lims_y[IW_idx, 1] + 1),
+            slice(A_IW_lims_x[IW_idx, 0], A_IW_lims_x[IW_idx, 1] + 1),
+        )
+        B_slice = (
+            slice(B_IW_lims_y[IW_idx, 0], B_IW_lims_y[IW_idx, 1] + 1),
+            slice(B_IW_lims_x[IW_idx, 0], B_IW_lims_x[IW_idx, 1] + 1),
+        )
+
+        IW_A = A[A_slice]
+        IW_B = B[B_slice]
+
+        C_map = C_maps[IW_idx]
+        C_map_h = C_map.shape[0] - 1
+        C_map_w = C_map.shape[1] - 1
+
+        # We have to backwards calculate `peak_x` and `peak_y` again,
+        # because they were not committed to memory to save on cpu time.
+        # They represent the correlation map indices of the correlation
+        # peak. We assume zero-padding was used for the FFT operations.
+        dx = VM_dx[IW_idx]
+        dy = VM_dy[IW_idx]
+        shift_x = IW_shifts_x[IW_idx]
+        shift_y = IW_shifts_y[IW_idx]
+        peak_x = dx + C_map_w // 2 - shift_x
+        peak_y = dy + C_map_h // 2 - shift_y
+
+        axs_2[stage_idx, 0].imshow(IW_A, interpolation="nearest")
+        axs_2[stage_idx, 1].imshow(IW_B, interpolation="nearest")
+        axs_2[stage_idx, 2].imshow(C_map, interpolation="nearest")
+        axs_2[stage_idx, 2].plot((0, C_map_w), np.ones(2) * C_map_h / 2, "k")
+        axs_2[stage_idx, 2].plot(np.ones(2) * C_map_w / 2, (0, C_map_h), "k")
+        axs_2[stage_idx, 2].plot(peak_x, peak_y, "xr")
+
+        axs_2[stage_idx, 0].grid(True)
+        axs_2[stage_idx, 1].grid(True)
+        axs_2[stage_idx, 2].grid(True)
 
     plt.show()
 
