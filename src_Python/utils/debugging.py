@@ -3,7 +3,7 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "18-10-2023"
+__date__ = "20-10-2023"
 __version__ = "1.0"
 
 import numpy as np
@@ -151,6 +151,8 @@ def IW_analysis(
     lVM_dx,
     lVM_dy,
 ):
+    N_stages = len(cfg.IW_SIZES)
+
     fig_1, axs_1 = plt.subplots(1, 2, figsize=(10, 4), sharex=True, sharey=True)
     ax_A: axes.Axes = axs_1[0]
     ax_B: axes.Axes = axs_1[1]
@@ -158,7 +160,7 @@ def IW_analysis(
     ax_A.imshow(A, interpolation="nearest")
     ax_B.imshow(B, interpolation="nearest")
 
-    fig_2, axs_2 = plt.subplots(len(cfg.IW_SIZES), 3, figsize=(10, 6))
+    fig_2, axs_2 = plt.subplots(N_stages, 3, figsize=(10, 6))
 
     for stage_idx, IW_size in enumerate(cfg.IW_SIZES):
         # fmt: off
@@ -182,6 +184,7 @@ def IW_analysis(
 
         IW_idx = lookup_IW_idx(IW_px_x, IW_px_y, IW_params)
 
+        # IW outlines
         ax_A.add_patch(
             Rectangle(
                 (A_IW_lims_x[IW_idx, 0], A_IW_lims_y[IW_idx, 0]),
@@ -203,6 +206,7 @@ def IW_analysis(
             )
         )
 
+        # Displacement vectors
         if not np.isnan(VM_dx[IW_idx]):
             ax_A.quiver(
                 VM_grid_x[IW_idx],
@@ -216,6 +220,15 @@ def IW_analysis(
                 # units="xy",
                 # width=0.5,
             )
+
+        # Zoom to largest IW with a margin around it
+        if stage_idx == 0:
+            xmin = A_IW_lims_x[IW_idx, 0] - IW_size
+            xmax = A_IW_lims_x[IW_idx, 1] + IW_size
+            ymin = A_IW_lims_y[IW_idx, 0] - IW_size
+            ymax = A_IW_lims_y[IW_idx, 1] + IW_size
+            ax_A.set_xlim(xmin, xmax)
+            ax_A.set_ylim(ymax, ymin)  # Must flip ymax and ymin due to imshow
 
         # Obtain images of IW frame A and IW frame B
         A_slice = (
@@ -245,16 +258,25 @@ def IW_analysis(
         peak_x = dx + C_map_w // 2 - shift_x
         peak_y = dy + C_map_h // 2 - shift_y
 
-        axs_2[stage_idx, 0].imshow(IW_A, interpolation="nearest")
-        axs_2[stage_idx, 1].imshow(IW_B, interpolation="nearest")
-        axs_2[stage_idx, 2].imshow(C_map, interpolation="nearest")
-        axs_2[stage_idx, 2].plot((0, C_map_w), np.ones(2) * C_map_h / 2, "k")
-        axs_2[stage_idx, 2].plot(np.ones(2) * C_map_w / 2, (0, C_map_h), "k")
-        axs_2[stage_idx, 2].plot(peak_x, peak_y, "xr")
+        if N_stages == 1:
+            ax_IW_A = axs_2[0]
+            ax_IW_B = axs_2[1]
+            ax_C_map = axs_2[2]
+        else:
+            ax_IW_A = axs_2[stage_idx, 0]
+            ax_IW_B = axs_2[stage_idx, 1]
+            ax_C_map = axs_2[stage_idx, 2]
 
-        axs_2[stage_idx, 0].grid(True)
-        axs_2[stage_idx, 1].grid(True)
-        axs_2[stage_idx, 2].grid(True)
+        ax_IW_A.imshow(IW_A, interpolation="nearest")
+        ax_IW_B.imshow(IW_B, interpolation="nearest")
+        ax_C_map.imshow(C_map, interpolation="nearest")
+        ax_C_map.plot((0, C_map_w), np.ones(2) * C_map_h / 2, "k")
+        ax_C_map.plot(np.ones(2) * C_map_w / 2, (0, C_map_h), "k")
+        ax_C_map.plot(peak_x, peak_y, "xr")
+
+        ax_IW_A.grid(True)
+        ax_IW_B.grid(True)
+        ax_C_map.grid(True)
 
     plt.show()
 
