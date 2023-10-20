@@ -11,7 +11,7 @@ VM: Displacement vector map
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "18-10-2023"
+__date__ = "20-10-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
@@ -282,7 +282,7 @@ if __name__ == "__main__":
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=cfg.N_WORKERS)
 
     # Debugging overrule: Only process the first two images and be done
-    if cfg.DEBUG or cfg.DEBUG_IW_PX is not None:
+    if cfg.DEBUG:
         cfg.N_IMAGES = 2
 
     done = False
@@ -439,7 +439,7 @@ if __name__ == "__main__":
         #   Debugging output
         # ----------------------------------------------------------------------
 
-        if cfg.DEBUG:
+        if cfg.DEBUG_PRINT:
             debugging.print_info(
                 lIW_params,
                 lA_IW_grid_x,
@@ -545,6 +545,9 @@ if __name__ == "__main__":
             fn_export = f"export_{frame_idx:04d}.png"
             # cv2.imwrite(fn_export, cv2.resize(rgb, display_resolution))
 
+            if cfg.DEBUG:
+                cv2.waitKey(0)
+
         else:
             grid_x = lVM_grid_x[-1]
             grid_y = lVM_grid_y[-1]
@@ -588,8 +591,8 @@ if __name__ == "__main__":
 
             if cfg.DEBUG:
                 plt.savefig("output_VM.png", dpi=300, bbox_inches="tight")  # type: ignore
-                plt.waitforbuttonpress()  # type: ignore
-                # plt.show()  # type: ignore
+                # plt.waitforbuttonpress()  # type: ignore
+                plt.show()  # type: ignore
 
         # ----------------------------------------------------------------------
         #   Are we finished?

@@ -12,7 +12,7 @@ Namespace `cfg` now contains all user settings
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "18-10-2023"
+__date__ = "20-10-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
@@ -26,8 +26,11 @@ import numpy as np
 #   Debugging
 # ------------------------------------------------------------------------------
 
-# Print debug info to the terminal? Slow!
+# When true, only processes the first image pair and halts on plotting
 DEBUG = False
+
+# Print debug info to the terminal? Slow!
+DEBUG_PRINT = False
 
 # Load matplotlib into memory and show vector map results?
 LOAD_MPL = True
@@ -35,8 +38,10 @@ LOAD_MPL = True
 # Show detailed IW analysis at the specified pixel location (x, y)?
 # - Specify a tuple as `(x, y)` to show IW analysis.
 # - Set to `None` or empty tuple `()` to skip.
-# DEBUG_IW_PX = (240, 240)
-DEBUG_IW_PX = None
+# DEBUG_IW_PX = (240, 1000)
+
+if not "DEBUG_IW_PX" in locals():
+    DEBUG_IW_PX = None
 
 if isinstance(DEBUG_IW_PX, tuple) and len(DEBUG_IW_PX) == 2:
     LOAD_MPL = True
