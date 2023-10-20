@@ -9,6 +9,8 @@ demo_images/PIV_challenge_2014_case_E/*
 !demo_images/PIV_challenge_2014_case_E/E_camera_3_frame_00001.tif
 !demo_images/PIV_challenge_2014_case_E/E_camera_3_frame_00002.tif
 
+src_Python/output_VM.png
+
 .vscode/
 
 # Byte-compiled / optimized / DLL files
