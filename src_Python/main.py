@@ -11,7 +11,7 @@ VM: Displacement vector map
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "20-10-2023"
+__date__ = "21-10-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
@@ -288,32 +288,6 @@ if __name__ == "__main__":
     done = False
     frame_idx = 0
     while not done:
-        # Reset
-        for stage_idx in range(N_stages):
-            lB_IW_grid_x[stage_idx] = np.copy(lIW_grid_x[stage_idx])
-            lB_IW_grid_y[stage_idx] = np.copy(lIW_grid_y[stage_idx])
-            lB_IW_lims_x[stage_idx] = np.copy(lIW_lims_x[stage_idx])
-            lB_IW_lims_y[stage_idx] = np.copy(lIW_lims_y[stage_idx])
-
-            """
-            # `lA_IW_grid_x/y` remain constant and do not need a reset.
-            # `lA_IW_lims_x/y` remain constant and do not need a reset.
-
-            # Reset not strictly necessary as all cells will get updated
-            # one-by-one. Reset only to make debugging easier.
-            lIW_shifts_x[stage_idx].fill(0)
-            lIW_shifts_y[stage_idx].fill(0)
-
-            # Reset not strictly necessary as all cells will get updated at
-            # once. Reset only to make debugging easier.
-            lVM_dx[stage_idx][:].fill(0)
-            lVM_dy[stage_idx][:].fill(0)
-
-            # Reset not strictly necessary as all cells will get updated
-            # one-by-one. Reset only to make debugging easier.
-            lC_maps[stage_idx][:].fill(np.nan)
-            """
-
         # ----------------------------------------------------------------------
         #   Read and prepare new image frames
         # ----------------------------------------------------------------------
@@ -365,6 +339,31 @@ if __name__ == "__main__":
 
         for stage_idx, IW_size in enumerate(cfg.IW_SIZES):
             N_IWs = lIW_params[stage_idx][2]
+
+            # Reset variables in-between image pairs
+            lB_IW_grid_x[stage_idx] = np.copy(lIW_grid_x[stage_idx])
+            lB_IW_grid_y[stage_idx] = np.copy(lIW_grid_y[stage_idx])
+            lB_IW_lims_x[stage_idx] = np.copy(lIW_lims_x[stage_idx])
+            lB_IW_lims_y[stage_idx] = np.copy(lIW_lims_y[stage_idx])
+
+            """
+            # `lA_IW_grid_x/y` remain constant and do not need a reset.
+            # `lA_IW_lims_x/y` remain constant and do not need a reset.
+
+            # Reset not strictly necessary as all cells will get updated
+            # one-by-one. Reset only to make debugging easier.
+            lIW_shifts_x[stage_idx].fill(0)
+            lIW_shifts_y[stage_idx].fill(0)
+
+            # Reset not strictly necessary as all cells will get updated at
+            # once. Reset only to make debugging easier.
+            lVM_dx[stage_idx][:].fill(0)
+            lVM_dy[stage_idx][:].fill(0)
+
+            # Reset not strictly necessary as all cells will get updated
+            # one-by-one. Reset only to make debugging easier.
+            lC_maps[stage_idx][:].fill(np.nan)
+            """
 
             # ------------------------------------------------------------------
             #   Walk over all interrogation windows
