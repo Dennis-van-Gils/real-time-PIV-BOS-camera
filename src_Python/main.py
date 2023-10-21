@@ -11,7 +11,7 @@ VM: Displacement vector map
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "20-10-2023"
+__date__ = "21-10-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
@@ -100,6 +100,10 @@ if __name__ == "__main__":
     A, frame_title = frame_server.begin()
     remove_mean_background(A)
 
+    # Short-hands
+    img_w = frame_server.img_w
+    img_h = frame_server.img_h
+
     # Prevent 'possibly unbound variable' warnings
     B_orig = np.zeros_like(A)
     B = np.zeros_like(A)
@@ -146,11 +150,6 @@ if __name__ == "__main__":
 
     # fmt: off
     # List of IW meshgrids and limits per stage of the multigrid
-    lIW_grid_x: list[npt.NDArray[np.int32]] = []    # NDArray shape (N_IWs, )
-    lIW_grid_y: list[npt.NDArray[np.int32]] = []    # NDArray shape (N_IWs, )
-    lIW_lims_x: list[npt.NDArray[np.int32]] = []    # NDArray shape (N_IWs, 2)
-    lIW_lims_y: list[npt.NDArray[np.int32]] = []    # NDArray shape (N_IWs, 2)
-
     lA_IW_grid_x: list[npt.NDArray[np.int32]] = []  # NDArray shape (N_IWs, )
     lA_IW_grid_y: list[npt.NDArray[np.int32]] = []  # NDArray shape (N_IWs, )
     lA_IW_lims_x: list[npt.NDArray[np.int32]] = []  # NDArray shape (N_IWs, 2)
@@ -160,6 +159,11 @@ if __name__ == "__main__":
     lB_IW_grid_y: list[npt.NDArray[np.int32]] = []  # NDArray shape (N_IWs, )
     lB_IW_lims_x: list[npt.NDArray[np.int32]] = []  # NDArray shape (N_IWs, 2)
     lB_IW_lims_y: list[npt.NDArray[np.int32]] = []  # NDArray shape (N_IWs, 2)
+
+    lB_IW_grid_xc: list[npt.NDArray[np.int32]] = [] # NDArray shape (N_IWs, )
+    lB_IW_grid_yc: list[npt.NDArray[np.int32]] = [] # NDArray shape (N_IWs, )
+    lB_IW_lims_xc: list[npt.NDArray[np.int32]] = [] # NDArray shape (N_IWs, 2)
+    lB_IW_lims_yc: list[npt.NDArray[np.int32]] = [] # NDArray shape (N_IWs, 2)
 
     # List of computed IW shifts per stage of the multigrid
     # NOTE: List index 0, which corresponds to `stage_idx = 0`, will be
@@ -201,15 +205,10 @@ if __name__ == "__main__":
             N_IWs,
             N_IWs_x,
             N_IWs_y,
-        ) = create_IW_grid(A.shape[1], A.shape[0], IW_size, IW_overlap)
+        ) = create_IW_grid(img_w, img_h, IW_size, IW_overlap)
 
         # Populate lists
         lIW_params.append((IW_size, IW_overlap, N_IWs, N_IWs_x, N_IWs_y))
-
-        lIW_grid_x.append(np.copy(IW_grid_x))
-        lIW_grid_y.append(np.copy(IW_grid_y))
-        lIW_lims_x.append(np.copy(IW_lims_x))
-        lIW_lims_y.append(np.copy(IW_lims_y))
 
         lA_IW_grid_x.append(np.copy(IW_grid_x))
         lA_IW_grid_y.append(np.copy(IW_grid_y))
@@ -221,11 +220,48 @@ if __name__ == "__main__":
         lB_IW_lims_x.append(np.copy(IW_lims_x))
         lB_IW_lims_y.append(np.copy(IW_lims_y))
 
+        lB_IW_grid_xc.append(np.copy(IW_grid_x))
+        lB_IW_grid_yc.append(np.copy(IW_grid_y))
+        lB_IW_lims_xc.append(np.copy(IW_lims_x))
+        lB_IW_lims_yc.append(np.copy(IW_lims_y))
+
         lIW_shifts_x.append(np.zeros(N_IWs, dtype=np.int32))
         lIW_shifts_y.append(np.zeros(N_IWs, dtype=np.int32))
 
+        # Enlarge IW_B limits with extra search margin for the child grids,
+        # keeping the extended search area centered around the original IW_B
+        # limits.
+        SEARCH_MARGIN = IW_size // 4
+        # SEARCH_MARGIN = 0
+        if stage_idx > 0:
+            for IW_idx, lims in enumerate(lB_IW_lims_xc[stage_idx]):
+                margin_l = lims[0] - np.maximum(lims[0] - SEARCH_MARGIN, 0)
+                margin_r = (
+                    np.minimum(lims[1] + SEARCH_MARGIN, img_w - 1) - lims[1]
+                )
+                margin = np.minimum(margin_l, margin_r)
+
+                lims[0] -= margin
+                lims[1] += margin
+
+            for IW_idx, lims in enumerate(lB_IW_lims_yc[stage_idx]):
+                margin_u = lims[0] - np.maximum(lims[0] - SEARCH_MARGIN, 0)
+                margin_d = (
+                    np.minimum(lims[1] + SEARCH_MARGIN, img_h - 1) - lims[1]
+                )
+                margin = np.minimum(margin_u, margin_d)
+
+                lims[0] -= margin
+                lims[1] += margin
+
         C_maps = np.empty(
-            (N_IWs, IW_size * 2 - 1, IW_size * 2 - 1),
+            (N_IWs, IW_size * 2 - 1, IW_size * 2 - 1)
+            if stage_idx == 0
+            else (
+                N_IWs,
+                (IW_size + 2 * SEARCH_MARGIN + IW_size) - 1,
+                (IW_size + 2 * SEARCH_MARGIN + IW_size) - 1,
+            ),
             dtype=np.float32,
         )
         C_maps[:] = np.nan
@@ -242,6 +278,12 @@ if __name__ == "__main__":
             fft_workers.append(
                 FFT_Convolver2D_Full(
                     (IW_size, IW_size),
+                    (IW_size, IW_size),
+                    fft_threads=cfg.N_FFT_THREADS,
+                )
+                if stage_idx == 0
+                else FFT_Convolver2D_Full(
+                    (IW_size + 2 * SEARCH_MARGIN, IW_size + 2 * SEARCH_MARGIN),
                     (IW_size, IW_size),
                     fft_threads=cfg.N_FFT_THREADS,
                 )
@@ -288,32 +330,6 @@ if __name__ == "__main__":
     done = False
     frame_idx = 0
     while not done:
-        # Reset
-        for stage_idx in range(N_stages):
-            lB_IW_grid_x[stage_idx] = np.copy(lIW_grid_x[stage_idx])
-            lB_IW_grid_y[stage_idx] = np.copy(lIW_grid_y[stage_idx])
-            lB_IW_lims_x[stage_idx] = np.copy(lIW_lims_x[stage_idx])
-            lB_IW_lims_y[stage_idx] = np.copy(lIW_lims_y[stage_idx])
-
-            """
-            # `lA_IW_grid_x/y` remain constant and do not need a reset.
-            # `lA_IW_lims_x/y` remain constant and do not need a reset.
-
-            # Reset not strictly necessary as all cells will get updated
-            # one-by-one. Reset only to make debugging easier.
-            lIW_shifts_x[stage_idx].fill(0)
-            lIW_shifts_y[stage_idx].fill(0)
-
-            # Reset not strictly necessary as all cells will get updated at
-            # once. Reset only to make debugging easier.
-            lVM_dx[stage_idx][:].fill(0)
-            lVM_dy[stage_idx][:].fill(0)
-
-            # Reset not strictly necessary as all cells will get updated
-            # one-by-one. Reset only to make debugging easier.
-            lC_maps[stage_idx][:].fill(np.nan)
-            """
-
         # ----------------------------------------------------------------------
         #   Read and prepare new image frames
         # ----------------------------------------------------------------------
@@ -365,6 +381,31 @@ if __name__ == "__main__":
 
         for stage_idx, IW_size in enumerate(cfg.IW_SIZES):
             N_IWs = lIW_params[stage_idx][2]
+
+            # Reset variables in-between image pairs
+            lB_IW_grid_x[stage_idx] = np.copy(lB_IW_grid_xc[stage_idx])
+            lB_IW_grid_y[stage_idx] = np.copy(lB_IW_grid_yc[stage_idx])
+            lB_IW_lims_x[stage_idx] = np.copy(lB_IW_lims_xc[stage_idx])
+            lB_IW_lims_y[stage_idx] = np.copy(lB_IW_lims_yc[stage_idx])
+
+            """
+            # `lA_IW_grid_x/y` remain constant and do not need a reset.
+            # `lA_IW_lims_x/y` remain constant and do not need a reset.
+
+            # Reset not strictly necessary as all cells will get updated
+            # one-by-one. Reset only to make debugging easier.
+            lIW_shifts_x[stage_idx].fill(0)
+            lIW_shifts_y[stage_idx].fill(0)
+
+            # Reset not strictly necessary as all cells will get updated at
+            # once. Reset only to make debugging easier.
+            lVM_dx[stage_idx][:].fill(0)
+            lVM_dy[stage_idx][:].fill(0)
+
+            # Reset not strictly necessary as all cells will get updated
+            # one-by-one. Reset only to make debugging easier.
+            lC_maps[stage_idx][:].fill(np.nan)
+            """
 
             # ------------------------------------------------------------------
             #   Walk over all interrogation windows

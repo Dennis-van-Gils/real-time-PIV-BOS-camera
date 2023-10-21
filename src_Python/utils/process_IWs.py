@@ -50,7 +50,7 @@ def conditional_decorator(dec, condition):
 # cross-correlation search area of frame B past its set IW size. We can't do
 # that here, because we have numba-optimized the cross-correlation function to
 # always expect equal-sized input arrays.
-MULTIGRID_PRESHIFT_FACTOR = 0.8
+MULTIGRID_PRESHIFT_FACTOR = 1.0
 
 # ------------------------------------------------------------------------------
 #   obtain_IWs_from_image
