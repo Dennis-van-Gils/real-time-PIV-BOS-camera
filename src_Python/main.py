@@ -547,7 +547,7 @@ if __name__ == "__main__":
             if cfg.DEBUG:
                 cv2.waitKey(0)
 
-        else:
+        elif cfg.LOAD_MPL:
             grid_x = lVM_grid_x[-1]
             grid_y = lVM_grid_y[-1]
             VM_dx = lVM_dx[-1]
