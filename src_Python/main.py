@@ -11,7 +11,7 @@ VM: Displacement vector map
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "21-10-2023"
+__date__ = "22-10-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
@@ -42,10 +42,9 @@ cfg.read_file(config_filename)
 # Now we can import the remaining modules
 from utils import debugging
 from utils.FrameServer import FrameServer
-from utils.process_IWs import process_IWs
+from utils.process_IWs import IW_Mesh, process_IWs
 from utils.my_fun import (
     remove_mean_background,
-    create_IW_grid,
     fliplrud,
     compute_displacement_vectors_from_C_maps,
 )
@@ -100,6 +99,9 @@ if __name__ == "__main__":
     A, frame_title = frame_server.begin()
     remove_mean_background(A)
 
+    img_h = frame_server.img_h
+    img_w = frame_server.img_w
+
     # Prevent 'possibly unbound variable' warnings
     B_orig = np.zeros_like(A)
     B = np.zeros_like(A)
@@ -129,7 +131,7 @@ if __name__ == "__main__":
         A_ = np.asarray(fliplrud(A), order="C")
 
     # --------------------------------------------------------------------------
-    #   Init - preallocate
+    #   Init - preallocate lists
     # --------------------------------------------------------------------------
 
     # Preallocate and populate lists for the upcoming multigrid analysis.
@@ -146,20 +148,7 @@ if __name__ == "__main__":
 
     # fmt: off
     # List of IW meshgrids and limits per stage of the multigrid
-    lIW_grid_x: list[npt.NDArray[np.int32]] = []    # NDArray shape (N_IWs, )
-    lIW_grid_y: list[npt.NDArray[np.int32]] = []    # NDArray shape (N_IWs, )
-    lIW_lims_x: list[npt.NDArray[np.int32]] = []    # NDArray shape (N_IWs, 2)
-    lIW_lims_y: list[npt.NDArray[np.int32]] = []    # NDArray shape (N_IWs, 2)
-
-    lA_IW_grid_x: list[npt.NDArray[np.int32]] = []  # NDArray shape (N_IWs, )
-    lA_IW_grid_y: list[npt.NDArray[np.int32]] = []  # NDArray shape (N_IWs, )
-    lA_IW_lims_x: list[npt.NDArray[np.int32]] = []  # NDArray shape (N_IWs, 2)
-    lA_IW_lims_y: list[npt.NDArray[np.int32]] = []  # NDArray shape (N_IWs, 2)
-
-    lB_IW_grid_x: list[npt.NDArray[np.int32]] = []  # NDArray shape (N_IWs, )
-    lB_IW_grid_y: list[npt.NDArray[np.int32]] = []  # NDArray shape (N_IWs, )
-    lB_IW_lims_x: list[npt.NDArray[np.int32]] = []  # NDArray shape (N_IWs, 2)
-    lB_IW_lims_y: list[npt.NDArray[np.int32]] = []  # NDArray shape (N_IWs, 2)
+    lIW_mesh: list[IW_Mesh] = []
 
     # List of computed IW shifts per stage of the multigrid
     # NOTE: List index 0, which corresponds to `stage_idx = 0`, will be
@@ -185,56 +174,45 @@ if __name__ == "__main__":
     lfft: list[list[FFT_Convolver2D_Full]] = []
 
     # --------------------------------------------------------------------------
-    #   Init - populate
+    #   Init - populate lists
     # --------------------------------------------------------------------------
 
     N_stages = len(cfg.IW_SIZES)
     for stage_idx, IW_size in enumerate(cfg.IW_SIZES):
         # Create interrogation windows. Only the last multigrid stage will have
         # window overlapping applied to it.
-        IW_overlap = cfg.IW_OVERLAP if stage_idx == N_stages - 1 else 0.0
-        (
-            IW_grid_x,
-            IW_grid_y,
-            IW_lims_x,
-            IW_lims_y,
-            N_IWs,
-            N_IWs_x,
-            N_IWs_y,
-        ) = create_IW_grid(A.shape[1], A.shape[0], IW_size, IW_overlap)
+        IW_mesh = IW_Mesh(
+            img_w,
+            img_h,
+            IW_size,
+            cfg.IW_OVERLAP if stage_idx == N_stages - 1 else 0.0,
+        )
 
-        # Populate lists
-        lIW_params.append((IW_size, IW_overlap, N_IWs, N_IWs_x, N_IWs_y))
+        lIW_mesh.append(IW_mesh)
+        lIW_params.append(
+            (
+                IW_mesh.IW_size,
+                IW_mesh.IW_overlap,
+                IW_mesh.N_IWs,
+                IW_mesh.N_IWs_x,
+                IW_mesh.N_IWs_y,
+            )
+        )
 
-        lIW_grid_x.append(np.copy(IW_grid_x))
-        lIW_grid_y.append(np.copy(IW_grid_y))
-        lIW_lims_x.append(np.copy(IW_lims_x))
-        lIW_lims_y.append(np.copy(IW_lims_y))
-
-        lA_IW_grid_x.append(np.copy(IW_grid_x))
-        lA_IW_grid_y.append(np.copy(IW_grid_y))
-        lA_IW_lims_x.append(np.copy(IW_lims_x))
-        lA_IW_lims_y.append(np.copy(IW_lims_y))
-
-        lB_IW_grid_x.append(np.copy(IW_grid_x))
-        lB_IW_grid_y.append(np.copy(IW_grid_y))
-        lB_IW_lims_x.append(np.copy(IW_lims_x))
-        lB_IW_lims_y.append(np.copy(IW_lims_y))
-
-        lIW_shifts_x.append(np.zeros(N_IWs, dtype=np.int32))
-        lIW_shifts_y.append(np.zeros(N_IWs, dtype=np.int32))
+        lIW_shifts_x.append(np.zeros(IW_mesh.N_IWs, dtype=np.int32))
+        lIW_shifts_y.append(np.zeros(IW_mesh.N_IWs, dtype=np.int32))
 
         C_maps = np.empty(
-            (N_IWs, IW_size * 2 - 1, IW_size * 2 - 1),
+            (IW_mesh.N_IWs, IW_size * 2 - 1, IW_size * 2 - 1),
             dtype=np.float32,
         )
         C_maps[:] = np.nan
         lC_maps.append(C_maps)
 
-        lVM_grid_x.append(np.copy(IW_grid_x))
-        lVM_grid_y.append(np.copy(IW_grid_y))
-        lVM_dx.append(np.zeros(N_IWs, dtype=np.float32))
-        lVM_dy.append(np.zeros(N_IWs, dtype=np.float32))
+        lVM_grid_x.append(np.copy(IW_mesh.A_grid_x))
+        lVM_grid_y.append(np.copy(IW_mesh.A_grid_y))
+        lVM_dx.append(np.zeros(IW_mesh.N_IWs, dtype=np.float32))
+        lVM_dy.append(np.zeros(IW_mesh.N_IWs, dtype=np.float32))
 
         # Create FFT calculation objects
         fft_workers = []
@@ -257,14 +235,14 @@ if __name__ == "__main__":
         lIW_params[0],
         lVM_dx[0],
         lVM_dy[0],
-        lA_IW_grid_x[0],
-        lA_IW_grid_y[0],
-        lA_IW_lims_x[0],
-        lA_IW_lims_y[0],
-        lB_IW_grid_x[0],
-        lB_IW_grid_y[0],
-        lB_IW_lims_x[0],
-        lB_IW_lims_y[0],
+        lIW_mesh[0].A_grid_x,
+        lIW_mesh[0].A_grid_y,
+        lIW_mesh[0].A_lims_x,
+        lIW_mesh[0].A_lims_y,
+        lIW_mesh[0].B_grid_x,
+        lIW_mesh[0].B_grid_y,
+        lIW_mesh[0].B_lims_x,
+        lIW_mesh[0].B_lims_y,
         lIW_shifts_x[0],
         lIW_shifts_y[0],
         lC_maps[0],
@@ -338,17 +316,15 @@ if __name__ == "__main__":
         # ----------------------------------------------------------------------
 
         for stage_idx, IW_size in enumerate(cfg.IW_SIZES):
-            N_IWs = lIW_params[stage_idx][2]
+            # Short-hands
+            N_IWs = lIW_mesh[stage_idx].N_IWs
 
             # Reset variables in-between image pairs
-            lB_IW_grid_x[stage_idx] = np.copy(lIW_grid_x[stage_idx])
-            lB_IW_grid_y[stage_idx] = np.copy(lIW_grid_y[stage_idx])
-            lB_IW_lims_x[stage_idx] = np.copy(lIW_lims_x[stage_idx])
-            lB_IW_lims_y[stage_idx] = np.copy(lIW_lims_y[stage_idx])
+            lIW_mesh[stage_idx].reset_B()
 
             """
-            # `lA_IW_grid_x/y` remain constant and do not need a reset.
-            # `lA_IW_lims_x/y` remain constant and do not need a reset.
+            # `IW_mesh.A_grid_x/y` remain constant and do not need a reset.
+            # `IW_mesh.A_lims_x/y` remain constant and do not need a reset.
 
             # Reset not strictly necessary as all cells will get updated
             # one-by-one. Reset only to make debugging easier.
@@ -381,6 +357,7 @@ if __name__ == "__main__":
 
             # Spawn workers, each performing 2D convolutions on a slice of IWs
             # fmt: off
+            prev_stage_idx = np.maximum(stage_idx - 1, 0)
             futures = []
             for worker_idx in range(cfg.N_WORKERS):
                 futures.append(
@@ -392,14 +369,14 @@ if __name__ == "__main__":
                         lIW_params  [stage_idx - 1],
                         lVM_dx      [stage_idx - 1],
                         lVM_dy      [stage_idx - 1],
-                        lA_IW_grid_x[stage_idx],
-                        lA_IW_grid_y[stage_idx],
-                        lA_IW_lims_x[stage_idx],
-                        lA_IW_lims_y[stage_idx],
-                        lB_IW_grid_x[stage_idx],
-                        lB_IW_grid_y[stage_idx],
-                        lB_IW_lims_x[stage_idx],
-                        lB_IW_lims_y[stage_idx],
+                        lIW_mesh    [stage_idx].A_grid_x,
+                        lIW_mesh    [stage_idx].A_grid_y,
+                        lIW_mesh    [stage_idx].A_lims_x,
+                        lIW_mesh    [stage_idx].A_lims_y,
+                        lIW_mesh    [stage_idx].B_grid_x,
+                        lIW_mesh    [stage_idx].B_grid_y,
+                        lIW_mesh    [stage_idx].B_lims_x,
+                        lIW_mesh    [stage_idx].B_lims_y,
                         lIW_shifts_x[stage_idx],
                         lIW_shifts_y[stage_idx],
                         lC_maps     [stage_idx],
@@ -440,15 +417,7 @@ if __name__ == "__main__":
 
         if cfg.DEBUG_PRINT:
             debugging.print_info(
-                lIW_params,
-                lA_IW_grid_x,
-                lA_IW_grid_y,
-                lA_IW_lims_x,
-                lA_IW_lims_y,
-                lB_IW_grid_x,
-                lB_IW_grid_y,
-                lB_IW_lims_x,
-                lB_IW_lims_y,
+                lIW_mesh,
                 lIW_shifts_x,
                 lIW_shifts_y,
                 lC_maps,
@@ -464,15 +433,7 @@ if __name__ == "__main__":
                 cfg.DEBUG_IW_PX[1],
                 A,
                 B,
-                lIW_params,
-                lA_IW_grid_x,
-                lA_IW_grid_y,
-                lA_IW_lims_x,
-                lA_IW_lims_y,
-                lB_IW_grid_x,
-                lB_IW_grid_y,
-                lB_IW_lims_x,
-                lB_IW_lims_y,
+                lIW_mesh,
                 lIW_shifts_x,
                 lIW_shifts_y,
                 lC_maps,

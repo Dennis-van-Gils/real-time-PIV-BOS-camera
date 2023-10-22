@@ -38,12 +38,12 @@ LOAD_MPL = True
 # Show detailed IW analysis at the specified pixel location (x, y)?
 # - Specify a tuple as `(x, y)` to show IW analysis.
 # - Set to `None` or empty tuple `()` to skip.
-# DEBUG_IW_PX = (240, 1000)
+# DEBUG_IW_PX = (500, 500)
 
 if not "DEBUG_IW_PX" in locals():
     DEBUG_IW_PX = None
 
-if isinstance(DEBUG_IW_PX, tuple) and len(DEBUG_IW_PX) == 2:
+if isinstance(DEBUG_IW_PX, tuple) and len(DEBUG_IW_PX) == 2:  # type: ignore
     LOAD_MPL = True
 else:
     DEBUG_IW_PX = None
