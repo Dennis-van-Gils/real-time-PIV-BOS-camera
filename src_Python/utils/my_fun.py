@@ -3,7 +3,7 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "03-10-2023"
+__date__ = "22-10-2023"
 __version__ = "1.0"
 
 import numpy as np
@@ -56,25 +56,10 @@ def remove_mean_background(img: npt.NDArray[np.float32]):
 
 
 @nb.njit(
+    "Tuple((int32[:], int32[:], int32[:, ::1], int32[:, ::1], int32, int32, int32))(int32, int32, int32, float32)",
     cache=True,
     nogil=True,
 )
-def meshgrid_numba(x, y):
-    """Numba-accelerated version of `np.meshgrid()` using `xy` indexing."""
-    n = len(x)
-    m = len(y)
-    xx = np.empty((m, n), dtype=x.dtype)
-    yy = np.empty((m, n), dtype=y.dtype)
-    for i in range(n):
-        xx[:, i] = x[i]
-    for j in range(m):
-        yy[j, :] = y[j]
-
-    return xx, yy
-
-
-# Can't `@njit`, because `np.tile()`, `np.repeat(..., axis=0)` and
-# `np.swapaxes()` are not supported.
 def create_IW_grid(
     img_w: int, img_h: int, IW_size: int, IW_overlap: float
 ) -> tuple[
@@ -103,8 +88,6 @@ def create_IW_grid(
             Window overlap fraction [0 - 1].
             0  : no window overlap
             0.5: 50% window overlap
-
-            Default: 0.5
 
     Returns (``tuple``):
         grid_x (``np.ndarray(np.int32)``):
@@ -139,10 +122,17 @@ def create_IW_grid(
             Obtained number of interrogation windows along the y-axis.
     """
 
+    # Example:
+    #   img_w      = 128
+    #   img_h      = 64
+    #   IW_size    = 32
+    #   IW_overlap = 0
+
     # Number of IWs that will fit in the source image
     N_IWs_x = int((img_w - IW_size) // (IW_size * (1 - IW_overlap))) + 1
     N_IWs_y = int((img_h - IW_size) // (IW_size * (1 - IW_overlap))) + 1
     N_IWs = N_IWs_x * N_IWs_y
+    # Example: (N_IWs, N_IWs_x, N_IWs_y) = (8, 4, 2)
 
     # IW center positions
     half_IW_size = IW_size // 2
@@ -150,34 +140,32 @@ def create_IW_grid(
     arr_y = np.arange(N_IWs_y) * (1 - IW_overlap) * IW_size + half_IW_size
     arr_x = np.asarray(arr_x, dtype=np.int32)
     arr_y = np.asarray(arr_y, dtype=np.int32)
+    # Example: arr_x  = [ 16  48  80 112]
+    # Example: arr_y  = [ 16  48]
 
-    if 1:
-        # Numba accelerated, faster than `np.meshgrid()`
-        grid_x, grid_y = meshgrid_numba(arr_x, arr_y)
-    else:
-        # Native numpy
-        grid_x, grid_y = np.meshgrid(arr_x, arr_y)
+    # Create mesh grid as a linearized arrays
+    grid_x = np.empty(N_IWs, dtype=np.int32)
+    for i in np.arange(N_IWs_y):
+        grid_x[i * N_IWs_x : (i + 1) * N_IWs_x] = arr_x
+    grid_y = np.repeat(arr_y, N_IWs_x)
+    # Example: grid_x = [ 16  48  80 112  16  48  80 112]
+    # Example: grid_y = [ 16  16  16  16  48  48  48  48]
 
     # IW limits
-    lims_x = np.column_stack((arr_x - half_IW_size, arr_x + half_IW_size - 1))
-    lims_y = np.column_stack((arr_y - half_IW_size, arr_y + half_IW_size - 1))
-    lims_x = np.tile(lims_x, (N_IWs_y, 1, 1))
-    lims_y = np.tile(lims_y, (N_IWs_x, 1, 1)).swapaxes(0, 1)
-
-    # After-thought: We linearize the matrices again. Using linearized matrices
-    # instead of multi-dim matrixes speeds up the code when iterating over all
-    # elements.
-    # TODO: Adjust above code to linearize from the very beginning. Not crucial
-    # though.
-    grid_x = grid_x.reshape(-1)
-    grid_y = grid_y.reshape(-1)
-    lims_x = lims_x.reshape(N_IWs, 2)
-    lims_y = lims_y.reshape(N_IWs, 2)
-
-    grid_x = np.asarray(grid_x, dtype=np.int32, order="C")
-    grid_y = np.asarray(grid_y, dtype=np.int32, order="C")
-    lims_x = np.asarray(lims_x, dtype=np.int32, order="C")
-    lims_y = np.asarray(lims_y, dtype=np.int32, order="C")
+    lims_x = np.empty((N_IWs, 2), dtype=np.int32)
+    lims_y = np.empty((N_IWs, 2), dtype=np.int32)
+    lims_x[:, 0] = grid_x - half_IW_size
+    lims_x[:, 1] = grid_x + half_IW_size - 1
+    lims_y[:, 0] = grid_y - half_IW_size
+    lims_y[:, 1] = grid_y + half_IW_size - 1
+    # Example: lims_x = [[  0  31]      lims_y = [[ 0 31]
+    #                    [ 32  63]                [ 0 31]
+    #                    [ 64  95]                [ 0 31]
+    #                    [ 96 127]                [ 0 31]
+    #                    [  0  31]                [32 63]
+    #                    [ 32  63]                [32 63]
+    #                    [ 64  95]                [32 63]
+    #                    [ 96 127]]               [32 63]]
 
     return grid_x, grid_y, lims_x, lims_y, N_IWs, N_IWs_x, N_IWs_y
 
