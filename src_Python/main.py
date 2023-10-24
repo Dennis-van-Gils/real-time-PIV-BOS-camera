@@ -145,14 +145,13 @@ if __name__ == "__main__":
     # NOTE: List index `stage_idx = 0` will be initialized with zeros and remain
     # so throughout, because no window pre-shifts ever exist for the first
     # multigrid stage by design. That's okay.
+    # fmt: off
     lIW_shifts_x: list[npt.NDArray[np.int32]] = []  # NDArray shape (N_IWs, )
     lIW_shifts_y: list[npt.NDArray[np.int32]] = []  # NDArray shape (N_IWs, )
 
     # Computed correlation maps per stage of the multigrid
-    #   NDArray shape (N_IWs, IW_size * 2 - 1, IW_size * 2 - 1)
-    lC_maps: list[npt.NDArray[np.float32]] = []
+    lC_maps: list[npt.NDArray[np.float32]] = []     # NDArray shape (N_IWs, :, :)
 
-    # fmt: off
     # Computed displacement vector maps per stage of the multigrid
     lVM_grid_x: list[npt.NDArray[np.int32]] = []    # NDArray shape (N_IWs, )
     lVM_grid_y: list[npt.NDArray[np.int32]] = []    # NDArray shape (N_IWs, )
@@ -160,7 +159,7 @@ if __name__ == "__main__":
     lVM_dy: list[npt.NDArray[np.float32]] = []      # NDArray shape (N_IWs, )
     # fmt: on
 
-    # FFT calculation instances per stage of the multigrid
+    # FFT-convolution calculation instances per stage of the multigrid
     # NOTE: In addition, each stage will have multiple copies of similar FFT
     # instances equal to the number of concurrent workers `cfg.N_WORKERS`.
     lfft: list[list[FFT_Convolver2D_Full]] = []
@@ -170,32 +169,19 @@ if __name__ == "__main__":
     # --------------------------------------------------------------------------
 
     for stage_idx, IW_size in enumerate(cfg.IW_SIZES):
-        # Create interrogation windows. Only the last multigrid stage will have
-        # window overlapping applied to it.
+        # Only the last stage will have window overlapping applied to it
         IW_mesh = IW_Mesh(
             img_w,
             img_h,
             IW_size,
             cfg.IW_OVERLAP if stage_idx == cfg.N_STAGES - 1 else 0.0,
         )
-        lIW_mesh.append(IW_mesh)
 
+        lIW_mesh.append(IW_mesh)
         lIW_shifts_x.append(np.zeros(IW_mesh.N_IWs, dtype=np.int32))
         lIW_shifts_y.append(np.zeros(IW_mesh.N_IWs, dtype=np.int32))
 
-        C_maps = np.empty(
-            (IW_mesh.N_IWs, IW_size * 2 - 1, IW_size * 2 - 1),
-            dtype=np.float32,
-        )
-        C_maps[:] = np.nan
-        lC_maps.append(C_maps)
-
-        lVM_grid_x.append(np.copy(IW_mesh.A_grid_x))
-        lVM_grid_y.append(np.copy(IW_mesh.A_grid_y))
-        lVM_dx.append(np.zeros(IW_mesh.N_IWs, dtype=np.float32))
-        lVM_dy.append(np.zeros(IW_mesh.N_IWs, dtype=np.float32))
-
-        # Create FFT calculation objects
+        # Create FFT-convolution calculation instances and store in list
         fft_workers = []
         for worker_idx in range(cfg.N_WORKERS):
             fft_workers.append(
@@ -206,6 +192,16 @@ if __name__ == "__main__":
                 )
             )
         lfft.append(fft_workers)
+
+        C_map_shape = lfft[-1][-1].shape_out
+        C_maps = np.empty((IW_mesh.N_IWs, *C_map_shape), dtype=np.float32)
+        C_maps[:] = np.nan
+        lC_maps.append(C_maps)
+
+        lVM_grid_x.append(np.copy(IW_mesh.A_grid_x))
+        lVM_grid_y.append(np.copy(IW_mesh.A_grid_y))
+        lVM_dx.append(np.zeros(IW_mesh.N_IWs, dtype=np.float32))
+        lVM_dy.append(np.zeros(IW_mesh.N_IWs, dtype=np.float32))
 
     # Force-trigger an eager numba compilation to take the compilation time of
     # function `process_IWs()` out of the timeit results.
