@@ -10,8 +10,8 @@ In this module I have experimented with the following numba-jitted class:
 
 Pro:
     It works great and improves the readability of the code, because a single
-    object `IW_mesh` can be passed around, instead of many individual array
-    arguments such as `A_grid_x`, `A_lims_x`, etc.
+    object `IW_mesh` can be passed around, instead of many individual arguments
+    such as arrays `A_grid_x`, `A_lims_x`, etc.
 
 Con:
     The numba compile time is huge. This is because caching can not be done for
@@ -19,7 +19,7 @@ Con:
     argument can no longer cache. Here, caching fails for `process_IWs()` and
     `obtain_IWs_from_image()` when using the jitted `IW_Mesh` class as argument.
 
-    Our compile time went from 2.5 sec to 5.5 sec :(
+    Our compile time went from 2.5 sec to 5.5 sec, every runtime :(
 
     See https://github.com/numba/numba/issues/4830#issuecomment-896819248
 
@@ -36,7 +36,7 @@ Taken solution:
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "22-10-2023"
+__date__ = "23-10-2023"
 __version__ = "1.0"
 
 import numpy as np
