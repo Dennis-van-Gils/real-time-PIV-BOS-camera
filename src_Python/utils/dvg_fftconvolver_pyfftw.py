@@ -12,11 +12,11 @@ huge performance gain.
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "22-09-2023"
+__date__ = "24-10-2023"
 __version__ = "1.0.0"
 # pylint: disable=invalid-name, missing-function-docstring
 
-import sys
+# import sys
 import numpy as np
 import numpy.typing as npt
 import numba as nb
@@ -93,19 +93,20 @@ class FFT_Convolver2D_Full:
     result as a `numpy.ndarray` containing the 'full' convolution elements.
 
     Args:
-        s1 (tuple[int, int]):
-            Shape of the upcoming input array `in1` to be passed to method
-            `convolve()`.
+        s1 (``tuple[int, int]``):
+            Fixed shape of upcoming input array `in1`.
 
-        s2 (tuple[int, int]):
-            Shape of the upcoming input array `in2` to be passed to method
-            `convolve()`.
+        s2 (``tuple[int, int]``):
+            Fixed shape of upcoming input array `in2`.
 
-        fft_threads (int, optional):
+        fft_threads (``int``, optional):
             Number of threads to use for each individual FFT transformation.
-            When set to > 1, the Python GIL will not be invoked.
 
             Default: 1
+
+    Members:
+        shape_out (``tuple[int, int]``):
+            Fixed shape of the output convolution array.
     """
 
     def __init__(
@@ -114,35 +115,36 @@ class FFT_Convolver2D_Full:
         s2: tuple[int, ...],
         fft_threads: int = 1,
     ):
-        # Example:   s1 = (64, 64), s2 = (64, 64)
-        # shape      evaluates to (127, 127)
-        # fshape     evaluates to (128, 128)
-        # fshape_out evaluates to (128, 65)
-        # slice_full evaluates to ((0:127), (0:127))
+        # Example:      s1 = (64, 64), s2 = (64, 64)
+        # shape_out     evaluates to (127, 127)
+        # _slice_out    evaluates to ((0:127), (0:127))
+        # shape_real    evaluates to (128, 128)
+        # shape_complex evaluates to (128, 65)
 
         # Ensure at least 1 thread
         fft_threads = int(np.maximum(fft_threads, 1))
 
-        # Speed up FFT by zero-padding to optimal size
-        shape = (s1[0] + s2[0] - 1, s1[1] + s2[1] - 1)
-        fshape = (
-            pyfftw.next_fast_len(np.int64(shape[0])),
-            pyfftw.next_fast_len(np.int64(shape[1])),
-        )
-        fshape_out = (fshape[0], fshape[1] // 2 + 1)
+        # Shape of the output convolution array containing the 'full'
+        # convolution elements
+        shape_out = (s1[0] + s2[0] - 1, s1[1] + s2[1] - 1)
+        self.shape_out = shape_out
+        self._slice_out = (slice(shape_out[0]), slice(shape_out[1]))
 
-        # Slice corresponding to the 'full' convolution elements to be
-        # finally returned as convolution result
-        self._slice_full = (slice(shape[0]), slice(shape[1]))
+        # Speed up FFT by zero-padding to optimal size
+        shape_real = (
+            pyfftw.next_fast_len(shape_out[0]),  # type: ignore
+            pyfftw.next_fast_len(shape_out[1]),  # type: ignore
+        )
+        shape_complex = (shape_real[0], shape_real[1] // 2 + 1)
 
         # fmt: off
         # Allocate C-contiguous arrays to speed up calculations
-        self._rfft_in1  = pyfftw.zeros_aligned(fshape    , dtype="float32")
-        self._rfft_in2  = pyfftw.zeros_aligned(fshape    , dtype="float32")
-        self._rfft_out1 = pyfftw.empty_aligned(fshape_out, dtype="complex64")
-        self._rfft_out2 = pyfftw.empty_aligned(fshape_out, dtype="complex64")
-        self._irfft_in  = pyfftw.empty_aligned(fshape_out, dtype="complex64")
-        self._irfft_out = pyfftw.empty_aligned(fshape    , dtype="float32")
+        self._rfft_in1  = pyfftw.zeros_aligned(shape_real   , dtype="float32")
+        self._rfft_in2  = pyfftw.zeros_aligned(shape_real   , dtype="float32")
+        self._rfft_out1 = pyfftw.empty_aligned(shape_complex, dtype="complex64")
+        self._rfft_out2 = pyfftw.empty_aligned(shape_complex, dtype="complex64")
+        self._irfft_in  = pyfftw.empty_aligned(shape_complex, dtype="complex64")
+        self._irfft_out = pyfftw.empty_aligned(shape_real   , dtype="float32")
         # fmt: on
 
         # Create the FFTW plans
@@ -202,7 +204,7 @@ class FFT_Convolver2D_Full:
         result = self._fftw_irfft()
 
         # Return the 'full' elements
-        return result[self._slice_full]
+        return result[self._slice_out]
 
 
 # ------------------------------------------------------------------------------

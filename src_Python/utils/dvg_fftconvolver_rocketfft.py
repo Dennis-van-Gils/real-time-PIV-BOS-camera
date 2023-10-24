@@ -11,7 +11,7 @@ https://numba.discourse.group/t/rocket-fft-a-numba-extension-supporting-numpy-ff
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "22-09-2023"
+__date__ = "24-10-2023"
 __version__ = "1.0.0"
 # pylint: disable=invalid-name, missing-function-docstring
 
@@ -87,7 +87,8 @@ def fast_multiply_p(
 # fmt: off
 spec = [
     ("fft_threads", nb.int64),
-    ("_slice_full", nb.types.UniTuple(nb.types.slice2_type, 2)),
+    ("shape_out"  , nb.types.UniTuple(nb.int64, 2)),
+    ("_slice_out" , nb.types.UniTuple(nb.types.slice2_type, 2)),
     ("_rfft_in1"  , nb.float32  [:, ::1]),
     ("_rfft_in2"  , nb.float32  [:, ::1]),
     ("_rfft_out1" , nb.complex64[:, ::1]),
@@ -105,18 +106,20 @@ class FFT_Convolver2D_Full:
     result as a `numpy.ndarray` containing the 'full' convolution elements.
 
     Args:
-        s1 (tuple[int, int]):
-            Shape of the upcoming input array `in1` to be passed to method
-            `convolve()`.
+        s1 (``tuple[int, int]``):
+            Fixed shape of upcoming input array `in1`.
 
-        s2 (tuple[int, int]):
-            Shape of the upcoming input array `in2` to be passed to method
-            `convolve()`.
+        s2 (``tuple[int, int]``):
+            Fixed shape of upcoming input array `in2`.
 
-        fft_threads (int, optional):
+        fft_threads (``int``, optional):
             Number of threads to use for each individual FFT transformation.
 
             Default: 1
+
+    Members:
+        shape_out (``tuple[int, int]``):
+            Fixed shape of the output convolution array.
     """
 
     def __init__(
@@ -125,35 +128,36 @@ class FFT_Convolver2D_Full:
         s2: tuple[int, ...],
         fft_threads: int = 1,
     ):
-        # Example:   s1 = (64, 64), s2 = (64, 64)
-        # shape      evaluates to (127, 127)
-        # fshape     evaluates to (128, 128)
-        # fshape_out evaluates to (128, 65)
-        # slice_full evaluates to ((0:127), (0:127))
+        # Example:      s1 = (64, 64), s2 = (64, 64)
+        # shape_out     evaluates to (127, 127)
+        # _slice_out    evaluates to ((0:127), (0:127))
+        # shape_real    evaluates to (128, 128)
+        # shape_complex evaluates to (128, 65)
 
         # Ensure at least 1 thread
         self.fft_threads = np.int64(np.maximum(fft_threads, 1))
 
-        # Speed up FFT by zero-padding to optimal size
-        shape = (s1[0] + s2[0] - 1, s1[1] + s2[1] - 1)
-        fshape = (
-            rocket_fft.good_size(np.int64(shape[0]), real=True),
-            rocket_fft.good_size(np.int64(shape[1]), real=True),
-        )
-        fshape_out = (fshape[0], fshape[1] // 2 + 1)
+        # Shape of the output convolution array containing the 'full'
+        # convolution elements
+        shape_out = (s1[0] + s2[0] - 1, s1[1] + s2[1] - 1)
+        self.shape_out = shape_out
+        self._slice_out = (slice(shape_out[0]), slice(shape_out[1]))
 
-        # Slice corresponding to the 'full' convolution elements to be
-        # finally returned as convolution result
-        self._slice_full = (slice(shape[0]), slice(shape[1]))
+        # Speed up FFT by zero-padding to optimal size
+        shape_real = (
+            rocket_fft.good_size(shape_out[0], real=True),  # type: ignore
+            rocket_fft.good_size(shape_out[1], real=True),  # type: ignore
+        )
+        shape_complex = (shape_real[0], shape_real[1] // 2 + 1)
 
         # fmt: off
         # Allocate C-contiguous arrays to speed up calculations
-        self._rfft_in1  = np.zeros(fshape    , dtype="float32")
-        self._rfft_in2  = np.zeros(fshape    , dtype="float32")
-        self._rfft_out1 = np.zeros(fshape_out, dtype="complex64")
-        self._rfft_out2 = np.zeros(fshape_out, dtype="complex64")
-        self._irfft_in  = np.zeros(fshape_out, dtype="complex64")
-        self._irfft_out = np.zeros(fshape    , dtype="float32")
+        self._rfft_in1  = np.zeros(shape_real   , dtype="float32")
+        self._rfft_in2  = np.zeros(shape_real   , dtype="float32")
+        self._rfft_out1 = np.zeros(shape_complex, dtype="complex64")
+        self._rfft_out2 = np.zeros(shape_complex, dtype="complex64")
+        self._irfft_in  = np.zeros(shape_complex, dtype="complex64")
+        self._irfft_out = np.zeros(shape_real   , dtype="float32")
         # fmt: on
 
     # --------------------------------------------------------------------------
@@ -193,7 +197,7 @@ class FFT_Convolver2D_Full:
         irfftn(self._irfft_in, self._irfft_out, nthreads=self.fft_threads)
 
         # Return the 'full' elements
-        return self._irfft_out[self._slice_full]
+        return self._irfft_out[self._slice_out]
 
 
 # ------------------------------------------------------------------------------
@@ -210,7 +214,7 @@ def rfftn(ain, aout, nthreads=np.int64(1)):
     axes = np.array([0, 1], dtype=np.int64)
     forward = True
     fct = np.float32(1.0)
-    rocket_fft.r2c(ain, aout, axes, forward, fct, nthreads)
+    rocket_fft.r2c(ain, aout, axes, forward, fct, nthreads)  # type: ignore
 
 
 @nb.njit(
@@ -222,7 +226,7 @@ def irfftn(ain, aout, nthreads=np.int64(1)):
     axes = np.array([0, 1], dtype=np.int64)
     forward = False
     fct = np.float32(1.0)
-    rocket_fft.c2r(ain, aout, axes, forward, fct, nthreads)
+    rocket_fft.c2r(ain, aout, axes, forward, fct, nthreads)  # type: ignore
 
 
 # ------------------------------------------------------------------------------
