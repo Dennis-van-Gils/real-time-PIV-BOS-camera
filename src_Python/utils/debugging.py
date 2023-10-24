@@ -3,7 +3,7 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "22-10-2023"
+__date__ = "23-10-2023"
 __version__ = "1.0"
 
 import numpy as np
@@ -31,8 +31,6 @@ def print_info(
     lIW_shifts_x,
     lIW_shifts_y,
     lC_maps,
-    lVM_grid_x,
-    lVM_grid_y,
     lVM_dx,
     lVM_dy,
 ):

@@ -11,7 +11,7 @@ VM: Displacement vector map
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "22-10-2023"
+__date__ = "23-10-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
@@ -421,8 +421,6 @@ if __name__ == "__main__":
                 lIW_shifts_x,
                 lIW_shifts_y,
                 lC_maps,
-                lVM_grid_x,
-                lVM_grid_y,
                 lVM_dx,
                 lVM_dy,
             )
