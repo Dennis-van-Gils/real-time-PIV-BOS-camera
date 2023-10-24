@@ -138,22 +138,13 @@ if __name__ == "__main__":
     # stage: Current multigrid stage from the largest IW size to the smallest.
     # Prefix 'l' denotes 'list' with index `stage_idx`.
 
-    # List of IW parameters per stage of the multigrid
-    #   tuple [IW_size    (``int``),
-    #          IW_overlap (``float``),
-    #          N_IWs      (``int``),
-    #          N_IWs_x    (``int``),
-    #          N_IWs_y    (``int``)]
-    lIW_params: list[tuple[int, float, int, int, int]] = []
-
-    # fmt: off
     # List of IW meshgrids and limits per stage of the multigrid
     lIW_mesh: list[IW_Mesh] = []
 
     # List of computed IW shifts per stage of the multigrid
     # NOTE: List index 0, which corresponds to `stage_idx = 0`, will be
     # initialized with zeros and remain so throughout, because no window shifts
-    # ever exist for the first multigrid stage by design. Thats okay.
+    # ever exist for the first multigrid stage by design. That's okay.
     lIW_shifts_x: list[npt.NDArray[np.int32]] = []  # NDArray shape (N_IWs, )
     lIW_shifts_y: list[npt.NDArray[np.int32]] = []  # NDArray shape (N_IWs, )
 
@@ -161,6 +152,7 @@ if __name__ == "__main__":
     #   NDArray shape (N_IWs, IW_size * 2 - 1, IW_size * 2 - 1)
     lC_maps: list[npt.NDArray[np.float32]] = []
 
+    # fmt: off
     # List of computed displacement vector maps per stage of the multigrid
     lVM_grid_x: list[npt.NDArray[np.int32]] = []    # NDArray shape (N_IWs, )
     lVM_grid_y: list[npt.NDArray[np.int32]] = []    # NDArray shape (N_IWs, )
@@ -187,17 +179,7 @@ if __name__ == "__main__":
             IW_size,
             cfg.IW_OVERLAP if stage_idx == N_stages - 1 else 0.0,
         )
-
         lIW_mesh.append(IW_mesh)
-        lIW_params.append(
-            (
-                IW_mesh.IW_size,
-                IW_mesh.IW_overlap,
-                IW_mesh.N_IWs,
-                IW_mesh.N_IWs_x,
-                IW_mesh.N_IWs_y,
-            )
-        )
 
         lIW_shifts_x.append(np.zeros(IW_mesh.N_IWs, dtype=np.int32))
         lIW_shifts_y.append(np.zeros(IW_mesh.N_IWs, dtype=np.int32))
@@ -232,7 +214,7 @@ if __name__ == "__main__":
         0,
         np.zeros((1, 1), dtype=np.float32),
         np.zeros((1, 1), dtype=np.float32),
-        lIW_params[0],
+        lIW_mesh[0].IW_params,
         lVM_dx[0],
         lVM_dy[0],
         lIW_mesh[0].A_grid_x,
@@ -366,7 +348,7 @@ if __name__ == "__main__":
                         stage_idx,
                         A_,
                         B,
-                        lIW_params  [stage_idx - 1],
+                        lIW_mesh    [stage_idx - 1].IW_params,
                         lVM_dx      [stage_idx - 1],
                         lVM_dy      [stage_idx - 1],
                         lIW_mesh    [stage_idx].A_grid_x,
@@ -447,7 +429,13 @@ if __name__ == "__main__":
 
         # TODO: In progress code. Contains hardcoded 'magic' constants.
         if cfg.MODE in [cfg.MODES.BOS]:
-            IW_size, IW_overlap, N_IWs, N_IWs_x, N_IWs_y = lIW_params[-1]
+            (
+                IW_size,
+                IW_overlap,
+                N_IWs,
+                N_IWs_x,
+                N_IWs_y,
+            ) = lIW_mesh[-1].IW_params
             grid_x = lVM_grid_x[-1]
             grid_y = lVM_grid_y[-1]
             VM_dx = lVM_dx[-1]

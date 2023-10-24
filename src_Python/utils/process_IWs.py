@@ -19,7 +19,7 @@ Con:
     argument can no longer cache. Here, caching fails for `process_IWs()` and
     `obtain_IWs_from_image()` when using the jitted `IW_Mesh` class as argument.
 
-    Our compile time went from 2.5 sec to 5.5 sec, every runtime :(
+    Our compile time went from 2.5 sec to 7.8 sec, every runtime :(
 
     See https://github.com/numba/numba/issues/4830#issuecomment-896819248
 
@@ -111,7 +111,7 @@ class IW_Mesh:
         IW_size (``int``):
             Square interrogation window size [px].
 
-        IW_overlap (``float``, optional):
+        IW_overlap (``float``):
             Window overlap fraction [0 - 1].
             0  : no window overlap
             0.5: 50% window overlap
@@ -147,6 +147,14 @@ class IW_Mesh:
 
         N_IWs_y (``int``):
             Obtained number of interrogation windows along the y-axis.
+
+        params (``tuple(int, float, int, int, int)``):
+            Convenience member, combining the following into one tuple:
+                (IW_size    (``int``),
+                 IW_overlap (``float``),
+                 N_IWs      (``int``),
+                 N_IWs_x    (``int``),
+                 N_IWs_y    (``int``))
     """
 
     """ COMMENTED OUT: JITCLASSED IW_MESH
@@ -161,6 +169,12 @@ class IW_Mesh:
     N_IWs        : nb.int32             # type: ignore
     N_IWs_x      : nb.int32             # type: ignore
     N_IWs_y      : nb.int32             # type: ignore
+    IW_params    : nb.types.Tuple((
+                        nb.int32,
+                        nb.float32,
+                        nb.int32,
+                        nb.int32,
+                        nb.int32))      # type: ignore
     orig_grid_x  : nb.int32[:]          # type: ignore
     orig_grid_y  : nb.int32[:]          # type: ignore
     orig_lims_x  : nb.int32[:, ::1]     # type: ignore
@@ -241,6 +255,7 @@ class IW_Mesh:
         self.N_IWs = N_IWs
         self.N_IWs_x = N_IWs_x
         self.N_IWs_y = N_IWs_y
+        self.IW_params = (IW_size, IW_overlap, N_IWs, N_IWs_x, N_IWs_y)
 
         self.orig_grid_x = grid_x
         self.orig_grid_y = grid_y
