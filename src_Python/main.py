@@ -92,11 +92,11 @@ if __name__ == "__main__":
     print(f"  IW_OVERLAP   : {cfg.IW_OVERLAP}\n")
     print("Setting up... ", end="")
     sys.stdout.flush()
-    t_0 = perf_counter()
+    tick = perf_counter()
 
     # Set up the frame server and read the first image frame
     frame_server = FrameServer()
-    A, frame_title = frame_server.begin()
+    A = frame_server.begin()
     remove_mean_background(A)
 
     img_h = frame_server.img_h
@@ -228,7 +228,7 @@ if __name__ == "__main__":
     )
 
     # Display info
-    print(f"done in {perf_counter() - t_0:.3f} sec\n")
+    print(f"done in {perf_counter() - tick:.3f} sec\n")
 
     # --------------------------------------------------------------------------
     #   Walk over all image frames from disk / acquire frames from the camera
@@ -240,32 +240,31 @@ if __name__ == "__main__":
     if cfg.DEBUG:
         cfg.N_IMAGES = 2
 
-    done = False
     frame_idx = 0
+    done = False
     while not done:
         # ----------------------------------------------------------------------
         #   Read and prepare new image frames
         # ----------------------------------------------------------------------
+        tick = perf_counter()
 
-        t_0 = perf_counter()
-        frame_title = ""
         if cfg.MODE == cfg.MODES.PIV:
             # Particle image velocimetry using equidistantly timed frames
             #   (frame_0, frame_1), (frame_1, frame_2), (frame_2, frame_3), ...
             A = np.copy(B)
-            B, frame_title = frame_server.serve(frame_idx + 1)
+            B = frame_server.serve(frame_idx + 1)
 
         elif cfg.MODE == cfg.MODES.PIV2:
             # Particle image velocimetry using image pairs
             #   (frame_0, frame_1), (frame_2, frame_3), (frame_4, frame_5), ...
-            A, frame_title = frame_server.serve(frame_idx)
-            B, frame_title = frame_server.serve(frame_idx + 1)
+            A = frame_server.serve(frame_idx)
+            B = frame_server.serve(frame_idx + 1)
             remove_mean_background(A)
 
         elif cfg.MODE == cfg.MODES.BOS:
             # Background-oriented Schlieren
             #   (frame_0, frame_1), (frame_0, frame_2), (frame_0, frame_3), ...
-            B, frame_title = frame_server.serve(frame_idx + 1)
+            B = frame_server.serve(frame_idx + 1)
 
         np.copyto(B_orig, B)  # Keep a copy of original `B` for plotting later
         remove_mean_background(B)
@@ -280,17 +279,17 @@ if __name__ == "__main__":
             A_ = np.asarray(fliplrud(A), order="C")
 
         # Display info
-        print(frame_title)
+        frame_title = frame_server.title
         print(
-            f"Reading, processing... done in {perf_counter() - t_0:.3f}, ",
+            f"{frame_title:<30s} read {perf_counter() - tick:.3f} | proc ",
             end="",
         )
         sys.stdout.flush()
-        t_0 = perf_counter()
 
         # ----------------------------------------------------------------------
         #   Walk over all multigrid stages
         # ----------------------------------------------------------------------
+        tick = perf_counter()
 
         for stage_idx, IW_size in enumerate(cfg.IW_SIZES):
             # Short-hands
@@ -385,8 +384,7 @@ if __name__ == "__main__":
             # fmt: on
 
         # Display info
-        duration = perf_counter() - t_0
-        print(f"{duration:.3f} sec")
+        print(f"{perf_counter() - tick:.3f}")
 
         # ----------------------------------------------------------------------
         #   Debugging output

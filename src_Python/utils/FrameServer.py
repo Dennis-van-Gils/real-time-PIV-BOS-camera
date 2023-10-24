@@ -7,7 +7,7 @@ webcamera or other video camera device.
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "16-10-2023"
+__date__ = "24-10-2023"
 __version__ = "1.0"
 
 import os
@@ -48,14 +48,17 @@ class FrameServer:
         cam_xi (``xiapi.Camera``):
             Ximea video capture instance when `source` is "ximea".
 
-        frame_count (``int``):
+        count (``int``):
             Number of frames served so far.
 
-        frame_t0 (``float``):
+        t0 (``float``):
             Time stamp [sec] of first frame captured when `begin()` was called.
 
-        frame_dT (``float``):
+        dT (``float``):
             Time interval [sec] between the last two served frames.
+
+        title (``str``):
+            String description befitting the last served frame.
 
         img_w (``int``):
             Obtained image frame width [px].
@@ -77,10 +80,12 @@ class FrameServer:
         self.img_xi: xiapi.Image
 
         # Timing
-        self.frame_count: int = 0
-        self.frame_t0: float = 0.0
-        self.frame_dT: float = 0.0
-        self._prev_tick_frame: float = 0.0
+        self.count: int = 0
+        self.t0: float = 0.0
+        self.dT: float = 0.0
+        self._prev_tick: float = 0.0
+
+        self.title = "Uninitialized"
 
         # To be derived in `begin()`
         self.img_w = 0
@@ -117,26 +122,19 @@ class FrameServer:
             self.cam_xi.start_acquisition()
             self.img_xi = xiapi.Image()
 
-    def begin(self) -> tuple[npt.NDArray[np.float32], str]:
+    def begin(self) -> npt.NDArray[np.float32]:
         """Finish setting up the frame server by reading the first image to get
-        the image width, height and bit depth. Returns the first image and a
-        befitting string description.
+        the image width, height and bit depth. Returns the grayscale image.
 
-        Returns (``tuple``):
-            img (``np.ndarray(np.float32)``):
-                2D numpy array containing the image bitmap in ``numpy.float32``
-                grayscale values, normalized by the maximum possible grayscale
-                intensity value. Hence, the output range is [0 - 1].
-
-            frame_title (``str``):
-                String description befitting the served image.
+        Returns (``np.ndarray(np.float32)``):
+            2D numpy array containing the image bitmap in ``numpy.float32``
+            grayscale values, normalized by the maximum possible grayscale
+            intensity value. Hence, the output range is [0 - 1].
         """
         return self.serve(0)
 
-    def serve(self, frame_idx: int = 1) -> tuple[npt.NDArray[np.float32], str]:
-        """Acquire and return a new grayscale image frame and a befitting string
-        description. The returned image data is rescaled to the interval [0 - 1]
-        regardless of the original format.
+    def serve(self, frame_idx: int = 1) -> npt.NDArray[np.float32]:
+        """Acquire and return a new grayscale image.
 
         Args:
             frame_idx (``int``, optional):
@@ -146,53 +144,49 @@ class FrameServer:
 
                 Default: 1
 
-        Returns (``tuple``):
-            img (``np.ndarray(np.float32)``):
-                2D numpy array containing the image bitmap in ``numpy.float32``
-                grayscale values, normalized by the maximum possible grayscale
-                intensity value. Hence, the output range is [0 - 1].
-
-            frame_title (``str``):
-                String description befitting the served image.
+        Returns (``np.ndarray(np.float32)``):
+            2D numpy array containing the image bitmap in ``numpy.float32``
+            grayscale values, normalized by the maximum possible grayscale
+            intensity value. Hence, the output range is [0 - 1].
         """
 
         if self.source == cfg.IMAGE_SOURCES.DISK:
             fn_img = cfg.IMAGE_FILES[frame_idx]
             img = cv2.imread(fn_img, cv2.IMREAD_GRAYSCALE)
             tick = time.perf_counter()
-            frame_title = get_filename_from_full_path(fn_img)
+            self.title = get_filename_from_full_path(fn_img)
 
         elif self.source == cfg.IMAGE_SOURCES.WEBCAM:
             success, img = self.cam_cv2.read()
             tick = time.perf_counter()
             img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-            frame_title = ""
+            self.title = ""
 
         elif self.source == cfg.IMAGE_SOURCES.XIMEA:
             self.cam_xi.get_image(self.img_xi)
             tick = time.perf_counter()
             img = self.img_xi.get_image_data_numpy()
-            frame_title = ""
+            self.title = ""
 
         else:
             img = np.zeros([1, 1], dtype=np.float32)
             tick = time.perf_counter()
-            frame_title = "Empty frame. Should never see me."
+            self.title = "Empty frame. Should never see me."
 
         # Live video sources: Keep track of time
         if self.source in [cfg.IMAGE_SOURCES.WEBCAM, cfg.IMAGE_SOURCES.XIMEA]:
             if frame_idx == 0:
-                self.frame_count = 0
-                self.frame_t0 = tick
-                self._prev_tick_frame = tick
+                self.count = 0
+                self.t0 = tick
+                self._prev_tick = tick
                 frame_time = 0
             else:
-                self.frame_count += 1
-                self.frame_dT = tick - self._prev_tick_frame
-                self._prev_tick_frame = tick
-                frame_time = tick - self.frame_t0
+                self.count += 1
+                self.dT = tick - self._prev_tick
+                self._prev_tick = tick
+                frame_time = tick - self.t0
 
-            frame_title = f"frame {self.frame_count:06d} t {frame_time:.3f}"
+            self.title = f"frame {self.count:06d} t {frame_time:.3f}"
 
         if frame_idx == 0:
             self.img_h, self.img_w = img.shape
@@ -203,7 +197,7 @@ class FrameServer:
         img = np.asarray(img, dtype=np.float32, order="C")
         img = img / self._img_max_bitval
 
-        return img, frame_title
+        return img
 
     def close(self):
         """Close video capture device if it was opened."""
