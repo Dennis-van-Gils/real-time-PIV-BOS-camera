@@ -12,7 +12,7 @@ Namespace `cfg` now contains all user settings
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "20-10-2023"
+__date__ = "24-10-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
@@ -88,6 +88,7 @@ WANTED_RESOLUTION = [1280, 720]
 MODE = MODES.BOS
 IW_SIZES = [32]
 IW_OVERLAP = 0.5
+N_STAGES = len(IW_SIZES)
 
 # [Plotting]
 QUIVER_SIZE = 10
@@ -159,10 +160,12 @@ def read_file(filename=None):
     global MODE
     global IW_SIZES
     global IW_OVERLAP
+    global N_STAGES
 
     MODE = getattr(MODES, parser["Processing"]["mode"].upper())
     IW_SIZES = parse_int_list(parser["Processing"]["IW_sizes"])
     IW_OVERLAP = np.clip(parser.getfloat("Processing", "IW_overlap"), 0.0, 0.8)
+    N_STAGES = len(IW_SIZES)
 
     # [Plotting]
     global QUIVER_SIZE

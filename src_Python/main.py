@@ -11,7 +11,7 @@ VM: Displacement vector map
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "23-10-2023"
+__date__ = "24-10-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
@@ -131,45 +131,44 @@ if __name__ == "__main__":
         A_ = np.asarray(fliplrud(A), order="C")
 
     # --------------------------------------------------------------------------
-    #   Init - preallocate lists
+    #   Preallocate and populate lists for the upcoming multigrid analysis.
+    #     stage: Current multigrid stage, from largest IW size to the smallest.
+    #     Prefix 'l' denotes 'list' with index `stage_idx`.
+    #
+    #   Preallocate lists
     # --------------------------------------------------------------------------
 
-    # Preallocate and populate lists for the upcoming multigrid analysis.
-    # stage: Current multigrid stage from the largest IW size to the smallest.
-    # Prefix 'l' denotes 'list' with index `stage_idx`.
-
-    # List of IW meshgrids and limits per stage of the multigrid
+    # IW meshgrids and limits per stage of the multigrid
     lIW_mesh: list[IW_Mesh] = []
 
-    # List of computed IW shifts per stage of the multigrid
-    # NOTE: List index 0, which corresponds to `stage_idx = 0`, will be
-    # initialized with zeros and remain so throughout, because no window shifts
-    # ever exist for the first multigrid stage by design. That's okay.
+    # Computed IW pre-shifts per stage of the multigrid
+    # NOTE: List index `stage_idx = 0` will be initialized with zeros and remain
+    # so throughout, because no window pre-shifts ever exist for the first
+    # multigrid stage by design. That's okay.
     lIW_shifts_x: list[npt.NDArray[np.int32]] = []  # NDArray shape (N_IWs, )
     lIW_shifts_y: list[npt.NDArray[np.int32]] = []  # NDArray shape (N_IWs, )
 
-    # List of computed correlations maps per stage of the multigrid
+    # Computed correlation maps per stage of the multigrid
     #   NDArray shape (N_IWs, IW_size * 2 - 1, IW_size * 2 - 1)
     lC_maps: list[npt.NDArray[np.float32]] = []
 
     # fmt: off
-    # List of computed displacement vector maps per stage of the multigrid
+    # Computed displacement vector maps per stage of the multigrid
     lVM_grid_x: list[npt.NDArray[np.int32]] = []    # NDArray shape (N_IWs, )
     lVM_grid_y: list[npt.NDArray[np.int32]] = []    # NDArray shape (N_IWs, )
     lVM_dx: list[npt.NDArray[np.float32]] = []      # NDArray shape (N_IWs, )
     lVM_dy: list[npt.NDArray[np.float32]] = []      # NDArray shape (N_IWs, )
     # fmt: on
 
-    # List of FFT calculation instances per stage of the multigrid. In
-    # addition, each stage will have a multiple of identical FFT instances
-    # equal to the number of concurrent workers set in `cfg.N_WORKERS`.
+    # FFT calculation instances per stage of the multigrid
+    # NOTE: In addition, each stage will have multiple copies of similar FFT
+    # instances equal to the number of concurrent workers `cfg.N_WORKERS`.
     lfft: list[list[FFT_Convolver2D_Full]] = []
 
     # --------------------------------------------------------------------------
-    #   Init - populate lists
+    #   Populate lists
     # --------------------------------------------------------------------------
 
-    N_stages = len(cfg.IW_SIZES)
     for stage_idx, IW_size in enumerate(cfg.IW_SIZES):
         # Create interrogation windows. Only the last multigrid stage will have
         # window overlapping applied to it.
@@ -177,7 +176,7 @@ if __name__ == "__main__":
             img_w,
             img_h,
             IW_size,
-            cfg.IW_OVERLAP if stage_idx == N_stages - 1 else 0.0,
+            cfg.IW_OVERLAP if stage_idx == cfg.N_STAGES - 1 else 0.0,
         )
         lIW_mesh.append(IW_mesh)
 
@@ -385,7 +384,7 @@ if __name__ == "__main__":
                 lIW_shifts_y[stage_idx],
                 lVM_dx      [stage_idx],
                 lVM_dy      [stage_idx],
-                perform_subpixel_fitting=(stage_idx == N_stages - 1),
+                perform_subpixel_fitting=(stage_idx == cfg.N_STAGES - 1),
             )
             # fmt: on
 
