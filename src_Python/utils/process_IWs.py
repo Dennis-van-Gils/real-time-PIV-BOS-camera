@@ -36,7 +36,7 @@ Taken solution:
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "23-10-2023"
+__date__ = "24-10-2023"
 __version__ = "1.0"
 
 import numpy as np
@@ -51,7 +51,7 @@ if cfg.FFT_LIB == cfg.FFT_LIBS.PYFFTW:
 elif cfg.FFT_LIB == cfg.FFT_LIBS.ROCKETFFT:
     from utils.dvg_fftconvolver_rocketfft import FFT_Convolver2D_Full
 elif cfg.FFT_LIB == cfg.FFT_LIBS.SCIPY:
-    from dvg_fftconvolver_scipy import FFT_Convolver2D_Full
+    from utils.dvg_fftconvolver_scipy import FFT_Convolver2D_Full
 else:
     from utils.dvg_fftconvolver_rocketfft import FFT_Convolver2D_Full
 
