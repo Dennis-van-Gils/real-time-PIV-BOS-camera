@@ -11,7 +11,7 @@ VM: Displacement vector map
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "24-10-2023"
+__date__ = "25-10-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
@@ -391,7 +391,7 @@ if __name__ == "__main__":
         # ----------------------------------------------------------------------
 
         if cfg.DEBUG_PRINT:
-            debugging.print_info(
+            debugging.print_IWs(
                 lIW_mesh,
                 lIW_shifts_x,
                 lIW_shifts_y,
@@ -401,7 +401,7 @@ if __name__ == "__main__":
             )
 
         if cfg.DEBUG_IW_PX is not None:
-            debugging.IW_analysis(
+            debugging.plot_IW_analysis(
                 cfg.DEBUG_IW_PX[0],
                 cfg.DEBUG_IW_PX[1],
                 A,
