@@ -36,7 +36,7 @@ Taken solution:
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "24-10-2023"
+__date__ = "26-10-2023"
 __version__ = "1.0"
 
 import numpy as np
@@ -237,17 +237,17 @@ class IW_Mesh:
         lims_x = np.empty((N_IWs, 2), dtype=np.int32)
         lims_y = np.empty((N_IWs, 2), dtype=np.int32)
         lims_x[:, 0] = grid_x - half_IW_size
-        lims_x[:, 1] = grid_x + half_IW_size - 1
+        lims_x[:, 1] = grid_x + half_IW_size
         lims_y[:, 0] = grid_y - half_IW_size
-        lims_y[:, 1] = grid_y + half_IW_size - 1
-        # Example: lims_x = [[  0  31]      lims_y = [[ 0 31]
-        #                    [ 32  63]                [ 0 31]
-        #                    [ 64  95]                [ 0 31]
-        #                    [ 96 127]                [ 0 31]
-        #                    [  0  31]                [32 63]
-        #                    [ 32  63]                [32 63]
-        #                    [ 64  95]                [32 63]
-        #                    [ 96 127]]               [32 63]]
+        lims_y[:, 1] = grid_y + half_IW_size
+        # Example: lims_x = [[  0  32]      lims_y = [[ 0 32]
+        #                    [ 32  64]                [ 0 32]
+        #                    [ 64  96]                [ 0 32]
+        #                    [ 96 128]                [ 0 32]
+        #                    [  0  32]                [32 64]
+        #                    [ 32  64]                [32 64]
+        #                    [ 64  96]                [32 64]
+        #                    [ 96 128]]               [32 64]]
 
         self._half_IW_size = half_IW_size
         self._overlap_px = overlap_px
@@ -459,7 +459,7 @@ def obtain_IWs_from_image(
             B_IW_lims_x[IW_idx, :] -= shift_x
             shift_x = np.int32(0)
 
-        if B_IW_lims_x[IW_idx, 1] > B.shape[1] - 1:
+        if B_IW_lims_x[IW_idx, 1] > B.shape[1]:
             IW_needs_to_be_a_copy = True
             zero_out_L = np.abs(shift_x)
             B_IW_grid_x[IW_idx] -= shift_x
@@ -473,7 +473,7 @@ def obtain_IWs_from_image(
             B_IW_lims_y[IW_idx, :] -= shift_y
             shift_y = np.int32(0)
 
-        if B_IW_lims_y[IW_idx, 1] > B.shape[0] - 1:
+        if B_IW_lims_y[IW_idx, 1] > B.shape[0]:
             IW_needs_to_be_a_copy = True
             zero_out_U = np.abs(shift_y)
             B_IW_grid_y[IW_idx] -= shift_y
@@ -492,17 +492,17 @@ def obtain_IWs_from_image(
     # have to flip the indices as well, hence the use of `A.shape[] - ...`.
     A_slice = (
         slice(
-            A_.shape[0] - A_IW_lims_y[IW_idx, 1] - 1,
+            A_.shape[0] - A_IW_lims_y[IW_idx, 1],
             A_.shape[0] - A_IW_lims_y[IW_idx, 0],
         ),
         slice(
-            A_.shape[1] - A_IW_lims_x[IW_idx, 1] - 1,
+            A_.shape[1] - A_IW_lims_x[IW_idx, 1],
             A_.shape[1] - A_IW_lims_x[IW_idx, 0],
         ),
     )
     B_slice = (
-        slice(B_IW_lims_y[IW_idx, 0], B_IW_lims_y[IW_idx, 1] + 1),
-        slice(B_IW_lims_x[IW_idx, 0], B_IW_lims_x[IW_idx, 1] + 1),
+        slice(B_IW_lims_y[IW_idx, 0], B_IW_lims_y[IW_idx, 1]),
+        slice(B_IW_lims_x[IW_idx, 0], B_IW_lims_x[IW_idx, 1]),
     )
 
     # fmt: off
@@ -743,7 +743,7 @@ def obtain_IWs_from_image(
             IW_mesh.B_lims_x[IW_idx, :] -= shift_x
             shift_x = np.int32(0)
 
-        if IW_mesh.B_lims_x[IW_idx, 1] > B.shape[1] - 1:
+        if IW_mesh.B_lims_x[IW_idx, 1] > B.shape[1]:
             IW_needs_to_be_a_copy = True
             zero_out_L = np.abs(shift_x)
             IW_mesh.B_grid_x[IW_idx] -= shift_x
@@ -757,7 +757,7 @@ def obtain_IWs_from_image(
             IW_mesh.B_lims_y[IW_idx, :] -= shift_y
             shift_y = np.int32(0)
 
-        if IW_mesh.B_lims_y[IW_idx, 1] > B.shape[0] - 1:
+        if IW_mesh.B_lims_y[IW_idx, 1] > B.shape[0]:
             IW_needs_to_be_a_copy = True
             zero_out_U = np.abs(shift_y)
             IW_mesh.B_grid_y[IW_idx] -= shift_y
@@ -776,17 +776,17 @@ def obtain_IWs_from_image(
     # have to flip the indices as well, hence the use of `A.shape[] - ...`.
     A_slice = (
         slice(
-            A_.shape[0] - IW_mesh.A_lims_y[IW_idx, 1] - 1,
+            A_.shape[0] - IW_mesh.A_lims_y[IW_idx, 1],
             A_.shape[0] - IW_mesh.A_lims_y[IW_idx, 0],
         ),
         slice(
-            A_.shape[1] - IW_mesh.A_lims_x[IW_idx, 1] - 1,
+            A_.shape[1] - IW_mesh.A_lims_x[IW_idx, 1],
             A_.shape[1] - IW_mesh.A_lims_x[IW_idx, 0],
         ),
     )
     B_slice = (
-        slice(IW_mesh.B_lims_y[IW_idx, 0], IW_mesh.B_lims_y[IW_idx, 1] + 1),
-        slice(IW_mesh.B_lims_x[IW_idx, 0], IW_mesh.B_lims_x[IW_idx, 1] + 1),
+        slice(IW_mesh.B_lims_y[IW_idx, 0], IW_mesh.B_lims_y[IW_idx, 1]),
+        slice(IW_mesh.B_lims_x[IW_idx, 0], IW_mesh.B_lims_x[IW_idx, 1]),
     )
 
     # fmt: off

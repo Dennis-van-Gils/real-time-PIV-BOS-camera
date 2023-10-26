@@ -3,7 +3,7 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "25-10-2023"
+__date__ = "26-10-2023"
 __version__ = "1.0"
 
 import numpy as np
@@ -186,8 +186,8 @@ def plot_IW_analysis(
         ax_A.add_patch(
             Rectangle(
                 (A_IW_lims_x[0], A_IW_lims_y[0]),
-                np.diff(A_IW_lims_x)[0] + 1,
-                np.diff(A_IW_lims_y)[0] + 1,
+                np.diff(A_IW_lims_x)[0],
+                np.diff(A_IW_lims_y)[0],
                 edgecolor="r",
                 fill=None,
                 lw=1,
@@ -196,8 +196,8 @@ def plot_IW_analysis(
         ax_B.add_patch(
             Rectangle(
                 (A_IW_lims_x[0], A_IW_lims_y[0]),
-                np.diff(A_IW_lims_x)[0] + 1,
-                np.diff(A_IW_lims_y)[0] + 1,
+                np.diff(A_IW_lims_x)[0],
+                np.diff(A_IW_lims_y)[0],
                 edgecolor="k",
                 fill=None,
                 lw=1,
@@ -206,8 +206,8 @@ def plot_IW_analysis(
         ax_B.add_patch(
             Rectangle(
                 (B_IW_lims_x[0], B_IW_lims_y[0]),
-                np.diff(B_IW_lims_x)[0] + 1,
-                np.diff(B_IW_lims_y)[0] + 1,
+                np.diff(B_IW_lims_x)[0],
+                np.diff(B_IW_lims_y)[0],
                 edgecolor="r",
                 fill=None,
                 lw=1,
@@ -236,14 +236,8 @@ def plot_IW_analysis(
             ax_A.set_ylim(ymax, ymin)  # Must flip ymax and ymin due to imshow
 
         # Obtain images of IW frame A and IW frame B
-        IW_A = A[
-            slice(A_IW_lims_y[0], A_IW_lims_y[1] + 1),
-            slice(A_IW_lims_x[0], A_IW_lims_x[1] + 1),
-        ]
-        IW_B = B[
-            slice(B_IW_lims_y[0], B_IW_lims_y[1] + 1),
-            slice(B_IW_lims_x[0], B_IW_lims_x[1] + 1),
-        ]
+        IW_A = A[slice(*A_IW_lims_y), slice(*A_IW_lims_x)]
+        IW_B = B[slice(*B_IW_lims_y), slice(*B_IW_lims_x)]
 
         if cfg.N_STAGES == 1:
             ax_IW_A = axs_2[0]
