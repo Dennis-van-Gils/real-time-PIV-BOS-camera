@@ -78,12 +78,12 @@ def conditional_decorator(dec, condition):
 # and too large vectors. Setting below factor to, for instance, 0.8 helps the
 # child IWs to find their way back home again.
 #
-# After reading multiple articles: This pre-shift factor < 1.0 approach seems to
-# be the poor man's approach to the otherwise recommended way of increasing the
-# cross-correlation search area of frame B past its set IW size. We can't do
-# that here, because we have numba-optimized the cross-correlation function to
-# always expect equal-sized input arrays.
-MULTIGRID_PRESHIFT_FACTOR = 0.8
+# After reading multiple articles: This pre-shift attenuation < 1.0 approach
+# seems to be the poor man's approach to the otherwise recommended way of
+# increasing the cross-correlation search area of frame B past its set IW size.
+# We can't do that here, because we have numba-optimized the cross-correlation
+# function to always expect equal-sized input arrays.
+PRESHIFT_ATTENUATION = 0.8
 
 # ------------------------------------------------------------------------------
 #   IW_Mesh
@@ -437,10 +437,10 @@ def obtain_IWs_from_image(
         shift_x = prev_VM_dx[parent_IW_idx]
         shift_y = prev_VM_dy[parent_IW_idx]
         shift_x = np.int32(
-            0 if np.isnan(shift_x) else shift_x * MULTIGRID_PRESHIFT_FACTOR
+            0 if np.isnan(shift_x) else shift_x * PRESHIFT_ATTENUATION
         )
         shift_y = np.int32(
-            0 if np.isnan(shift_y) else shift_y * MULTIGRID_PRESHIFT_FACTOR
+            0 if np.isnan(shift_y) else shift_y * PRESHIFT_ATTENUATION
         )
 
         # Apply the pre-shift to IW B (eager)
@@ -721,10 +721,10 @@ def obtain_IWs_from_image(
         shift_x = prev_VM_dx[parent_IW_idx]
         shift_y = prev_VM_dy[parent_IW_idx]
         shift_x = np.int32(
-            0 if np.isnan(shift_x) else shift_x * MULTIGRID_PRESHIFT_FACTOR
+            0 if np.isnan(shift_x) else shift_x * PRESHIFT_ATTENUATION
         )
         shift_y = np.int32(
-            0 if np.isnan(shift_y) else shift_y * MULTIGRID_PRESHIFT_FACTOR
+            0 if np.isnan(shift_y) else shift_y * PRESHIFT_ATTENUATION
         )
 
         # Apply the pre-shift to IW B (eager)
