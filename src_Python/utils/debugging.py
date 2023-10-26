@@ -186,8 +186,8 @@ def plot_IW_analysis(
         ax_A.add_patch(
             Rectangle(
                 (A_IW_lims_x[0], A_IW_lims_y[0]),
-                np.diff(A_IW_lims_x)[0],
-                np.diff(A_IW_lims_y)[0],
+                np.diff(A_IW_lims_x)[0] + 1,
+                np.diff(A_IW_lims_y)[0] + 1,
                 edgecolor="r",
                 fill=None,
                 lw=1,
@@ -196,8 +196,8 @@ def plot_IW_analysis(
         ax_B.add_patch(
             Rectangle(
                 (A_IW_lims_x[0], A_IW_lims_y[0]),
-                np.diff(A_IW_lims_x)[0],
-                np.diff(A_IW_lims_y)[0],
+                np.diff(A_IW_lims_x)[0] + 1,
+                np.diff(A_IW_lims_y)[0] + 1,
                 edgecolor="k",
                 fill=None,
                 lw=1,
@@ -206,8 +206,8 @@ def plot_IW_analysis(
         ax_B.add_patch(
             Rectangle(
                 (B_IW_lims_x[0], B_IW_lims_y[0]),
-                np.diff(B_IW_lims_x)[0],
-                np.diff(B_IW_lims_y)[0],
+                np.diff(B_IW_lims_x)[0] + 1,
+                np.diff(B_IW_lims_y)[0] + 1,
                 edgecolor="r",
                 fill=None,
                 lw=1,
