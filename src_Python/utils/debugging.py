@@ -8,7 +8,7 @@ __version__ = "1.0"
 
 import numpy as np
 
-from utils.process_IWs import IW_Mesh
+from utils.process_IWs import IW_Mesh, PRESHIFT_ATTENUATION
 import init_config as cfg
 
 from matplotlib import pyplot as plt
@@ -119,20 +119,34 @@ def plot_IW_analysis(
     lVM_dx,
     lVM_dy,
 ):
-    fig_1, axs_1 = plt.subplots(1, 2, figsize=(10, 4), sharex=True, sharey=True)
+    # Lay-out
+    title_spec = {"fontsize": 8, "fontfamily": "monospace"}
+    imshow_spec = {"cmap": "viridis", "interpolation": "nearest"}
+
+    fig_1, axs_1 = plt.subplots(1, 2, figsize=(8, 4), sharex=True, sharey=True)
+    fig_1.subplots_adjust(left=0.125, bottom=0.11, right=0.9, top=0.8)
     ax_A: axes.Axes = axs_1[0]
     ax_B: axes.Axes = axs_1[1]
+    ax_A.imshow(A, **imshow_spec)  # type: ignore
+    ax_B.imshow(B, **imshow_spec)  # type: ignore
 
-    ax_A.imshow(A, interpolation="nearest")
-    ax_B.imshow(B, interpolation="nearest")
+    fig_2, axs_2 = plt.subplots(cfg.N_STAGES, 3, figsize=(9, 6))
+    fig_2.subplots_adjust(left=0.125, bottom=0.08, right=0.9, top=0.85)
 
-    fig_2, axs_2 = plt.subplots(cfg.N_STAGES, 3, figsize=(10, 6))
-
-    print(f"\n@px {IW_px_x}, {IW_px_y}")
-    print("stage | IW_idx |  pre-shift |   VM_dx,   VM_dy")
-    print("------|--------|------------|-----------------")
-    str_lines = []
-    title_specs = {"fontsize": 8, "fontfamily": "monospace"}
+    # String info
+    header = (
+        f"\n@px {IW_px_x}, {IW_px_y}\n"
+        f"PRESHIFT_ATTENUATION={PRESHIFT_ATTENUATION}"
+    )
+    table = []
+    table.append(
+        " # | IW_idx |    A_xlim    A_ylim |    B_xlim    B_ylim |"
+        " pre-shift |   VM_dx   VM_dy"
+    )
+    table.append(
+        "---|--------|---------------------|---------------------|"
+        "-----------|----------------"
+    )
 
     for stage_idx, IW_mesh in enumerate(lIW_mesh):
         IW_idx = IW_mesh.lookup_IW_idx(IW_px_x, IW_px_y)
@@ -154,14 +168,19 @@ def plot_IW_analysis(
         peak_y  = backwards_calculate_C_peak(shift_y, dy, C_map.shape[0])
         # fmt: on
 
-        # For plot titles
-        str_line = (
-            f"{stage_idx:5d} | {IW_idx:6d} | "
-            f"{shift_x:+4.0f}, {shift_y:+4.0f} | {dx:+7.2f}, {dy:+7.2f}"
+        # String info
+        str_A_xlim = f"{A_IW_lims_x[0]:d}-{A_IW_lims_x[1]:d}"
+        str_A_ylim = f"{A_IW_lims_y[0]:d}-{A_IW_lims_y[1]:d}"
+        str_B_xlim = f"{B_IW_lims_x[0]:d}-{B_IW_lims_x[1]:d}"
+        str_B_ylim = f"{B_IW_lims_y[0]:d}-{B_IW_lims_y[1]:d}"
+        table.append(
+            f"{stage_idx:2d} | {IW_idx:6d} | "
+            f"{str_A_xlim:>9} "
+            f"{str_A_ylim:>9} | "
+            f"{str_B_xlim:>9} "
+            f"{str_B_ylim:>9} | "
+            f"{shift_x:+4.0f} {shift_y:+4.0f} | {dx:+7.2f} {dy:+7.2f}"
         )
-        str_line2 = f"{shift_x:+4.0f}, {shift_y:+4.0f} | {dx:+7.2f}, {dy:+7.2f}"
-        str_lines.append(str_line)
-        print(str_line)
 
         # IW outlines
         ax_A.add_patch(
@@ -170,6 +189,16 @@ def plot_IW_analysis(
                 np.diff(A_IW_lims_x)[0],
                 np.diff(A_IW_lims_y)[0],
                 edgecolor="r",
+                fill=None,
+                lw=1,
+            )
+        )
+        ax_B.add_patch(
+            Rectangle(
+                (A_IW_lims_x[0], A_IW_lims_y[0]),
+                np.diff(A_IW_lims_x)[0],
+                np.diff(A_IW_lims_y)[0],
+                edgecolor="k",
                 fill=None,
                 lw=1,
             )
@@ -186,19 +215,16 @@ def plot_IW_analysis(
         )
 
         # Displacement vectors
+        quiver_spec = {
+            "angles": "xy",
+            "scale_units": "xy",
+            # "scale": 1,
+            # "units": "xy",
+            # "width": 0.5,
+        }
         if not np.isnan(dx):
-            ax_A.quiver(
-                grid_x,
-                grid_y,
-                dx,
-                dy,
-                angles="xy",
-                scale_units="xy",
-                # scale=1,
-                color="r",
-                # units="xy",
-                # width=0.5,
-            )
+            ax_A.quiver(grid_x, grid_y, dx, dy, color="r", **quiver_spec)
+            ax_B.quiver(grid_x, grid_y, dx, dy, color="k", **quiver_spec)
 
         # Zoom to largest IW with a margin around it
         if stage_idx == 0:
@@ -228,22 +254,26 @@ def plot_IW_analysis(
             ax_IW_B = axs_2[stage_idx, 1]
             ax_C_map = axs_2[stage_idx, 2]
 
-        ax_IW_A.imshow(IW_A, interpolation="nearest")
-        ax_IW_B.imshow(IW_B, interpolation="nearest")
+        ax_IW_A.imshow(IW_A, **imshow_spec)
+        ax_IW_B.imshow(IW_B, **imshow_spec)
         ax_IW_A.grid(True)
         ax_IW_B.grid(True)
 
         C_map_h = C_map.shape[0] - 1
         C_map_w = C_map.shape[1] - 1
-        ax_C_map.imshow(C_map, interpolation="nearest")
+        ax_C_map.imshow(C_map, **imshow_spec)
         ax_C_map.plot((0, C_map_w), np.ones(2) * C_map_h / 2, "k")
         ax_C_map.plot(np.ones(2) * C_map_w / 2, (0, C_map_h), "k")
         ax_C_map.plot(peak_x, peak_y, "xr")
         ax_C_map.grid(True)
-        ax_C_map.set_title(str_line2, **title_specs)
 
-    ax_A.set_title(f"@px {IW_px_x}, {IW_px_y}", **title_specs)
-    ax_B.set_title("\n".join(str_lines), **title_specs)
+    fig_1.suptitle("\n".join(table), **title_spec)  # type: ignore
+    fig_2.suptitle("\n".join(table), **title_spec)  # type: ignore
+    # ax_A.set_title("A", **title_spec)
+    # ax_B.set_title("B", **title_spec)
 
+    print(header)
+    print("")
+    print("\n".join(table))
     print("")
     plt.show()
