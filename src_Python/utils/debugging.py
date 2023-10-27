@@ -3,7 +3,7 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "26-10-2023"
+__date__ = "27-10-2023"
 __version__ = "1.0"
 
 import numpy as np
@@ -132,6 +132,7 @@ def plot_IW_analysis(
 
     fig_2, axs_2 = plt.subplots(cfg.N_STAGES, 3, figsize=(9, 6))
     fig_2.subplots_adjust(left=0.125, bottom=0.08, right=0.9, top=0.85)
+    axs_2 = axs_2.flat
 
     # String info
     header = (
@@ -239,14 +240,9 @@ def plot_IW_analysis(
         IW_A = A[slice(*A_IW_lims_y), slice(*A_IW_lims_x)]
         IW_B = B[slice(*B_IW_lims_y), slice(*B_IW_lims_x)]
 
-        if cfg.N_STAGES == 1:
-            ax_IW_A = axs_2[0]
-            ax_IW_B = axs_2[1]
-            ax_C_map = axs_2[2]
-        else:
-            ax_IW_A = axs_2[stage_idx, 0]
-            ax_IW_B = axs_2[stage_idx, 1]
-            ax_C_map = axs_2[stage_idx, 2]
+        ax_IW_A = axs_2[stage_idx * 3 + 0]
+        ax_IW_B = axs_2[stage_idx * 3 + 1]
+        ax_C_map = axs_2[stage_idx * 3 + 2]
 
         ax_IW_A.imshow(IW_A, **imshow_spec)
         ax_IW_B.imshow(IW_B, **imshow_spec)
