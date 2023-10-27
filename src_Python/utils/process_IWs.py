@@ -36,7 +36,7 @@ Taken solution:
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "26-10-2023"
+__date__ = "27-10-2023"
 __version__ = "1.0"
 
 import numpy as np
@@ -571,7 +571,7 @@ def process_IWs(
     IW_shifts_y: npt.NDArray[np.int32],    # in-place operation, debug output
     C_maps     : npt.NDArray[np.float32],  # in-place output
     fft        : FFT_Convolver2D_Full,
-    IWs_slice  : slice = slice(None),
+    IWs_slice  : tuple[int, int],
 ):
     # fmt: on
     """In-place operation on:
@@ -587,16 +587,15 @@ def process_IWs(
     and `B` using window pre-shifts when available from the previous multigrid
     stage, and compute the 2D correlation maps.
 
-    The last argument `IWs_slice` can be set to only process a certain slice out
-    of all the IWs. This is useful to distribute the calculation of all IWs over
-    multiple concurrent tasks. Defaults to all IWs when omitted.
+    The last argument `IWs_slice` determines which slice out of all the IWs to
+    process. This is useful to distribute the calculation of all IWs over
+    multiple concurrent tasks. NOTE: Processes all IWs when set to (0, 0).
     """
 
-    idx_start = 0 if IWs_slice.start is None else IWs_slice.start
-    idx_stop = C_maps.shape[0] if IWs_slice.stop is None else IWs_slice.stop
-    idx_step = 1 if IWs_slice.step is None else IWs_slice.step
+    if IWs_slice == (0, 0):
+        IWs_slice = (int(0), C_maps.shape[0])
 
-    for IW_idx in range(idx_start, idx_stop, idx_step):
+    for IW_idx in range(IWs_slice[0], IWs_slice[1]):
         IW_A_, IW_B = obtain_IWs_from_image(
             IW_idx,
             stage_idx,
@@ -837,7 +836,7 @@ def obtain_IWs_from_image(
             nb.int32[::1],
             nb.float32[:, :, :],
             FFT_Convolver2D_Full.class_type.instance_type,  # type: ignore
-            nb.types.slice2_type,
+            nb.types.UniTuple(nb.int64, 2),
         ),
         cache=True,
         nogil=True,
@@ -857,7 +856,7 @@ def process_IWs(
     IW_shifts_y : npt.NDArray[np.int32],    # in-place operation, debug output
     C_maps      : npt.NDArray[np.float32],  # in-place output
     fft         : FFT_Convolver2D_Full,
-    IWs_slice   : slice = slice(None),
+    IWs_slice   : tuple[int, int],
 ):
     # fmt: on
     """In-place operation on:
@@ -873,16 +872,15 @@ def process_IWs(
     and `B` using window pre-shifts when available from the previous multigrid
     stage, and compute the 2D correlation maps.
 
-    The last argument `IWs_slice` can be set to only process a certain slice out
-    of all the IWs. This is useful to distribute the calculation of all IWs over
-    multiple concurrent tasks. Defaults to all IWs when omitted.
+    The last argument `IWs_slice` determines which slice out of all the IWs to
+    process. This is useful to distribute the calculation of all IWs over
+    multiple concurrent tasks. NOTE: Processes all IWs when set to (0, 0).
     """
 
-    idx_start = 0 if IWs_slice.start is None else IWs_slice.start
-    idx_stop = C_maps.shape[0] if IWs_slice.stop is None else IWs_slice.stop
-    idx_step = 1 if IWs_slice.step is None else IWs_slice.step
+    if IWs_slice == (0, 0):
+        IWs_slice = (int(0), C_maps.shape[0])
 
-    for IW_idx in range(idx_start, idx_stop, idx_step):
+    for IW_idx in range(IWs_slice[0], IWs_slice[1]):
         IW_A_, IW_B = obtain_IWs_from_image(
             IW_idx,
             stage_idx,

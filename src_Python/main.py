@@ -11,7 +11,7 @@ VM: Displacement vector map
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "25-10-2023"
+__date__ = "27-10-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
@@ -159,10 +159,23 @@ if __name__ == "__main__":
     lVM_dy: list[npt.NDArray[np.float32]] = []      # NDArray shape (N_IWs, )
     # fmt: on
 
-    # FFT-convolution calculation instances per stage of the multigrid
-    # NOTE: In addition, each stage will have multiple copies of similar FFT
-    # instances equal to the number of concurrent workers `cfg.N_WORKERS`.
+    # `FFT_Convolver` instances per stage of the multigrid and per concurrent
+    # worker.
+    #
+    # Mechanism: Calculating the FFT-convolution over all IWs contained in a
+    # specific multigrid stage will be evenly distributed over multiple
+    # concurrent threads, called 'workers', equal to the number `cfg.N_WORKERS`.
+    # Each worker will have a single `FFT_Convolver` instance that will operate
+    # on a specific slice of all available IWs.
+    # Hence, the inner list holds the `FFT_Convolver` instances per worker of
+    # a specific stage, and the outer list enumerates the specific stage.
     lfft: list[list[FFT_Convolver2D_Full]] = []
+
+    # Slices of IWs to be passed to the `FFT_Convolver` instances per stage of
+    # the multigrid and per concurrent worker.
+    # The inner list holds the slice (as `tuple[int, int]`) of IWs that each
+    # worker will operate on, and the outer list enumerates the specific stage.
+    lIWs_slices: list[list[tuple[int, int]]] = []
 
     # --------------------------------------------------------------------------
     #   Populate lists
@@ -176,14 +189,16 @@ if __name__ == "__main__":
             IW_size,
             cfg.IW_OVERLAP if stage_idx == cfg.N_STAGES - 1 else 0.0,
         )
+        N_IWs = IW_mesh.N_IWs
 
         lIW_mesh.append(IW_mesh)
-        lIW_shifts_x.append(np.zeros(IW_mesh.N_IWs, dtype=np.int32))
-        lIW_shifts_y.append(np.zeros(IW_mesh.N_IWs, dtype=np.int32))
+        lIW_shifts_x.append(np.zeros(N_IWs, dtype=np.int32))
+        lIW_shifts_y.append(np.zeros(N_IWs, dtype=np.int32))
 
-        # Create FFT-convolution calculation instances and store in list
         fft_workers = []
+        IWs_slices = []
         for worker_idx in range(cfg.N_WORKERS):
+            # Create `FFT_Convolver` instance per worker
             fft_workers.append(
                 FFT_Convolver2D_Full(
                     (IW_size, IW_size),
@@ -191,17 +206,26 @@ if __name__ == "__main__":
                     fft_threads=cfg.N_FFT_THREADS,
                 )
             )
+
+            # Slice of IWs to be processed by the worker
+            IWs_slices.append(
+                (
+                    int(np.floor(N_IWs / cfg.N_WORKERS * worker_idx)),
+                    int(np.floor(N_IWs / cfg.N_WORKERS * (worker_idx + 1))),
+                )
+            )
         lfft.append(fft_workers)
+        lIWs_slices.append(IWs_slices)
 
         C_map_shape = lfft[-1][-1].shape_out
-        C_maps = np.empty((IW_mesh.N_IWs, *C_map_shape), dtype=np.float32)
+        C_maps = np.empty((N_IWs, *C_map_shape), dtype=np.float32)
         C_maps[:] = np.nan
         lC_maps.append(C_maps)
 
         lVM_grid_x.append(np.copy(IW_mesh.A_grid_x))
         lVM_grid_y.append(np.copy(IW_mesh.A_grid_y))
-        lVM_dx.append(np.zeros(IW_mesh.N_IWs, dtype=np.float32))
-        lVM_dy.append(np.zeros(IW_mesh.N_IWs, dtype=np.float32))
+        lVM_dx.append(np.zeros(N_IWs, dtype=np.float32))
+        lVM_dy.append(np.zeros(N_IWs, dtype=np.float32))
 
     # Force-trigger an eager numba compilation to take the compilation time of
     # function `process_IWs()` out of the timeit results.
@@ -224,7 +248,7 @@ if __name__ == "__main__":
         lIW_shifts_y[0],
         lC_maps[0],
         lfft[0][0],
-        slice(0, 0),
+        (0, 0),
     )
 
     # Display info
@@ -280,10 +304,8 @@ if __name__ == "__main__":
 
         # Display info
         frame_title = frame_server.title
-        print(
-            f"{frame_title:<30s} read {perf_counter() - tick:.3f} | proc ",
-            end="",
-        )
+        duration = perf_counter() - tick
+        print(f"{frame_title:<30s} read {duration:.3f} | proc ", end="")
         sys.stdout.flush()
 
         # ----------------------------------------------------------------------
@@ -291,10 +313,7 @@ if __name__ == "__main__":
         # ----------------------------------------------------------------------
         tick = perf_counter()
 
-        for stage_idx, IW_size in enumerate(cfg.IW_SIZES):
-            # Short-hands
-            N_IWs = lIW_mesh[stage_idx].N_IWs
-
+        for stage_idx in range(cfg.N_STAGES):
             # Reset variables in-between image pairs
             lIW_mesh[stage_idx].reset_B()
 
@@ -321,16 +340,6 @@ if __name__ == "__main__":
             #   Walk over all interrogation windows
             # ------------------------------------------------------------------
 
-            # Evenly distribute the IWs over all concurrent workers
-            IWs_slices = []
-            for worker_idx in range(cfg.N_WORKERS):
-                IWs_slices.append(
-                    slice(
-                        int(np.floor(N_IWs / cfg.N_WORKERS * worker_idx)),
-                        int(np.floor(N_IWs / cfg.N_WORKERS * (worker_idx + 1))),
-                    )
-                )
-
             # Spawn workers, each performing 2D convolutions on a slice of IWs
             # fmt: off
             prev_stage_idx = np.maximum(stage_idx - 1, 0)
@@ -342,9 +351,9 @@ if __name__ == "__main__":
                         stage_idx,
                         A_,
                         B,
-                        lIW_mesh    [stage_idx - 1].IW_params,
-                        lVM_dx      [stage_idx - 1],
-                        lVM_dy      [stage_idx - 1],
+                        lIW_mesh    [prev_stage_idx].IW_params,
+                        lVM_dx      [prev_stage_idx],
+                        lVM_dy      [prev_stage_idx],
                         lIW_mesh    [stage_idx].A_grid_x,
                         lIW_mesh    [stage_idx].A_grid_y,
                         lIW_mesh    [stage_idx].A_lims_x,
@@ -357,7 +366,7 @@ if __name__ == "__main__":
                         lIW_shifts_y[stage_idx],
                         lC_maps     [stage_idx],
                         lfft        [stage_idx][worker_idx],
-                        IWs_slices  [worker_idx],
+                        lIWs_slices [stage_idx][worker_idx],
                     )
                 )
             # fmt: on
@@ -384,7 +393,8 @@ if __name__ == "__main__":
             # fmt: on
 
         # Display info
-        print(f"{perf_counter() - tick:.3f}")
+        duration = perf_counter() - tick
+        print(f"{duration:.3f}")
 
         # ----------------------------------------------------------------------
         #   Debugging output
