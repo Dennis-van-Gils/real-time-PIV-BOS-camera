@@ -4,6 +4,8 @@
 TODO
 ----
 
+- Add check on the `IWs_slices` calculation in `main.py` and fix super division by possibly too many workers, resulting in duplicate single item slices.
+
 - Print image width, height and bit depth to terminal
 
 - Expand config.ini with desired camera resolution and exposure time (Ximea)

@@ -208,12 +208,16 @@ if __name__ == "__main__":
             )
 
             # Slice of IWs to be processed by the worker
-            IWs_slices.append(
-                (
-                    int(np.floor(N_IWs / cfg.N_WORKERS * worker_idx)),
-                    int(np.floor(N_IWs / cfg.N_WORKERS * (worker_idx + 1))),
+            # TODO: Add check and fix super division by possibly too many
+            # workers, resulting in duplicate single item slices.
+            idx_0 = int(np.floor(N_IWs / cfg.N_WORKERS * worker_idx))
+            idx_1 = int(np.floor(N_IWs / cfg.N_WORKERS * (worker_idx + 1)))
+            IWs_slices.append((idx_0, idx_1))
+            if (idx_1 - idx_0) < 2:  # TODO: Fix ahead of time
+                raise Exception(
+                    "ERROR: Too many workers for the amount of IWs."
                 )
-            )
+
         lfft.append(fft_workers)
         lIWs_slices.append(IWs_slices)
 
@@ -430,118 +434,101 @@ if __name__ == "__main__":
         #   Show results
         # ----------------------------------------------------------------------
 
-        # TODO: In progress code. Contains hardcoded 'magic' constants.
-        if cfg.MODE in [cfg.MODES.BOS]:
-            (
-                IW_size,
-                IW_overlap,
-                N_IWs,
-                N_IWs_x,
-                N_IWs_y,
-            ) = lIW_mesh[-1].IW_params
+        if cfg.LOAD_MPL:
+            # Retrieve the end results
+            IW_mesh = lIW_mesh[-1]
             grid_x = lVM_grid_x[-1]
             grid_y = lVM_grid_y[-1]
             VM_dx = lVM_dx[-1]
             VM_dy = lVM_dy[-1]
 
-            # Creates an image filled with zero
-            # intensities with the same dimensions
-            # as the frame
-            mask = np.zeros((N_IWs_y, N_IWs_x, 3), dtype=np.uint8)
+            # Vector magnitudes and angles
+            magnis, angles = cv2.cartToPolar(VM_dx, VM_dy, angleInDegrees=True)
+            magnis = np.asarray(magnis, float)  # [px]
+            angles = np.asarray(angles, float)  # [deg]
 
-            # Computes the magnitude and angle of the 2D vectors
-            VM_dx_2 = np.reshape(VM_dx, (N_IWs_y, N_IWs_x))
-            VM_dy_2 = np.reshape(VM_dy, (N_IWs_y, N_IWs_x))
-            M, angle = cv2.cartToPolar(VM_dx_2, VM_dy_2, angleInDegrees=True)
+            if cfg.MODE in [cfg.MODES.BOS]:
+                # TODO: In progress code. Contains hardcoded 'magic' constants.
+                shape_2D = (IW_mesh.N_IWs_y, IW_mesh.N_IWs_x)
+                magnis = np.reshape(magnis, shape_2D)
+                angles = np.reshape(angles, shape_2D)
+                magnis = np.nan_to_num(magnis)
+                angles = np.nan_to_num(angles)
 
-            # Sets image hue according to the optical flow direction
-            angle = np.nan_to_num(angle)
-            mask[..., 0] = angle / 2
+                # Create an HSV canvas and color it in
+                canvas = np.zeros((*shape_2D, 3), dtype=np.uint8)
+                canvas[..., 0] = angles / 2
+                canvas[..., 1] = 255
+                canvas[..., 2] = np.clip(magnis * 300, 0, 255)
+                # canvas[..., 2] = cv2.normalize(M, None, 0, 255, cv2.NORM_MINMAX)
 
-            # Sets image saturation to maximum
-            mask[..., 1] = 255
-
-            # Sets image value according to the optical flow
-            # magnitude (normalized)
-            M = np.nan_to_num(M)
-            # mask[..., 2] = cv2.normalize(M, None, 0, 255, cv2.NORM_MINMAX)
-            mask[..., 2] = np.clip(M * 300, 0, 255)
-
-            # Converts HSV to RGB (BGR) color representation
-            rgb = cv2.cvtColor(mask, cv2.COLOR_HSV2BGR)
-
-            display_resolution = (B.shape[1] // 2, B.shape[0] // 2)
-            cv2.imshow(
-                "BOS",
-                cv2.resize(
-                    rgb,
-                    display_resolution,
-                    interpolation=cv2.INTER_NEAREST,
+                # HSV to RGB and rescale
+                output_resolution = (img_w // 2, img_h // 2)
+                canvas = cv2.cvtColor(canvas, cv2.COLOR_HSV2BGR)
+                canvas = cv2.resize(
+                    canvas,
+                    output_resolution,
+                    interpolation=cv2.INTER_CUBIC,
+                    # interpolation=cv2.INTER_LINEAR,
                     # interpolation=cv2.INTER_NEAREST,
-                ),
-            )
-            cv2.imshow(
-                "Image",
-                cv2.resize(
-                    B_orig,
-                    display_resolution,
-                    interpolation=cv2.INTER_NEAREST,
-                ),
-            )
-
-            cv2.setWindowTitle("BOS", f"BOS {frame_title}")
-
-            fn_export = f"export_{frame_idx:04d}.png"
-            # cv2.imwrite(fn_export, cv2.resize(rgb, display_resolution))
-
-            if cfg.DEBUG:
-                cv2.waitKey(0)
-
-        elif cfg.LOAD_MPL:
-            grid_x = lVM_grid_x[-1]
-            grid_y = lVM_grid_y[-1]
-            VM_dx = lVM_dx[-1]
-            VM_dy = lVM_dy[-1]
-
-            # Vector magnitude
-            M = np.sqrt(np.square(VM_dx) + np.square(VM_dy))
-
-            # Threshold on vector magnitude
-            # VM_dx[M < 0.5] = np.nan
-            # VM_dy[M < 0.5] = np.nan
-
-            colors = M / cfg.COLOR_DIV
-            colormap = mpl.cm.jet  # type: ignore
-
-            if not (plt.fignum_exists("VM")):  # type: ignore
-                fig = plt.figure("VM")  # type: ignore
-                h_imshow = plt.imshow(A, cmap="gray", interpolation="none")  # type: ignore
-                h_quiver = plt.quiver(  # type: ignore
-                    grid_x,
-                    grid_y,
-                    np.zeros(VM_dx.shape),
-                    np.zeros(VM_dy.shape),
-                    angles="xy",
-                    scale_units="xy",
-                    scale=1,  # Scales down by `scale`
-                    # color="r",
-                    color=colormap(colors),
-                    linewidths=1,
                 )
-                h_title = plt.title(f"{frame_title}")  # type: ignore
 
-            h_imshow.set_data(A)  # type: ignore
-            h_quiver.set_UVC(VM_dx * cfg.QUIVER_SIZE, VM_dy * cfg.QUIVER_SIZE)  # type: ignore
-            h_quiver.set_color(colormap(colors))  # type: ignore
-            h_title.set_text(f"{frame_title}")  # type: ignore
+                cv2.imshow("BOS", canvas)
+                cv2.imshow(
+                    "Image",
+                    cv2.resize(
+                        B_orig,
+                        output_resolution,
+                        interpolation=cv2.INTER_NEAREST,
+                    ),
+                )
+                cv2.setWindowTitle("BOS", f"BOS {frame_title}")
 
-            plt.draw()  # type: ignore
-            plt.pause(0.0001)  # type: ignore
+                EXPORT = False
+                if EXPORT:
+                    fn_export = f"export_{frame_idx:04d}.png"
+                    cv2.imwrite(fn_export, canvas)
 
-            if cfg.DEBUG:
-                plt.savefig("output_VM.png", dpi=300, bbox_inches="tight")  # type: ignore
-                # plt.waitforbuttonpress()  # type: ignore
-                plt.show()  # type: ignore
+                if cfg.DEBUG:
+                    cv2.waitKey(0)
+
+            elif cfg.LOAD_MPL:
+                # Threshold on vector magnitude
+                # VM_dx[magnis < 0.5] = np.nan
+                # VM_dy[magnis < 0.5] = np.nan
+
+                colors = magnis / cfg.COLOR_DIV
+                colormap = mpl.cm.jet  # type: ignore
+
+                if not (plt.fignum_exists("VM")):  # type: ignore
+                    fig = plt.figure("VM")  # type: ignore
+                    h_imshow = plt.imshow(A, cmap="gray", interpolation="none")  # type: ignore
+                    h_quiver = plt.quiver(  # type: ignore
+                        grid_x,
+                        grid_y,
+                        np.zeros(VM_dx.shape),
+                        np.zeros(VM_dy.shape),
+                        angles="xy",
+                        scale_units="xy",
+                        scale=1,  # Scales down by `scale`
+                        # color="r",
+                        color=colormap(colors),
+                        linewidths=1,
+                    )
+                    h_title = plt.title(f"{frame_title}")  # type: ignore
+
+                h_imshow.set_data(A)  # type: ignore
+                h_quiver.set_UVC(VM_dx * cfg.QUIVER_SIZE, VM_dy * cfg.QUIVER_SIZE)  # type: ignore
+                h_quiver.set_color(colormap(colors))  # type: ignore
+                h_title.set_text(f"{frame_title}")  # type: ignore
+
+                plt.draw()  # type: ignore
+                plt.pause(0.0001)  # type: ignore
+
+                if cfg.DEBUG:
+                    plt.savefig("output_VM.png", dpi=300, bbox_inches="tight")  # type: ignore
+                    # plt.waitforbuttonpress()  # type: ignore
+                    plt.show()  # type: ignore
 
         # ----------------------------------------------------------------------
         #   Are we finished?
