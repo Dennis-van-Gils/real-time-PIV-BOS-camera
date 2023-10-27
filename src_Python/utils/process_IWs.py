@@ -589,10 +589,10 @@ def process_IWs(
 
     The last argument `IWs_slice` determines which slice out of all the IWs to
     process. This is useful to distribute the calculation of all IWs over
-    multiple concurrent tasks. NOTE: Processes all IWs when set to (0, 0).
+    multiple concurrent tasks. NOTE: Processes all IWs when set to (-1, -1).
     """
 
-    if IWs_slice == (0, 0):
+    if IWs_slice == (-1, -1):
         IWs_slice = (int(0), C_maps.shape[0])
 
     for IW_idx in range(IWs_slice[0], IWs_slice[1]):
