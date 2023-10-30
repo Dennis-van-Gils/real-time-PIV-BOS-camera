@@ -11,7 +11,7 @@ VM: Displacement vector map
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "27-10-2023"
+__date__ = "30-10-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
@@ -86,11 +86,13 @@ if __name__ == "__main__":
     print("\nConfiguration")
     print(f"  MODE         : {cfg.MODE.name}")
     print(f"  FFT LIB      : {cfg.FFT_LIB.name}")
-    print(f"  N_WORKERS    : {cfg.N_WORKERS}")
+    print(f"  MAX_WORKERS  : {cfg.MAX_WORKERS}")
     print(f"  N_FFT_THREADS: {cfg.N_FFT_THREADS}")
     print(f"  IW_SIZES     : {cfg.IW_SIZES}")
     print(f"  IW_OVERLAP   : {cfg.IW_OVERLAP}\n")
-    print("Setting up... ", end="")
+    print("Setting up...\n")
+    print("  IW_size |  N_IWs | N_workers")
+    print("  --------|--------|----------")
     sys.stdout.flush()
     tick = perf_counter()
 
@@ -162,11 +164,12 @@ if __name__ == "__main__":
     # `FFT_Convolver` instances per stage of the multigrid and per concurrent
     # worker.
     #
-    # Mechanism: Calculating the FFT-convolution over all IWs contained in a
+    # Mechanism: The calculation of the FFT-convolution over all IWs in a
     # specific multigrid stage will be evenly distributed over multiple
-    # concurrent threads, called 'workers', equal to the number `cfg.N_WORKERS`.
-    # Each worker will have a single `FFT_Convolver` instance that will operate
-    # on a specific slice of all available IWs.
+    # concurrent threads, called workers. Each worker will have a single
+    # `FFT_Convolver` instance that will operate on a specific slice of the
+    # available IWs. The number of workers will be calculated later, with at
+    # least one IW per worker, up to a maximum of `cfg.MAX_WORKERS`.
     # Hence, the inner list holds the `FFT_Convolver` instances per worker of
     # a specific stage, and the outer list enumerates the specific stage.
     lfft: list[list[FFT_Convolver2D_Full]] = []
@@ -195,9 +198,19 @@ if __name__ == "__main__":
         lIW_shifts_x.append(np.zeros(N_IWs, dtype=np.int32))
         lIW_shifts_y.append(np.zeros(N_IWs, dtype=np.int32))
 
+        # Determine the number of workers to divide the IWs over, per stage.
+        # Ensure at least one IW per worker. The maximum number of workers is
+        # set by `cfg.MAX_WORKERS`.
+        N_workers = np.minimum(N_IWs, cfg.MAX_WORKERS)
+        print(f"  {IW_size:7d} |{N_IWs:7d} |{N_workers:10d}")
+
         fft_workers = []
         IWs_slices = []
-        for worker_idx in range(cfg.N_WORKERS):
+        for worker_idx in range(N_workers):
+            idx_0 = int(np.floor(N_IWs / N_workers * worker_idx))
+            idx_1 = int(np.floor(N_IWs / N_workers * (worker_idx + 1)))
+            IWs_slices.append((idx_0, idx_1))
+
             # Create `FFT_Convolver` instance per worker
             fft_workers.append(
                 FFT_Convolver2D_Full(
@@ -206,18 +219,6 @@ if __name__ == "__main__":
                     fft_threads=cfg.N_FFT_THREADS,
                 )
             )
-
-            # Slice of IWs to be processed by the worker
-            # TODO: Add check and fix super division by possibly too many
-            # workers, resulting in duplicate single item slices.
-            idx_0 = int(np.floor(N_IWs / cfg.N_WORKERS * worker_idx))
-            idx_1 = int(np.floor(N_IWs / cfg.N_WORKERS * (worker_idx + 1)))
-            IWs_slices.append((idx_0, idx_1))
-            if (idx_1 - idx_0) < 2:  # TODO: Fix ahead of time
-                raise Exception(
-                    "ERROR: Too many workers for the amount of IWs."
-                )
-
         lfft.append(fft_workers)
         lIWs_slices.append(IWs_slices)
 
@@ -256,13 +257,15 @@ if __name__ == "__main__":
     )
 
     # Display info
-    print(f"done in {perf_counter() - tick:.3f} sec\n")
+    print(f"\ndone in {perf_counter() - tick:.3f} sec\n")
 
     # --------------------------------------------------------------------------
     #   Walk over all image frames from disk / acquire frames from the camera
     # --------------------------------------------------------------------------
 
-    executor = concurrent.futures.ThreadPoolExecutor(max_workers=cfg.N_WORKERS)
+    executor = concurrent.futures.ThreadPoolExecutor(
+        max_workers=cfg.MAX_WORKERS
+    )
 
     # Debugging overrule: Only process the first two images and be done
     if cfg.DEBUG:
@@ -348,7 +351,7 @@ if __name__ == "__main__":
             # fmt: off
             prev_stage_idx = np.maximum(stage_idx - 1, 0)
             futures = []
-            for worker_idx in range(cfg.N_WORKERS):
+            for worker_idx in range(len(lIWs_slices[stage_idx])):
                 futures.append(
                     executor.submit(
                         process_IWs,

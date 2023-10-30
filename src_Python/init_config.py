@@ -12,7 +12,7 @@ Namespace `cfg` now contains all user settings
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "24-10-2023"
+__date__ = "30-10-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
@@ -96,7 +96,7 @@ COLOR_DIV = 1
 
 # [Advanced]
 FFT_LIB = FFT_LIBS.ROCKETFFT
-N_WORKERS = 32
+MAX_WORKERS = 32
 N_FFT_THREADS = 1
 
 
@@ -176,11 +176,11 @@ def read_file(filename=None):
 
     # [Advanced]
     global FFT_LIB
-    global N_WORKERS
+    global MAX_WORKERS
     global N_FFT_THREADS
 
     FFT_LIB = getattr(FFT_LIBS, parser["Advanced"]["FFT_lib"].upper())
-    N_WORKERS = np.maximum(parser.getint("Advanced", "N_workers"), 1)
+    MAX_WORKERS = np.maximum(parser.getint("Advanced", "max_workers"), 1)
     N_FFT_THREADS = np.maximum(parser.getint("Advanced", "N_FFT_threads"), 1)
 
 
