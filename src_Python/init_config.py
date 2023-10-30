@@ -146,7 +146,7 @@ def read_file(filename=None):
     )
     IMAGE_PATH = parser["Source"]["image_path"]
     if IMAGE_SOURCE == IMAGE_SOURCES.DISK:
-        IMAGE_FILES = glob.glob(IMAGE_PATH)
+        IMAGE_FILES = sorted(glob.glob(IMAGE_PATH))
         N_IMAGES = len(IMAGE_FILES)
         if N_IMAGES < 2:
             raise Exception(
