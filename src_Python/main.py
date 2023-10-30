@@ -114,6 +114,7 @@ if __name__ == "__main__":
         #   (frame_0, frame_1), (frame_1, frame_2), (frame_2, frame_3), ...
         #
         # Directly copy frame `A` into `B` to init the upcoming loop
+        frame_server.counter = 1
         B = np.copy(A)
 
     elif cfg.MODE == cfg.MODES.PIV2:
@@ -130,6 +131,7 @@ if __name__ == "__main__":
         # on to cross-correlate all subsequent frames `B` against.
         # Flip the image of frame `A` left-to-right and up-to-down ahead of time
         # as needed for the upcoming 2D cross-correlation done via convolution.
+        frame_server.counter = 1
         A_ = np.asarray(fliplrud(A), order="C")
 
     # --------------------------------------------------------------------------
@@ -263,17 +265,16 @@ if __name__ == "__main__":
     #   Walk over all image frames from disk / acquire frames from the camera
     # --------------------------------------------------------------------------
 
-    executor = concurrent.futures.ThreadPoolExecutor(
-        max_workers=cfg.MAX_WORKERS
-    )
+    executor = concurrent.futures.ThreadPoolExecutor(cfg.MAX_WORKERS)
 
     # Debugging overrule: Only process the first two images and be done
     if cfg.DEBUG:
         cfg.N_IMAGES = 2
 
-    frame_idx = 0
     done = False
-    while not done:
+    while (not done) and (
+        frame_server.has_available(2 if cfg.MODE in [cfg.MODES.PIV2] else 1)
+    ):
         # ----------------------------------------------------------------------
         #   Read and prepare new image frames
         # ----------------------------------------------------------------------
@@ -283,19 +284,19 @@ if __name__ == "__main__":
             # Particle image velocimetry using equidistantly timed frames
             #   (frame_0, frame_1), (frame_1, frame_2), (frame_2, frame_3), ...
             A = np.copy(B)
-            B = frame_server.serve(frame_idx + 1)
+            B = frame_server.serve()
 
         elif cfg.MODE == cfg.MODES.PIV2:
             # Particle image velocimetry using image pairs
             #   (frame_0, frame_1), (frame_2, frame_3), (frame_4, frame_5), ...
-            A = frame_server.serve(frame_idx)
-            B = frame_server.serve(frame_idx + 1)
+            A = frame_server.serve()
+            B = frame_server.serve()
             remove_mean_background(A)
 
         elif cfg.MODE == cfg.MODES.BOS:
             # Background-oriented Schlieren
             #   (frame_0, frame_1), (frame_0, frame_2), (frame_0, frame_3), ...
-            B = frame_server.serve(frame_idx + 1)
+            B = frame_server.serve()
 
         np.copyto(B_orig, B)  # Keep a copy of original `B` for plotting later
         remove_mean_background(B)
@@ -489,7 +490,11 @@ if __name__ == "__main__":
 
                 EXPORT = False
                 if EXPORT:
-                    fn_export = f"export_{frame_idx:04d}.png"
+                    if cfg.MODE in [cfg.MODES.PIV2]:
+                        export_idx = frame_server.counter // 2 - 1
+                    else:
+                        export_idx = frame_server.counter - 1
+                    fn_export = f"export_{export_idx:04d}.png"
                     cv2.imwrite(fn_export, canvas)
 
                 if cfg.DEBUG:
@@ -534,17 +539,9 @@ if __name__ == "__main__":
                     plt.show()  # type: ignore
 
         # ----------------------------------------------------------------------
-        #   Are we finished?
+        #   Check for key presses
         # ----------------------------------------------------------------------
 
-        frame_step = 2 if cfg.MODE == cfg.MODES.PIV2 else 1
-        frame_idx += frame_step
-
-        if cfg.IMAGE_SOURCE == cfg.IMAGE_SOURCES.DISK:
-            if frame_idx >= cfg.N_IMAGES - 1:
-                done = True
-
-        # Check for key presses
         if cv2.waitKey(1) & 0xFF == ord("q"):
             break
 

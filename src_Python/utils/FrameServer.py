@@ -7,7 +7,7 @@ webcamera or other video camera device.
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "24-10-2023"
+__date__ = "30-10-2023"
 __version__ = "1.0"
 
 import os
@@ -80,7 +80,7 @@ class FrameServer:
         self.img_xi: xiapi.Image
 
         # Timing
-        self.count: int = 0
+        self.counter: int = 0
         self.t0: float = 0.0
         self.dT: float = 0.0
         self._prev_tick: float = 0.0
@@ -124,25 +124,26 @@ class FrameServer:
 
     def begin(self) -> npt.NDArray[np.float32]:
         """Finish setting up the frame server by reading the first image to get
-        the image width, height and bit depth. Returns the grayscale image.
+        the image width, height and bit depth. Returns the image in grayscale
+        and resets the served images counter `counter` to 0. The counter starts
+        increasing when calling `serve()`
 
         Returns (``np.ndarray(np.float32)``):
             2D numpy array containing the image bitmap in ``numpy.float32``
             grayscale values, normalized by the maximum possible grayscale
             intensity value. Hence, the output range is [0 - 1].
         """
-        return self.serve(0)
+        img = self.serve()
+        self.counter = 0  # Don't count `begin()` as a served frame
 
-    def serve(self, frame_idx: int = 1) -> npt.NDArray[np.float32]:
-        """Acquire and return a new grayscale image.
+        return img
 
-        Args:
-            frame_idx (``int``, optional):
-                When the images are read from files on disk, ``frame_idx``
-                indicates which file of the image list to read. Otherwise,
-                ``frame_idx`` gets ignored.
-
-                Default: 1
+    def serve(self) -> npt.NDArray[np.float32]:
+        """Acquire and return a new grayscale image. Specifically, when
+        `cfg.image_source = disk`, the files are returned one by one from the
+        list as contained in `cfg.IMAGE_FILES` which is sorted alphabetically.
+        Each call to `serve()` increases the served images counter `counter` by
+        1.
 
         Returns (``np.ndarray(np.float32)``):
             2D numpy array containing the image bitmap in ``numpy.float32``
@@ -151,53 +152,56 @@ class FrameServer:
         """
 
         if self.source == cfg.IMAGE_SOURCES.DISK:
-            fn_img = cfg.IMAGE_FILES[frame_idx]
+            fn_img = cfg.IMAGE_FILES[self.counter]
             img = cv2.imread(fn_img, cv2.IMREAD_GRAYSCALE)
-            tick = time.perf_counter()
             self.title = get_filename_from_full_path(fn_img)
 
         elif self.source == cfg.IMAGE_SOURCES.WEBCAM:
             success, img = self.cam_cv2.read()
-            tick = time.perf_counter()
             img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-            self.title = ""
 
         elif self.source == cfg.IMAGE_SOURCES.XIMEA:
             self.cam_xi.get_image(self.img_xi)
-            tick = time.perf_counter()
             img = self.img_xi.get_image_data_numpy()
-            self.title = ""
 
         else:
-            img = np.zeros([1, 1], dtype=np.float32)
-            tick = time.perf_counter()
-            self.title = "Empty frame. Should never see me."
+            raise ValueError("cfg.image_source falled through without a match.")
 
-        # Live video sources: Keep track of time
-        if self.source in [cfg.IMAGE_SOURCES.WEBCAM, cfg.IMAGE_SOURCES.XIMEA]:
-            if frame_idx == 0:
-                self.count = 0
-                self.t0 = tick
-                self._prev_tick = tick
-                frame_time = 0
-            else:
-                self.count += 1
-                self.dT = tick - self._prev_tick
-                self._prev_tick = tick
-                frame_time = tick - self.t0
+        # Count time /after/ we have obtained the new image, not before
+        tick = time.perf_counter()
 
-            self.title = f"frame {self.count:06d} t {frame_time:.3f}"
+        if self.counter == 0:
+            self.t0 = tick
+            self._prev_tick = tick
 
-        if frame_idx == 0:
             self.img_h, self.img_w = img.shape
             self.img_N_pixels = self.img_w * self.img_h
             self.img_bit_depth = img[0, 0].nbytes * 8
             self._img_max_bitval = 2**self.img_bit_depth - 1
 
+        # Live video sources
+        if self.source in [cfg.IMAGE_SOURCES.WEBCAM, cfg.IMAGE_SOURCES.XIMEA]:
+            self.title = f"frame {self.counter:06d} t {tick - self.t0:.3f}"
+
+        self.dT = tick - self._prev_tick
+        self._prev_tick = tick
+        self.counter += 1
+
         img = np.asarray(img, dtype=np.float32, order="C")
         img = img / self._img_max_bitval
-
         return img
+
+    def report(self):
+        print()  # TODO
+
+    def has_available(self, number: int) -> bool:
+        """When `cfg.image_source = disk`, return the boolean check if there are
+        still `number` of frames available to be read from files on disk.
+        Otherwise, in case of live video capture, simply return True."""
+        if self.source == cfg.IMAGE_SOURCES.DISK:
+            return (cfg.N_IMAGES - self.counter) >= number
+        else:
+            return True
 
     def close(self):
         """Close video capture device if it was opened."""

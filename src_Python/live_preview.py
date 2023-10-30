@@ -3,7 +3,7 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "17-10-2023"
+__date__ = "30-10-2023"
 __version__ = "1.0"
 
 import os
@@ -154,12 +154,13 @@ prev_tick_histogram = tick
 try:
     while True:
         # Acquire frame
-        img_gray, frame_title = frame_server.serve()
+        img_gray = frame_server.serve()
+        frame_title = frame_server.title
 
         # Timer
         tick = time.perf_counter()
         if do_report_frame_dT:
-            print(f"{frame_server.frame_dT*1000:.0f}")
+            print(f"{frame_server.dT*1000:.0f}")
 
         # Convert float32 [0 - 1] pixel intensity range to uint8 [0 - 255]
         img_gray = np.asarray(img_gray * 255, dtype=np.uint8)
