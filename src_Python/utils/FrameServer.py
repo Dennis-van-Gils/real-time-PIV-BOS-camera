@@ -7,7 +7,7 @@ webcamera or other video camera device.
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "30-10-2023"
+__date__ = "31-10-2023"
 __version__ = "1.0"
 
 import os
@@ -74,7 +74,7 @@ class FrameServer:
     """
 
     def __init__(self):
-        self.source = cfg.IMAGE_SOURCE
+        self.source: cfg.IMAGE_SOURCES = cfg.IMAGE_SOURCE
         self.cam_cv2: cv2.VideoCapture
         self.cam_xi: xiapi.Camera
         self.img_xi: xiapi.Image
@@ -88,11 +88,11 @@ class FrameServer:
         self.title = "Uninitialized"
 
         # To be derived in `begin()`
-        self.img_w = 0
-        self.img_h = 0
-        self.img_N_pixels = 0
-        self.img_bit_depth = 0
-        self._img_max_bitval = 1
+        self.img_w: int = 0
+        self.img_h: int = 0
+        self.img_N_pixels: int = 0
+        self.img_bit_depth: int = 0
+        self._img_max_bitval: int = 1
 
         # TODO: Turn into config parameters
         Ximea_exposure = 20000  # [us]
@@ -122,6 +122,10 @@ class FrameServer:
             self.cam_xi.start_acquisition()
             self.img_xi = xiapi.Image()
 
+    # --------------------------------------------------------------------------
+    #   begin
+    # --------------------------------------------------------------------------
+
     def begin(self) -> npt.NDArray[np.float32]:
         """Finish setting up the frame server by reading the first image to get
         the image width, height and bit depth. Returns the image in grayscale
@@ -137,6 +141,10 @@ class FrameServer:
         self.counter = 0  # Don't count `begin()` as a served frame
 
         return img
+
+    # --------------------------------------------------------------------------
+    #   serve
+    # --------------------------------------------------------------------------
 
     def serve(self) -> npt.NDArray[np.float32]:
         """Acquire and return a new grayscale image. Specifically, when
@@ -191,8 +199,25 @@ class FrameServer:
         img = img / self._img_max_bitval
         return img
 
+    # --------------------------------------------------------------------------
+    #   report
+    # --------------------------------------------------------------------------
+
     def report(self):
-        print()  # TODO
+        print("Frame server")
+        print(f"  source    : {self.source.name}")
+        if self.source == cfg.IMAGE_SOURCES.DISK:
+            print(f"  image_path: {cfg.IMAGE_PATH}")
+            print(f"  N_images  : {cfg.N_IMAGES}")
+        print(
+            f"  resolution: {self.img_w} x {self.img_h} = "
+            f"{self.img_N_pixels/1e6:.1f} Mpx"
+        )
+        print(f"  bit_depth : {self.img_bit_depth}")
+
+    # --------------------------------------------------------------------------
+    #   has_available
+    # --------------------------------------------------------------------------
 
     def has_available(self, number: int) -> bool:
         """When `cfg.image_source = disk`, return the boolean check if there are
@@ -202,6 +227,10 @@ class FrameServer:
             return (cfg.N_IMAGES - self.counter) >= number
         else:
             return True
+
+    # --------------------------------------------------------------------------
+    #   close
+    # --------------------------------------------------------------------------
 
     def close(self):
         """Close video capture device if it was opened."""

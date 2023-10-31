@@ -11,7 +11,7 @@ VM: Displacement vector map
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "30-10-2023"
+__date__ = "31-10-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
@@ -80,34 +80,30 @@ if __name__ == "__main__":
         print("Warning: Could not set process to high priority.")
 
     # Display info
-    print(f"Running on computer `{platform.node()}`")
+    print(f"\nRunning on computer `{platform.node()}`")
     print(f"  CPU: {platform.processor()}")
     print(f"  OS : {platform.system()}")
     print("\nConfiguration")
-    print(f"  MODE         : {cfg.MODE.name}")
-    print(f"  FFT LIB      : {cfg.FFT_LIB.name}")
-    print(f"  MAX_WORKERS  : {cfg.MAX_WORKERS}")
-    print(f"  N_FFT_THREADS: {cfg.N_FFT_THREADS}")
-    print(f"  IW_SIZES     : {cfg.IW_SIZES}")
-    print(f"  IW_OVERLAP   : {cfg.IW_OVERLAP}\n")
-    print("Setting up...\n")
-    print("  IW_size |  N_IWs | N_workers")
-    print("  --------|--------|----------")
-    sys.stdout.flush()
+    print(f"  mode         : {cfg.MODE.name}")
+    print(f"  FFT_lib      : {cfg.FFT_LIB.name}")
+    print(f"  max_workers  : {cfg.MAX_WORKERS}")
+    print(f"  N_FFT_threads: {cfg.N_FFT_THREADS}")
+    print(f"  IW_sizes     : {cfg.IW_SIZES}")
+    print(f"  IW_overlap   : {cfg.IW_OVERLAP}\n")
     tick = perf_counter()
 
     # Set up the frame server and read the first image frame
     frame_server = FrameServer()
     A = frame_server.begin()
-    remove_mean_background(A)
+    frame_server.report()
 
-    img_h = frame_server.img_h
-    img_w = frame_server.img_w
-
-    # Prevent 'possibly unbound variable' warnings
+    # Pre-allocate to prevent 'possibly unbound variable' warnings
     A_ = np.zeros_like(A)
     B = np.zeros_like(A)
     B_orig = np.zeros_like(A)
+
+    # Init image processing
+    remove_mean_background(A)
 
     if cfg.MODE == cfg.MODES.PIV:
         # Particle image velocimetry using equidistantly timed frames
@@ -120,7 +116,7 @@ if __name__ == "__main__":
     elif cfg.MODE == cfg.MODES.PIV2:
         # Particle image velocimetry using image pairs
         #   (frame_0, frame_1), (frame_2, frame_3), (frame_4, frame_5), ...
-        pass  # No extra steps needed
+        pass
 
     elif cfg.MODE == cfg.MODES.BOS:
         # Background-oriented Schlieren
@@ -186,11 +182,15 @@ if __name__ == "__main__":
     #   Populate lists
     # --------------------------------------------------------------------------
 
+    print("\nSetting up...\n")
+    print("  IW_size |  N_IWs | N_workers")
+    print("  --------|--------|----------")
+
     for stage_idx, IW_size in enumerate(cfg.IW_SIZES):
         # Only the last stage will have window overlapping applied to it
         IW_mesh = IW_Mesh(
-            img_w,
-            img_h,
+            frame_server.img_w,
+            frame_server.img_h,
             IW_size,
             cfg.IW_OVERLAP if stage_idx == cfg.N_STAGES - 1 else 0.0,
         )
@@ -205,6 +205,7 @@ if __name__ == "__main__":
         # set by `cfg.MAX_WORKERS`.
         N_workers = np.minimum(N_IWs, cfg.MAX_WORKERS)
         print(f"  {IW_size:7d} |{N_IWs:7d} |{N_workers:10d}")
+        sys.stdout.flush()
 
         fft_workers = []
         IWs_slices = []
@@ -467,7 +468,10 @@ if __name__ == "__main__":
                 # canvas[..., 2] = cv2.normalize(M, None, 0, 255, cv2.NORM_MINMAX)
 
                 # HSV to RGB and rescale
-                output_resolution = (img_w // 2, img_h // 2)
+                output_resolution = (
+                    frame_server.img_w // 2,
+                    frame_server.img_h // 2,
+                )
                 canvas = cv2.cvtColor(canvas, cv2.COLOR_HSV2BGR)
                 canvas = cv2.resize(
                     canvas,

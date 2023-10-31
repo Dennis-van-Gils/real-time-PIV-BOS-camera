@@ -4,8 +4,6 @@
 TODO
 ----
 
-- Print image width, height and bit depth to terminal
-
 - Expand config.ini with desired camera resolution and exposure time (Ximea)
 
 - Examine the GIL lock and release
