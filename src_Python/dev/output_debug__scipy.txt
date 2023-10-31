@@ -1,19 +1,34 @@
 Reading configuration file: configs\config_PIV_demo_1.ini
+
 Running on computer `Onera`
   CPU: AMD64 Family 23 Model 113 Stepping 0, AuthenticAMD
   OS : Windows
 
 Configuration
-  MODE         : PIV2
-  FFT LIB      : SCIPY
-  N_WORKERS    : 32
-  N_FFT_THREADS: 1
-  IW_SIZES     : [64, 32]
-  IW_OVERLAP   : 0.5
+  mode         : PIV2
+  FFT_lib      : SCIPY
+  max_workers  : 64
+  N_FFT_threads: 1
+  IW_sizes     : [64, 32]
+  IW_overlap   : 0.5
 
-Setting up... done in 3.405 sec
+Frame server
+  source    : DISK
+  image_path: ../demo_images/PIV_rising_vortex_plume/*.png
+  N_images  : 20
+  resolution: 1376 x 1024 = 1.4 Mpx
+  bit_depth : 8
 
-01_B.png                       read 0.024 | proc 0.116
+Setting up...
+
+  IW_size |  N_IWs | N_workers
+  --------|--------|----------
+       64 |    336 |        64
+       32 |   5355 |        64
+
+done in 3.419 sec
+
+01_B.png                       read 0.024 | proc 0.110
 IW: 0 of 335 @px 32, 32
    A_xlim [   0,   64]
    A_ylim [   0,   64]
