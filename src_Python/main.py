@@ -263,7 +263,7 @@ if __name__ == "__main__":
     print(f"\ndone in {perf_counter() - tick:.3f} sec\n")
 
     # --------------------------------------------------------------------------
-    #   Walk over all image frames from disk / acquire frames from the camera
+    #   Walk over all image frames from disk / Acquire frames from the camera
     # --------------------------------------------------------------------------
 
     executor = concurrent.futures.ThreadPoolExecutor(cfg.MAX_WORKERS)
@@ -272,10 +272,7 @@ if __name__ == "__main__":
     if cfg.DEBUG:
         cfg.N_IMAGES = 2
 
-    done = False
-    while (not done) and (
-        frame_server.has_available(2 if cfg.MODE == cfg.MODES.PIV2 else 1)
-    ):
+    while frame_server.has_available(2 if cfg.MODE == cfg.MODES.PIV2 else 1):
         # ----------------------------------------------------------------------
         #   Read and prepare new image frames
         # ----------------------------------------------------------------------
@@ -329,6 +326,7 @@ if __name__ == "__main__":
             """
             # `IW_mesh.A_grid_x/y` remain constant and do not need a reset.
             # `IW_mesh.A_lims_x/y` remain constant and do not need a reset.
+            lIW_mesh[stage_idx].reset_A()
 
             # Reset not strictly necessary as all cells will get updated
             # one-by-one. Reset only to make debugging easier.
@@ -553,7 +551,7 @@ if __name__ == "__main__":
         if msvcrt.kbhit():
             k = msvcrt.getch()
             if k == b"q":
-                done = True
+                break
 
     cv2.destroyAllWindows()
     frame_server.close()
