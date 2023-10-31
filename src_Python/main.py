@@ -105,17 +105,17 @@ if __name__ == "__main__":
     img_w = frame_server.img_w
 
     # Prevent 'possibly unbound variable' warnings
-    B_orig = np.zeros_like(A)
-    B = np.zeros_like(A)
     A_ = np.zeros_like(A)
+    B = np.zeros_like(A)
+    B_orig = np.zeros_like(A)
 
     if cfg.MODE == cfg.MODES.PIV:
         # Particle image velocimetry using equidistantly timed frames
         #   (frame_0, frame_1), (frame_1, frame_2), (frame_2, frame_3), ...
-        #
+
         # Directly copy frame `A` into `B` to init the upcoming loop
         frame_server.counter = 1
-        B = np.copy(A)
+        np.copyto(B, A)
 
     elif cfg.MODE == cfg.MODES.PIV2:
         # Particle image velocimetry using image pairs
@@ -125,9 +125,9 @@ if __name__ == "__main__":
     elif cfg.MODE == cfg.MODES.BOS:
         # Background-oriented Schlieren
         #   (frame_0, frame_1), (frame_0, frame_2), (frame_0, frame_3), ...
-        #
-        # The first frame (frame_0 == `A`) should contain the quiescent
-        # background consisting of a fine grained noise pattern, used from now
+
+        # The first frame (frame_0 === `A`) should contain the quiescent
+        # background consisting of a fine-grained noise pattern, used from now
         # on to cross-correlate all subsequent frames `B` against.
         # Flip the image of frame `A` left-to-right and up-to-down ahead of time
         # as needed for the upcoming 2D cross-correlation done via convolution.
@@ -273,7 +273,7 @@ if __name__ == "__main__":
 
     done = False
     while (not done) and (
-        frame_server.has_available(2 if cfg.MODE in [cfg.MODES.PIV2] else 1)
+        frame_server.has_available(2 if cfg.MODE == cfg.MODES.PIV2 else 1)
     ):
         # ----------------------------------------------------------------------
         #   Read and prepare new image frames
@@ -283,7 +283,7 @@ if __name__ == "__main__":
         if cfg.MODE == cfg.MODES.PIV:
             # Particle image velocimetry using equidistantly timed frames
             #   (frame_0, frame_1), (frame_1, frame_2), (frame_2, frame_3), ...
-            A = np.copy(B)
+            np.copyto(A, B)
             B = frame_server.serve()
 
         elif cfg.MODE == cfg.MODES.PIV2:
