@@ -11,7 +11,7 @@ VM: Displacement vector map
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "31-10-2023"
+__date__ = "03-11-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
@@ -145,19 +145,8 @@ if __name__ == "__main__":
     # NOTE: List index `stage_idx = 0` will be initialized with zeros and remain
     # so throughout, because no window pre-shifts ever exist for the first
     # multigrid stage by design. That's okay.
-    # fmt: off
     lIW_shifts_x: list[npt.NDArray[np.int32]] = []  # NDArray shape (N_IWs, )
     lIW_shifts_y: list[npt.NDArray[np.int32]] = []  # NDArray shape (N_IWs, )
-
-    # Computed correlation maps per stage of the multigrid
-    lC_maps: list[npt.NDArray[np.float32]] = []     # NDArray shape (N_IWs, :, :)
-
-    # Computed displacement vector maps per stage of the multigrid
-    lVM_grid_x: list[npt.NDArray[np.int32]] = []    # NDArray shape (N_IWs, )
-    lVM_grid_y: list[npt.NDArray[np.int32]] = []    # NDArray shape (N_IWs, )
-    lVM_dx: list[npt.NDArray[np.float32]] = []      # NDArray shape (N_IWs, )
-    lVM_dy: list[npt.NDArray[np.float32]] = []      # NDArray shape (N_IWs, )
-    # fmt: on
 
     # `FFT_Convolver` instances per stage of the multigrid and per concurrent
     # worker.
@@ -177,6 +166,21 @@ if __name__ == "__main__":
     # The inner list holds the slice (as `tuple[int, int]`) of IWs that each
     # worker will operate on, and the outer list enumerates the specific stage.
     lIWs_slices: list[list[tuple[int, int]]] = []
+
+    # fmt: off
+    # Computed correlation maps per stage of the multigrid
+    lC_maps: list[npt.NDArray[np.float32]] = []     # NDArray shape (N_IWs, :, :)
+
+    # Computed displacement vector maps per stage of the multigrid
+    lVM_grid_x: list[npt.NDArray[np.int32]] = []    # NDArray shape (N_IWs, )
+    lVM_grid_y: list[npt.NDArray[np.int32]] = []    # NDArray shape (N_IWs, )
+    lVM_dx: list[npt.NDArray[np.float32]] = []      # NDArray shape (N_IWs, )
+    lVM_dy: list[npt.NDArray[np.float32]] = []      # NDArray shape (N_IWs, )
+
+    # Computed vector magnitudes and angles per stage of the multigrid
+    lVM_magn: list[npt.NDArray[np.float32]] = []    # NDArray shape (N_IWs, )
+    lVM_angle: list[npt.NDArray[np.float32]] = []   # NDArray shape (N_IWs, )
+    # fmt: on
 
     # --------------------------------------------------------------------------
     #   Populate lists
@@ -230,10 +234,14 @@ if __name__ == "__main__":
         C_maps[:] = np.nan
         lC_maps.append(C_maps)
 
+        # fmt: off
         lVM_grid_x.append(np.copy(IW_mesh.A_grid_x))
         lVM_grid_y.append(np.copy(IW_mesh.A_grid_y))
-        lVM_dx.append(np.zeros(N_IWs, dtype=np.float32))
-        lVM_dy.append(np.zeros(N_IWs, dtype=np.float32))
+        lVM_dx    .append(np.zeros(N_IWs, dtype=np.float32))
+        lVM_dy    .append(np.zeros(N_IWs, dtype=np.float32))
+        lVM_magn  .append(np.zeros(N_IWs, dtype=np.float32))
+        lVM_angle .append(np.zeros(N_IWs, dtype=np.float32))
+        # fmt: on
 
     # Force-trigger an eager numba compilation to take the compilation time of
     # function `process_IWs()` out of the timeit results.
@@ -272,6 +280,7 @@ if __name__ == "__main__":
     if cfg.DEBUG:
         cfg.N_IMAGES = 2
 
+    tick_overall = perf_counter()
     while frame_server.has_available(2 if cfg.MODE == cfg.MODES.PIV2 else 1):
         # ----------------------------------------------------------------------
         #   Read and prepare new image frames
@@ -397,6 +406,14 @@ if __name__ == "__main__":
                 lVM_dy      [stage_idx],
                 perform_subpixel_fitting=(stage_idx == cfg.N_STAGES - 1),
             )
+
+            cv2.cartToPolar(
+                lVM_dx   [stage_idx],
+                lVM_dy   [stage_idx],
+                lVM_magn [stage_idx],
+                lVM_angle[stage_idx],
+                angleInDegrees=True,
+            )
             # fmt: on
 
         # Display info
@@ -444,11 +461,8 @@ if __name__ == "__main__":
             grid_y = lVM_grid_y[-1]
             VM_dx = lVM_dx[-1]
             VM_dy = lVM_dy[-1]
-
-            # Vector magnitudes and angles
-            magnis, angles = cv2.cartToPolar(VM_dx, VM_dy, angleInDegrees=True)
-            magnis = np.asarray(magnis, float)  # [px]
-            angles = np.asarray(angles, float)  # [deg]
+            magnis = lVM_magn[-1]
+            angles = lVM_angle[-1]
 
             if cfg.MODE in [cfg.MODES.BOS]:
                 # TODO: In progress code. Contains hardcoded 'magic' constants.
@@ -552,6 +566,8 @@ if __name__ == "__main__":
             k = msvcrt.getch()
             if k == b"q":
                 break
+
+    print(f"Overall run time: {perf_counter() - tick_overall:.1f} s")
 
     cv2.destroyAllWindows()
     frame_server.close()
