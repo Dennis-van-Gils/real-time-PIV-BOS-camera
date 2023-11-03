@@ -41,6 +41,7 @@ cfg.read_file(config_filename)
 
 # Now we can import the remaining modules
 from utils import debugging
+from utils import plotting
 from utils.FrameServer import FrameServer
 from utils.process_IWs import IW_Mesh, process_IWs
 from utils.my_fun import (
@@ -57,12 +58,6 @@ elif cfg.FFT_LIB == cfg.FFT_LIBS.SCIPY:
     from utils.dvg_fftconvolver_scipy import FFT_Convolver2D_Full
 else:
     from utils.dvg_fftconvolver_rocketfft import FFT_Convolver2D_Full
-
-if cfg.LOAD_MPL:
-    import matplotlib as mpl
-    from matplotlib import pyplot as plt
-
-    mpl.use("TkAgg")
 
 # ------------------------------------------------------------------------------
 #   Main
@@ -454,46 +449,37 @@ if __name__ == "__main__":
         #   Show results
         # ----------------------------------------------------------------------
 
-        if cfg.LOAD_MPL:
+        if cfg.PLOT_VECTOR_MAP_RESULTS:
+            # fmt: off
             # Retrieve the end results
-            IW_mesh = lIW_mesh[-1]
-            grid_x = lVM_grid_x[-1]
-            grid_y = lVM_grid_y[-1]
-            VM_dx = lVM_dx[-1]
-            VM_dy = lVM_dy[-1]
-            magnis = lVM_magn[-1]
-            angles = lVM_angle[-1]
+            IW_mesh   = lIW_mesh[-1]
+            VM_grid_x = lVM_grid_x[-1]
+            VM_grid_y = lVM_grid_y[-1]
+            VM_dx     = lVM_dx[-1]
+            VM_dy     = lVM_dy[-1]
+            VM_magn   = lVM_magn[-1]
+            VM_angle  = lVM_angle[-1]
+            # fmt: on
 
             if cfg.MODE in [cfg.MODES.BOS]:
-                # TODO: In progress code. Contains hardcoded 'magic' constants.
-                shape_2D = (IW_mesh.N_IWs_y, IW_mesh.N_IWs_x)
-                magnis = np.reshape(magnis, shape_2D)
-                angles = np.reshape(angles, shape_2D)
-                magnis = np.nan_to_num(magnis)
-                angles = np.nan_to_num(angles)
-
-                # Create an HSV canvas and color it in
-                canvas = np.zeros((*shape_2D, 3), dtype=np.uint8)
-                canvas[..., 0] = angles / 2
-                canvas[..., 1] = 255
-                canvas[..., 2] = np.clip(magnis * 300, 0, 255)
-                # canvas[..., 2] = cv2.normalize(M, None, 0, 255, cv2.NORM_MINMAX)
-
-                # HSV to RGB and rescale
                 output_resolution = (
                     frame_server.img_w // 2,
                     frame_server.img_h // 2,
                 )
-                canvas = cv2.cvtColor(canvas, cv2.COLOR_HSV2BGR)
-                canvas = cv2.resize(
-                    canvas,
-                    output_resolution,
+
+                canvas = plotting.vector_map_to_hsv_colors(
+                    VM_magn,
+                    VM_angle,
+                    (IW_mesh.N_IWs_y, IW_mesh.N_IWs_x),
+                    VM_magn_multiplier=300,  # TODO: Turn `300` into `cfg`-param
+                    output_resolution=output_resolution,
                     interpolation=cv2.INTER_CUBIC,
                     # interpolation=cv2.INTER_LINEAR,
                     # interpolation=cv2.INTER_NEAREST,
                 )
 
                 cv2.imshow("BOS", canvas)
+                cv2.setWindowTitle("BOS", f"BOS {frame_title}")
                 cv2.imshow(
                     "Image",
                     cv2.resize(
@@ -502,7 +488,6 @@ if __name__ == "__main__":
                         interpolation=cv2.INTER_NEAREST,
                     ),
                 )
-                cv2.setWindowTitle("BOS", f"BOS {frame_title}")
 
                 EXPORT = False
                 if EXPORT:
@@ -516,43 +501,24 @@ if __name__ == "__main__":
                 if cfg.DEBUG:
                     cv2.waitKey(0)
 
-            elif cfg.LOAD_MPL:
-                # Threshold on vector magnitude
-                # VM_dx[magnis < 0.5] = np.nan
-                # VM_dy[magnis < 0.5] = np.nan
+            else:
+                plotting.vector_map_to_quiver_plot(
+                    A,
+                    VM_grid_x,
+                    VM_grid_y,
+                    VM_dx,
+                    VM_dy,
+                    VM_magn,
+                    frame_title,
+                )
 
-                colors = magnis / cfg.COLOR_DIV
-                colormap = mpl.cm.jet  # type: ignore
-
-                if not (plt.fignum_exists("VM")):  # type: ignore
-                    fig = plt.figure("VM")  # type: ignore
-                    h_imshow = plt.imshow(A, cmap="gray", interpolation="none")  # type: ignore
-                    h_quiver = plt.quiver(  # type: ignore
-                        grid_x,
-                        grid_y,
-                        np.zeros(VM_dx.shape),
-                        np.zeros(VM_dy.shape),
-                        angles="xy",
-                        scale_units="xy",
-                        scale=1,  # Scales down by `scale`
-                        # color="r",
-                        color=colormap(colors),
-                        linewidths=1,
-                    )
-                    h_title = plt.title(f"{frame_title}")  # type: ignore
-
-                h_imshow.set_data(A)  # type: ignore
-                h_quiver.set_UVC(VM_dx * cfg.QUIVER_SIZE, VM_dy * cfg.QUIVER_SIZE)  # type: ignore
-                h_quiver.set_color(colormap(colors))  # type: ignore
-                h_title.set_text(f"{frame_title}")  # type: ignore
-
-                plt.draw()  # type: ignore
-                plt.pause(0.0001)  # type: ignore
-
+                # TODO: fix missing ref to `plt`
+                """
                 if cfg.DEBUG:
                     plt.savefig("output_VM.png", dpi=300, bbox_inches="tight")  # type: ignore
                     # plt.waitforbuttonpress()  # type: ignore
                     plt.show()  # type: ignore
+                """
 
         # ----------------------------------------------------------------------
         #   Check for key presses
