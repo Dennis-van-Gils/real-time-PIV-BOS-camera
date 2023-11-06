@@ -11,8 +11,10 @@ import init_config as cfg
 import numpy as np
 import numpy.typing as npt
 import cv2
+
 import matplotlib as mpl
 from matplotlib import pyplot as plt
+from matplotlib import colors as mpl_colors
 
 mpl.use("TkAgg")
 
@@ -77,10 +79,8 @@ def vector_map_to_hsv_colors(
     if output_resolution is None:
         output_resolution = VM_grid_shape_2D
 
-    VM_magn = np.reshape(VM_magn, VM_grid_shape_2D)
-    VM_angle = np.reshape(VM_angle, VM_grid_shape_2D)
-    VM_magn = np.nan_to_num(VM_magn)
-    VM_angle = np.nan_to_num(VM_angle)
+    VM_magn = np.nan_to_num(np.reshape(VM_magn, VM_grid_shape_2D))
+    VM_angle = np.nan_to_num(np.reshape(VM_angle, VM_grid_shape_2D))
 
     # Create an HSV canvas and color it in
     canvas = np.zeros((*VM_grid_shape_2D, 3), dtype=np.uint8)
@@ -88,12 +88,9 @@ def vector_map_to_hsv_colors(
     canvas[..., 1] = 255
     canvas[..., 2] = np.clip(VM_magn * VM_magn_multiplier, 0, 255)
 
-    # HSV to RGB and rescale
-    canvas = cv2.cvtColor(canvas, cv2.COLOR_HSV2BGR)
+    cv2.cvtColor(canvas, cv2.COLOR_HSV2BGR, dst=canvas)
     if output_resolution != VM_grid_shape_2D:
-        canvas = cv2.resize(
-            canvas, output_resolution, interpolation=interpolation
-        )
+        canvas = cv2.resize(canvas, output_resolution, interpolation=interpolation)
 
     return np.asarray(canvas, dtype=np.uint8)
 
@@ -111,15 +108,20 @@ def vector_map_to_quiver_plot(
     VM_dy: npt.NDArray[np.float32],
     VM_magn: npt.NDArray[np.float32],
     frame_title: str,
+    colormap: mpl_colors.Colormap = plt.get_cmap("jet"),
+    # colormap: mpl_colors.Colormap = mpl.cm.jet,
 ):
-    """TODO: Fix unbound variabes `h_imshow` etc"""
-    colors = VM_magn / cfg.COLOR_DIV
-    colormap = mpl.cm.jet  # type: ignore
+    self = vector_map_to_quiver_plot
+    VM_colors = VM_magn / cfg.COLOR_DIV
 
-    if not (plt.fignum_exists("VM")):  # type: ignore
-        fig = plt.figure("VM")
-        h_imshow = plt.imshow(background_img, cmap="gray", interpolation="none")
-        h_quiver = plt.quiver(
+    if not plt.fignum_exists("VM_quiver_plot"):  # type: ignore
+        plt.figure("VM_quiver_plot")
+        self.h_imshow = plt.imshow(
+            background_img,
+            cmap="gray",
+            interpolation="none",
+        )
+        self.h_quiver = plt.quiver(
             VM_grid_x,
             VM_grid_y,
             np.zeros(VM_dx.shape),
@@ -127,22 +129,15 @@ def vector_map_to_quiver_plot(
             angles="xy",
             scale_units="xy",
             scale=1,  # Scales down by `scale`
-            # color="r",
-            color=colormap(colors),
+            color=colormap(VM_colors),
             linewidths=1,
         )
-        h_title = plt.title(f"{frame_title}")
+        self.h_title = plt.title(f"{frame_title}")
 
-    # TODO: Ditch these unbound variables. Think of another solution.
-    fig = plt.figure("VM")
-    h_imshow = fig.get_children()[1].get_children()[0]
-    h_quiver = fig.get_children()[1].get_children()[1]
-    h_title = fig.get_children()[1].get_children()[8]
-
-    h_imshow.set_data(background_img)  # type: ignore
-    h_quiver.set_UVC(VM_dx * cfg.QUIVER_SIZE, VM_dy * cfg.QUIVER_SIZE)  # type: ignore
-    h_quiver.set_color(colormap(colors))  # type: ignore
-    h_title.set_text(f"{frame_title}")  # type: ignore
+    self.h_imshow.set_data(background_img)
+    self.h_quiver.set_UVC(VM_dx * cfg.QUIVER_SIZE, VM_dy * cfg.QUIVER_SIZE)
+    self.h_quiver.set_color(colormap(VM_colors))  # type: ignore
+    self.h_title.set_text(f"{frame_title}")
 
     plt.draw()
     plt.pause(0.0001)

@@ -26,6 +26,7 @@ import msvcrt
 import psutil
 import numpy as np
 import numpy.typing as npt
+import matplotlib.pyplot as plt
 import cv2
 
 # The import order is important. We must handle the user configuration first.
@@ -510,6 +511,7 @@ if __name__ == "__main__":
                     VM_dy,
                     VM_magn,
                     frame_title,
+                    colormap=plt.get_cmap("jet"),
                 )
 
                 # TODO: fix missing ref to `plt`
@@ -533,7 +535,7 @@ if __name__ == "__main__":
             if k == b"q":
                 break
 
-    print(f"Overall run time: {perf_counter() - tick_overall:.1f} s")
+    print(f"\nOverall run time: {perf_counter() - tick_overall:.1f} s")
 
     cv2.destroyAllWindows()
     frame_server.close()
