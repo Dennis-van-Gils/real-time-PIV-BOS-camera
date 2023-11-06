@@ -1,3 +1,13 @@
+Fix Windows display scaling messing up OpenCV window sizes
+----------------------------------------------------------
+Go to python.exe's path, right-click the executable, choose 'Properties' and
+under the tab 'Compatibility' hit 'Change high DPI settings'. Then activate
+'Override high DPI scaling behavior', set 'Scaling performed by' to 'Application'.
+
+This will change the behavior for all sessions that this python.exe serves,
+though. One could use virtual environments to overcome this limitation.
+
+
 TO INVESTIGATE
 --------------
 
