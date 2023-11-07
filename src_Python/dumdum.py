@@ -1,29 +1,29 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+
+from time import perf_counter
 import numpy as np
+import numpy.typing as npt
+import numba as nb
 import cv2
 
+# ------------------------------------------------------------------------------
+#   draw_8line
+# ------------------------------------------------------------------------------
 
-import numpy as np
 
-
-def draw_8line(img, p1, p2, width):
-    """Bresenham's line algorithm"""
-
-    """
-    # Check if the points are inside the image dimensions
-    if (
-        p1[0] < 0
-        or p1[0] >= img.shape[1]
-        or p1[1] < 0
-        or p1[1] >= img.shape[0]
-        or p2[0] < 0
-        or p2[0] >= img.shape[1]
-        or p2[1] < 0
-        or p2[1] >= img.shape[0]
-    ):
-        raise ValueError("Points are outside the image dimensions")
-    """
+@nb.njit(
+    "(uint8[:, :], int32[:], int32[:], int32)",
+    cache=True,
+    nogil=True,
+)
+def draw_8line(
+    img: npt.NDArray[np.uint8],
+    p1: npt.NDArray[np.int32],
+    p2: npt.NDArray[np.int32],
+    width: int,
+):
+    """Bresenham's line algorithm with support for custom linewidths."""
 
     # Calculate the half-width for the line
     half_width = width // 2
@@ -40,17 +40,10 @@ def draw_8line(img, p1, p2, width):
     while True:
         for i in range(-half_width, half_width + 1):
             for j in range(-half_width, half_width + 1):
-                # Calculate the pixel coordinates
                 px = x1 + i
                 py = y1 + j
 
-                if (
-                    px >= 0
-                    and px < img.shape[1]
-                    and py >= 0
-                    and py < img.shape[0]
-                ):
-                    # Set the pixel at the current position to 255 (white)
+                if px >= 0 and px < img.shape[1] and py >= 0 and py < img.shape[0]:
                     img[py, px] = 255
 
         if x1 == x2 and y1 == y2:
@@ -64,48 +57,70 @@ def draw_8line(img, p1, p2, width):
             err += dx
             y1 += sy
 
-    return img
+
+# ------------------------------------------------------------------------------
+#   draw_8line_with_arrowhead
+# ------------------------------------------------------------------------------
 
 
-def draw_8line_with_arrowhead(img, p1, p2, width=3, arrowhead_size=20):
+@nb.njit(
+    "(uint8[:, :], int32[:], int32[:], int32, int32)",
+    cache=True,
+    nogil=True,
+)
+def draw_8line_with_arrowhead(
+    img: npt.NDArray[np.uint8],
+    p1: npt.NDArray[np.int32],
+    p2: npt.NDArray[np.int32],
+    width: int,
+    arrowhead_size: int,
+):
     # Calculate arrowhead points
-    dx = abs(p2[0] - p1[0])
-    dy = abs(p2[1] - p1[1])
+    dx = p2[0] - p1[0]
+    dy = p2[1] - p1[1]
     length = np.sqrt(dx**2 + dy**2)
-    dx_unit = dx / length
-    dy_unit = dy / length
+    adx = arrowhead_size * dx / length
+    ady = arrowhead_size * dy / length
 
-    arrowhead_p1 = (
-        int(p2[0] - arrowhead_size * dx_unit + arrowhead_size * dy_unit),
-        int(p2[1] - arrowhead_size * dy_unit - arrowhead_size * dx_unit),
+    a1 = np.array((p2[0] - adx + ady, p2[1] - ady - adx), dtype=np.int32)
+    a2 = np.array((p2[0] - adx - ady, p2[1] - ady + adx), dtype=np.int32)
+
+    draw_8line(img, p1, p2, width)
+    draw_8line(img, a1, p2, width)
+    draw_8line(img, a2, p2, width)
+
+
+# ------------------------------------------------------------------------------
+#   main
+# ------------------------------------------------------------------------------
+
+center = np.array([200, 200], dtype=np.int32)
+radius = 100
+N_points = 360
+linewidth = 2
+arrowhead_size = 20
+
+img_empty = np.zeros((400, 400), dtype=np.uint8)
+img = np.copy(img_empty)
+p2 = np.array([0, 0], dtype=np.int32)
+
+tick = perf_counter()
+for theta in np.linspace(0, 2 * np.pi, N_points):
+    np.copyto(img, img_empty)
+    p2[0] = np.round(center[0] + radius * np.sin(theta))
+    p2[1] = np.round(center[1] + radius * np.cos(theta))
+
+    draw_8line_with_arrowhead(
+        img,
+        p1=center,
+        p2=p2,
+        width=linewidth,
+        arrowhead_size=arrowhead_size,
     )
-    arrowhead_p2 = (
-        int(p2[0] - arrowhead_size * dx_unit - arrowhead_size * dy_unit),
-        int(p2[1] - arrowhead_size * dy_unit + arrowhead_size * dx_unit),
-    )
 
-    img = draw_8line(img, p1, p2, width)
-    img = draw_8line(img, arrowhead_p1, p2, width)
-    img = draw_8line(img, arrowhead_p2, p2, width)
+    if 1:
+        cv2.imshow("output", img)
+        cv2.setWindowTitle("output", f"{theta * 180 / np.pi:.1f}")
+        cv2.waitKey(1)
 
-    return img
-
-
-if 1:
-    result_image = draw_8line_with_arrowhead(
-        np.zeros((400, 400), dtype=np.uint8),
-        (100, 100),
-        (20, 30),
-        10,
-    )
-else:
-    result_image = draw_8line(
-        np.zeros((400, 400), dtype=np.uint8),
-        (100, 100),
-        (20, 30),
-        10,
-    )
-
-cv2.imshow("output", result_image)
-cv2.imwrite("output.png", result_image)
-cv2.waitKey(0)
+print(f"{(perf_counter() - tick)/N_points*1000:.3f} ms")
