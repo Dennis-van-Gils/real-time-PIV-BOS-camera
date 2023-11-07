@@ -3,20 +3,163 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "03-11-2023"
+__date__ = "07-11-2023"
 __version__ = "1.0"
+
+import sys
 
 import init_config as cfg
 
 import numpy as np
 import numpy.typing as npt
-import cv2
-
 import matplotlib as mpl
 from matplotlib import pyplot as plt
-from matplotlib import colors as mpl_colors
+import cv2
 
 mpl.use("TkAgg")
+
+N_COLORS_LUT = 1024
+
+
+# ------------------------------------------------------------------------------
+#   build_mpl_colormap
+# ------------------------------------------------------------------------------
+
+
+def build_mpl_colormap(
+    mpl_colormap_name: str = "jet",
+    mpl_set_under=None,
+    mpl_set_over=None,
+):
+    """Build and return an instance to a Matplotlib colormap as configured.
+
+    Args:
+        mpl_colormap_name (``str``, optional):
+            Name of a built-in Matplotlib colormap, e.g. "jet" or "hot", etc.
+
+            Default: "jet"
+
+        mpl_set_under (matplotlib color, optional):
+            Matplotlib color specification (e.g. "k" or a RGBA color tuple) to
+            indicate out-of-range under values.
+
+            Default: None
+
+        mpl_set_over (matplotlib color, optional):
+            Matplotlib color specification (e.g. "k" or a RGBA color tuple to
+            indicate out-of-range over values.
+
+            Default: None
+    """
+    mpl_cm = plt.get_cmap(mpl_colormap_name)
+
+    if mpl_set_under is not None:
+        mpl_cm.set_under(mpl_set_under)
+
+    if mpl_set_over is not None:
+        mpl_cm.set_over(mpl_set_over)
+
+    return mpl_cm
+
+
+# ------------------------------------------------------------------------------
+#   build_cv2_colormap_lut
+# ------------------------------------------------------------------------------
+
+
+def build_cv2_colormap_lut(
+    mpl_colormap_name: str = "jet",
+    mpl_set_under=None,
+    mpl_set_over=None,
+) -> list[list[int]]:
+    """Build and return a color lookup table taken from MatplotLib and converted
+    for use in OpenCV. Matplotlib uses float [0 - 1] RGBA colors. OpenCV uses
+    [0 - 255] BGR colors.
+
+    Args:
+        mpl_colormap_name (``str``, optional):
+            Name of a built-in Matplotlib colormap, e.g. "jet" or "hot", etc.
+
+            Default: "jet"
+
+        mpl_set_under (matplotlib color, optional):
+            Matplotlib color specification (e.g. "k" or a RGBA color tuple) to
+            indicate out-of-range under values.
+
+            Default: None
+
+        mpl_set_over (matplotlib color, optional):
+            Matplotlib color specification (e.g. "k" or a RGBA color tuple to
+            indicate out-of-range over values.
+
+            Default: None
+
+    Returns (``list[list[int]]``):
+        List containing BGR color values as `[color_idx][B, G, R]` with a shape
+        equal to `(N_COLORS_LUT + 2, 3)`. The colormap proper has a length of
+        `N_COLORS_LUT`. The extra last three entries are special colors:
+            N_COLORS_LUT    : out-of-range under color
+            N_COLORS_LUT + 1: out-of-range over color
+            N_COLORS_LUT + 2: mask color (unused)
+    """
+    mpl_cm = plt.get_cmap(mpl_colormap_name, N_COLORS_LUT)
+
+    if mpl_set_under is not None:
+        mpl_cm.set_under(mpl_set_under)
+
+    if mpl_set_over is not None:
+        mpl_cm.set_over(mpl_set_over)
+
+    mpl_cm._init()  # Build the lut # type: ignore
+    mpl_lut = mpl_cm._lut  # type: ignore
+    cv2_lut = np.asarray(mpl_lut * 255, dtype=np.uint8)  # [0., 1.] to [0, 255]
+    cv2_lut = cv2_lut[:, 2::-1]  # Drop `A` from `RGBA`and turn `RGB` into `BGR`
+
+    return cv2_lut.tolist()
+
+
+# ------------------------------------------------------------------------------
+#   Module-level defined colormaps
+# ------------------------------------------------------------------------------
+
+this = sys.modules[__name__]
+
+this.mpl_colormap = build_mpl_colormap(  # type: ignore
+    mpl_colormap_name=cfg.COLORMAP_NAME,
+    mpl_set_under=cfg.COLORMAP_OUT_OF_RANGE_UNDER,
+    mpl_set_over=cfg.COLORMAP_OUT_OF_RANGE_OVER,
+)
+
+this.cv2_colormap_lut = build_cv2_colormap_lut(  # type: ignore
+    mpl_colormap_name=cfg.COLORMAP_NAME,
+    mpl_set_under=cfg.COLORMAP_OUT_OF_RANGE_UNDER,
+    mpl_set_over=cfg.COLORMAP_OUT_OF_RANGE_OVER,
+)
+
+# ------------------------------------------------------------------------------
+#   get_color_from_cv2_colormap_lut
+# ------------------------------------------------------------------------------
+
+
+def get_color_from_cv2_colormap_lut(value: float):
+    """Look up and return the BGR color value from the colormap as defined at
+    this module level (`[plotting.py].cv2_colormap_lut`).
+
+    Args:
+        value (``float``):
+            Normalized color lookup value.
+                0.0 <= value <= 1.0: colormap proper
+                value < 0.0        : out-of-range under color
+                value > 1.0        : out-of-range over color
+    """
+    if value < 0.0:  # Out-of-range under
+        lut_idx = N_COLORS_LUT
+    elif value > 1.0:  # Out-of-range over
+        lut_idx = N_COLORS_LUT + 1
+    else:  # Colormap proper
+        lut_idx = int(np.round(value * (N_COLORS_LUT - 1)))
+
+    return this.cv2_colormap_lut[lut_idx]
 
 
 # ------------------------------------------------------------------------------
@@ -74,7 +217,6 @@ def vector_map_to_hsv_colors(
 
     Returns:
         The RGB image as a 3D numpy array of `uint8` values.
-
     """
     if output_resolution is None:
         output_resolution = VM_grid_shape_2D
@@ -90,7 +232,9 @@ def vector_map_to_hsv_colors(
 
     cv2.cvtColor(canvas, cv2.COLOR_HSV2BGR, dst=canvas)
     if output_resolution != VM_grid_shape_2D:
-        canvas = cv2.resize(canvas, output_resolution, interpolation=interpolation)
+        canvas = cv2.resize(
+            canvas, output_resolution, interpolation=interpolation
+        )
 
     return np.asarray(canvas, dtype=np.uint8)
 
@@ -108,10 +252,10 @@ def vector_map_to_quiver_plot(
     VM_dy: npt.NDArray[np.float32],
     VM_magn: npt.NDArray[np.float32],
     frame_title: str,
-    colormap: mpl_colors.Colormap = plt.get_cmap("jet"),
-    # colormap: mpl_colors.Colormap = mpl.cm.jet,
 ):
+    """ """
     self = vector_map_to_quiver_plot
+    colormap = this.mpl_colormap
     VM_colors = VM_magn / cfg.COLOR_DIV
 
     if not plt.fignum_exists("VM_quiver_plot"):  # type: ignore
@@ -136,8 +280,61 @@ def vector_map_to_quiver_plot(
 
     self.h_imshow.set_data(background_img)
     self.h_quiver.set_UVC(VM_dx * cfg.QUIVER_SIZE, VM_dy * cfg.QUIVER_SIZE)
-    self.h_quiver.set_color(colormap(VM_colors))  # type: ignore
+    self.h_quiver.set_color(colormap(VM_colors))
     self.h_title.set_text(f"{frame_title}")
 
     plt.draw()
     plt.pause(0.0001)
+
+
+# ------------------------------------------------------------------------------
+#   vector_map_to_cv2_quiver_plot
+# ------------------------------------------------------------------------------
+
+
+def vector_map_to_cv2_quiver_plot(
+    background_img: npt.NDArray[np.float32],
+    VM_grid_x: npt.NDArray[np.int32],
+    VM_grid_y: npt.NDArray[np.int32],
+    VM_dx: npt.NDArray[np.float32],
+    VM_dy: npt.NDArray[np.float32],
+    VM_magn: npt.NDArray[np.float32],
+    output_resolution: tuple[int, int] | None = None,
+    interpolation: int = cv2.INTER_AREA,
+) -> npt.NDArray[np.uint8]:
+    """ """
+    if output_resolution is None:
+        output_resolution = (background_img.shape[1], background_img.shape[0])
+
+    canvas = cv2.cvtColor(background_img * 255, cv2.COLOR_GRAY2BGR)
+
+    for IW_idx in range(len(VM_grid_x)):
+        # fmt: off
+        x    = VM_grid_x[IW_idx]
+        y    = VM_grid_y[IW_idx]
+        dx   = VM_dx[IW_idx]
+        dy   = VM_dy[IW_idx]
+        magn = VM_magn[IW_idx]
+        # fmt: on
+
+        if not np.isnan(dx):
+            canvas = cv2.arrowedLine(
+                canvas,
+                pt1=(x, y),
+                pt2=(
+                    int(np.round(x + dx * cfg.QUIVER_SIZE)),
+                    int(np.round(y + dy * cfg.QUIVER_SIZE)),
+                ),
+                color=get_color_from_cv2_colormap_lut(magn / cfg.COLOR_DIV),
+                thickness=2,
+                tipLength=0.3,
+            )
+
+    if output_resolution != (background_img.shape[1], background_img.shape[0]):
+        canvas = cv2.resize(
+            canvas,
+            output_resolution,
+            interpolation=interpolation,
+        )
+
+    return np.asarray(canvas, dtype=np.uint8)

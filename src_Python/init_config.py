@@ -12,7 +12,7 @@ Namespace `cfg` now contains all user settings
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "03-11-2023"
+__date__ = "07-11-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
@@ -72,7 +72,7 @@ class FFT_LIBS(enum.IntEnum):
 
 
 # ------------------------------------------------------------------------------
-#   Defaults
+#   Default placeholders
 # ------------------------------------------------------------------------------
 
 
@@ -91,6 +91,9 @@ IW_OVERLAP = 0.5
 N_STAGES = len(IW_SIZES)
 
 # [Plotting]
+COLORMAP_NAME = "jet"
+COLORMAP_OUT_OF_RANGE_UNDER = None
+COLORMAP_OUT_OF_RANGE_OVER = (1.0, 0, 0.58)
 QUIVER_SIZE = 10
 COLOR_DIV = 1
 
@@ -168,9 +171,19 @@ def read_file(filename=None):
     N_STAGES = len(IW_SIZES)
 
     # [Plotting]
+    global COLORMAP_NAME
+    global COLORMAP_OUT_OF_RANGE_UNDER
+    global COLORMAP_OUT_OF_RANGE_OVER
     global QUIVER_SIZE
     global COLOR_DIV
 
+    COLORMAP_NAME = parser["Plotting"]["colormap_name"]
+    COLORMAP_OUT_OF_RANGE_UNDER = parse_float_list(
+        parser["Plotting"]["colormap_out_of_range_under"]
+    )
+    COLORMAP_OUT_OF_RANGE_OVER = parse_float_list(
+        parser["Plotting"]["colormap_out_of_range_over"]
+    )
     QUIVER_SIZE = parser.getfloat("Plotting", "quiver_size")
     COLOR_DIV = parser.getfloat("Plotting", "color_div")
 
@@ -239,3 +252,15 @@ def parse_int_list(str_in):
         return list(int(k.strip()) for k in str_in[1:-1].split(","))
     except Exception as err:
         raise configparser.ParsingError(str_in) from None
+
+
+# ------------------------------------------------------------------------------
+#   parse_float_list
+# ------------------------------------------------------------------------------
+
+
+def parse_float_list(str_in):
+    try:
+        return list(float(k.strip()) for k in str_in[1:-1].split(","))
+    except Exception as err:
+        return None

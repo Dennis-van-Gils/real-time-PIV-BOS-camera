@@ -11,7 +11,7 @@ VM: Displacement vector map
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "03-11-2023"
+__date__ = "07-11-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
@@ -464,8 +464,8 @@ if __name__ == "__main__":
 
             if cfg.MODE in [cfg.MODES.BOS]:
                 output_resolution = (
-                    frame_server.img_w // 2,
-                    frame_server.img_h // 2,
+                    frame_server.img_w,
+                    frame_server.img_h,
                 )
 
                 canvas = plotting.vector_map_to_hsv_colors(
@@ -479,8 +479,8 @@ if __name__ == "__main__":
                     # interpolation=cv2.INTER_NEAREST,
                 )
 
-                cv2.imshow("BOS", canvas)
-                cv2.setWindowTitle("BOS", f"BOS {frame_title}")
+                cv2.imshow("VM_results", canvas)
+                cv2.setWindowTitle("VM_results", f"{frame_title}")
                 cv2.imshow(
                     "Image",
                     cv2.resize(
@@ -503,16 +503,30 @@ if __name__ == "__main__":
                     cv2.waitKey(0)
 
             else:
-                plotting.vector_map_to_quiver_plot(
-                    A,
+                if cfg.DEBUG:
+                    plotting.vector_map_to_quiver_plot(
+                        A,
+                        VM_grid_x,
+                        VM_grid_y,
+                        VM_dx,
+                        VM_dy,
+                        VM_magn,
+                        frame_title,
+                    )
+
+                canvas = plotting.vector_map_to_cv2_quiver_plot(
+                    B_orig,
                     VM_grid_x,
                     VM_grid_y,
                     VM_dx,
                     VM_dy,
                     VM_magn,
-                    frame_title,
-                    colormap=plt.get_cmap("jet"),
                 )
+                cv2.imshow("VM_results", canvas)
+                cv2.setWindowTitle("VM_results", f"{frame_title}")
+
+                if cfg.DEBUG:
+                    cv2.waitKey(0)
 
                 # TODO: fix missing ref to `plt`
                 """
