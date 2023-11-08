@@ -4,7 +4,9 @@
 TODO: Read https://stackoverflow.com/questions/41195973/how-to-use-bresenhams-line-drawing-algorithm-with-sub-pixel-bias
 """
 
+import sys
 from time import perf_counter
+
 import numpy as np
 import numpy.typing as npt
 import numba as nb
@@ -12,13 +14,21 @@ import cv2
 
 import matplotlib.pyplot as plt
 
+MINIMUM_QUIVER_TIP_SIZE = 5
+
 # ------------------------------------------------------------------------------
 #   draw_8line_u8
 # ------------------------------------------------------------------------------
 
 
 @nb.njit(
-    "(uint8[:, :], int32[:], int32[:], uint8, int32)",
+    (
+        nb.types.Array(nb.uint8, 2, "C"),
+        nb.types.Array(nb.int32, 1, "C"),
+        nb.types.Array(nb.int32, 1, "C"),
+        nb.uint8,
+        nb.int32,
+    ),
     cache=True,
     nogil=True,
     fastmath=True,
@@ -75,7 +85,13 @@ def draw_8line_u8(
 
 
 @nb.njit(
-    "(uint8[:, :, :], int32[:], int32[:], uint8[:], int32)",
+    (
+        nb.types.Array(nb.uint8, 3, "C"),
+        nb.types.Array(nb.int32, 1, "C"),
+        nb.types.Array(nb.int32, 1, "C"),
+        nb.types.Array(nb.uint8, 1, "C"),
+        nb.int32,
+    ),
     cache=True,
     nogil=True,
     fastmath=True,
@@ -134,7 +150,15 @@ def draw_8line_u24(
 
 
 @nb.njit(
-    "(uint8[:, :], int32[:], int32[:], uint8, int32, float32, float32)",
+    (
+        nb.types.Array(nb.uint8, 2, "C"),
+        nb.types.Array(nb.int32, 1, "C"),
+        nb.types.Array(nb.int32, 1, "C"),
+        nb.uint8,
+        nb.int32,
+        nb.float32,
+        nb.float32,
+    ),
     cache=True,
     nogil=True,
     fastmath=True,
@@ -175,26 +199,22 @@ def draw_quiver_u8(
             The angle of the arrow tip in radians. E.g., `np.pi/4` for a wide
             tip or `np.pi/8` for a slender tip.
     """
-
     x1, y1 = pt1
     x2, y2 = pt2
     dx = x2 - x1
     dy = y2 - y1
-    length = np.sqrt(dx**2 + dy**2)  # TODO: Turn into input arg
-    angle = np.arctan2(-dy, -dx)  # TODO: Turn into input arg
+    length = np.sqrt(dx**2 + dy**2)
+    angle = np.arctan2(-dy, -dx)
     tip_size = length * tip_size
 
+    if tip_size < MINIMUM_QUIVER_TIP_SIZE and tip_size != 0:
+        tip_size = MINIMUM_QUIVER_TIP_SIZE
+
     draw_8line_u8(img, pt1, pt2, color, linewidth)
-
-    tip = np.array(
-        (
-            np.round(x2 + tip_size * np.cos(angle + tip_angle)),
-            np.round(y2 + tip_size * np.sin(angle + tip_angle)),
-        ),
-        dtype=np.int32,
-    )
+    tip = np.empty(2, dtype=np.int32)
+    tip[0] = np.round(x2 + tip_size * np.cos(angle + tip_angle))
+    tip[1] = np.round(y2 + tip_size * np.sin(angle + tip_angle))
     draw_8line_u8(img, tip, pt2, color, linewidth)
-
     tip[0] = np.round(x2 + tip_size * np.cos(angle - tip_angle))
     tip[1] = np.round(y2 + tip_size * np.sin(angle - tip_angle))
     draw_8line_u8(img, tip, pt2, color, linewidth)
@@ -206,7 +226,15 @@ def draw_quiver_u8(
 
 
 @nb.njit(
-    "(uint8[:, :, :], int32[:], int32[:], uint8[:], int32, float32, float32)",
+    (
+        nb.types.Array(nb.uint8, 3, "C"),
+        nb.types.Array(nb.int32, 1, "C"),
+        nb.types.Array(nb.int32, 1, "C"),
+        nb.types.Array(nb.uint8, 1, "C"),
+        nb.int32,
+        nb.float32,
+        nb.float32,
+    ),
     cache=True,
     nogil=True,
     fastmath=True,
@@ -248,29 +276,95 @@ def draw_quiver_u24(
             The angle of the arrow tip in radians. E.g., `np.pi/4` for a wide
             tip or `np.pi/8` for a slender tip.
     """
-
     x1, y1 = pt1
     x2, y2 = pt2
     dx = x2 - x1
     dy = y2 - y1
-    length = np.sqrt(dx**2 + dy**2)  # TODO: Turn into input arg
-    angle = np.arctan2(-dy, -dx)  # TODO: Turn into input arg
+    length = np.sqrt(dx**2 + dy**2)
+    angle = np.arctan2(-dy, -dx)
     tip_size = length * tip_size
 
+    if tip_size < MINIMUM_QUIVER_TIP_SIZE and tip_size != 0:
+        tip_size = MINIMUM_QUIVER_TIP_SIZE
+
     draw_8line_u24(img, pt1, pt2, color, linewidth)
-
-    tip = np.array(
-        (
-            np.round(x2 + tip_size * np.cos(angle + tip_angle)),
-            np.round(y2 + tip_size * np.sin(angle + tip_angle)),
-        ),
-        dtype=np.int32,
-    )
+    tip = np.empty(2, dtype=np.int32)
+    tip[0] = np.round(x2 + tip_size * np.cos(angle + tip_angle))
+    tip[1] = np.round(y2 + tip_size * np.sin(angle + tip_angle))
     draw_8line_u24(img, tip, pt2, color, linewidth)
-
     tip[0] = np.round(x2 + tip_size * np.cos(angle - tip_angle))
     tip[1] = np.round(y2 + tip_size * np.sin(angle - tip_angle))
     draw_8line_u24(img, tip, pt2, color, linewidth)
+
+
+# ------------------------------------------------------------------------------
+#   draw_quiver_map_u8
+# ------------------------------------------------------------------------------
+
+
+@nb.njit(
+    (
+        nb.types.Array(nb.uint8, 2, "C"),
+        nb.types.Array(nb.int32, 2, "C"),
+        nb.types.Array(nb.int32, 2, "C"),
+        nb.types.Array(nb.uint8, 1, "C"),
+        nb.int32,
+        nb.float32,
+        nb.float32,
+    ),
+    cache=True,
+    nogil=True,
+    fastmath=True,
+)
+def draw_quiver_map_u8(
+    img: npt.NDArray[np.uint8],
+    pts1: npt.NDArray[np.int32],
+    pts2: npt.NDArray[np.int32],
+    colors: npt.NDArray[np.uint8],
+    linewidth: int,
+    tip_size: float,
+    tip_angle: float,
+):
+    for i in range(len(pts1)):
+        pt1 = pts1[i]
+        pt2 = pts2[i]
+        color = colors[i]
+        draw_quiver_u8(img, pt1, pt2, color, linewidth, tip_size, tip_angle)
+
+
+# ------------------------------------------------------------------------------
+#   draw_quiver_map_u24
+# ------------------------------------------------------------------------------
+
+
+@nb.njit(
+    (
+        nb.types.Array(nb.uint8, 3, "C"),
+        nb.types.Array(nb.int32, 2, "C"),
+        nb.types.Array(nb.int32, 2, "C"),
+        nb.types.Array(nb.uint8, 2, "C"),
+        nb.int32,
+        nb.float32,
+        nb.float32,
+    ),
+    cache=True,
+    nogil=True,
+    fastmath=True,
+)
+def draw_quiver_map_u24(
+    img: npt.NDArray[np.uint8],
+    pts1: npt.NDArray[np.int32],
+    pts2: npt.NDArray[np.int32],
+    colors: npt.NDArray[np.uint8],
+    linewidth: int,
+    tip_size: float,
+    tip_angle: float,
+):
+    for i in range(len(pts1)):
+        pt1 = pts1[i]
+        pt2 = pts2[i]
+        color = colors[i]
+        draw_quiver_u24(img, pt1, pt2, color, linewidth, tip_size, tip_angle)
 
 
 # ------------------------------------------------------------------------------
@@ -304,9 +398,11 @@ def demo(
     start_radius = 50
     N_frames = 360
 
-    linewidth = 2
-    tip_size = 0.2
-    tip_angle = np.pi / 4
+    quiver_kwargs = {
+        "linewidth": 2,
+        "tip_size": 0.2,
+        "tip_angle": np.pi / 4,
+    }
 
     # Create grid of quivers, spaced equally apart
     # --------------------------------------------
@@ -332,8 +428,10 @@ def demo(
     img = np.copy(img_empty)
     pts1 = np.zeros((N_quivers, 2), dtype=np.int32)  # Start points
     pts2 = np.zeros((N_quivers * N_frames, 2), dtype=np.int32)  # End points
+    colors_u8 = np.ones(N_quivers, dtype=np.uint8)
+    colors_u8[:] = 255
+    colors_u24 = np.zeros((N_quivers, 3), dtype=np.uint8)
     thetas = np.linspace(0, 2 * np.pi, N_frames)
-    colors = np.zeros((N_quivers, 3), dtype=np.uint8)  # BGR colors
 
     for theta_idx, theta in enumerate(thetas):
         for quiver_idx in range(N_quivers):
@@ -357,42 +455,38 @@ def demo(
                 pts1[quiver_idx][1] = y1
 
                 lut_idx = int(np.round(r / start_radius * (N_COLORS_LUT - 1)))
-                colors[quiver_idx] = cv2_lut[lut_idx]
+                colors_u24[quiver_idx] = cv2_lut[lut_idx]
 
             pts2[quiver_idx + theta_idx * N_quivers][0] = x2
             pts2[quiver_idx + theta_idx * N_quivers][1] = y2
 
     # Pure draw and plot
     # ------------------
+    PLOT_PER_QUIVER = 0
 
     tick = perf_counter()
     for theta_idx, theta in enumerate(thetas):
         np.copyto(img, img_empty)
 
-        for quiver_idx in range(N_quivers):
-            pt1 = pts1[quiver_idx]
-            pt2 = pts2[quiver_idx + theta_idx * N_quivers]
+        if PLOT_PER_QUIVER:
+            for quiver_idx in range(N_quivers):
+                pt1 = pts1[quiver_idx]
+                pt2 = pts2[quiver_idx + theta_idx * N_quivers]
+
+                if use_color:
+                    color = colors_u24[quiver_idx]
+                    draw_quiver_u24(img, pt1, pt2, color, **quiver_kwargs)
+                else:
+                    color = colors_u8[quiver_idx]
+                    draw_quiver_u8(img, pt1, pt2, color, **quiver_kwargs)
+
+        else:
+            pts2_set = pts2[theta_idx * N_quivers : (theta_idx + 1) * N_quivers]
 
             if use_color:
-                draw_quiver_u24(
-                    img,
-                    pt1=pt1,
-                    pt2=pt2,
-                    color=colors[quiver_idx],
-                    linewidth=linewidth,
-                    tip_size=tip_size,
-                    tip_angle=tip_angle,
-                )
+                draw_quiver_map_u24(img, pts1, pts2_set, colors_u24, **quiver_kwargs)
             else:
-                draw_quiver_u8(
-                    img,
-                    pt1=pt1,
-                    pt2=pt2,
-                    color=255,
-                    linewidth=linewidth,
-                    tip_size=tip_size,
-                    tip_angle=tip_angle,
-                )
+                draw_quiver_map_u8(img, pts1, pts2_set, colors_u8, **quiver_kwargs)
 
         if 1:
             cv2.imshow("output", img)
@@ -410,8 +504,10 @@ def demo(
 #   main
 # ------------------------------------------------------------------------------
 
-
 if __name__ == "__main__":
+    print("__main__")
+    sys.stdout.flush()
+
     img_w, img_h = 600, 400
-    # demo(img_w, img_h, use_color=False)
+    demo(img_w, img_h, use_color=False)
     demo(img_w, img_h, colormap_name="jet")
