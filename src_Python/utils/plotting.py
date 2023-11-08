@@ -3,7 +3,7 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "07-11-2023"
+__date__ = "08-11-2023"
 __version__ = "1.0"
 
 import sys
@@ -216,7 +216,8 @@ def vector_map_to_hsv_colors(
             Default: cv2.INTER_CUBIC
 
     Returns:
-        The RGB image as a 3D numpy array of `uint8` values.
+        The RGB image as a 2D numpy array containing `[uint8, uint8, uint8]`
+        RGB color values.
     """
     if output_resolution is None:
         output_resolution = VM_grid_shape_2D
@@ -232,9 +233,7 @@ def vector_map_to_hsv_colors(
 
     cv2.cvtColor(canvas, cv2.COLOR_HSV2BGR, dst=canvas)
     if output_resolution != VM_grid_shape_2D:
-        canvas = cv2.resize(
-            canvas, output_resolution, interpolation=interpolation
-        )
+        canvas = cv2.resize(canvas, output_resolution, interpolation=interpolation)
 
     return np.asarray(canvas, dtype=np.uint8)
 
