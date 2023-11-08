@@ -8,29 +8,32 @@ import numba as nb
 import cv2
 
 # ------------------------------------------------------------------------------
-#   draw_8line
+#   draw_8line_u8
 # ------------------------------------------------------------------------------
 
 
 @nb.njit(
-    "(uint8[:, :], int32[:], int32[:], int32)",
+    "(uint8[:, :], int32[:], int32[:], uint8, int32)",
     cache=True,
     nogil=True,
 )
-def draw_8line(
+def draw_8line_u8(
     img: npt.NDArray[np.uint8],
-    p1: npt.NDArray[np.int32],
-    p2: npt.NDArray[np.int32],
-    width: int,
+    pt1: npt.NDArray[np.int32],
+    pt2: npt.NDArray[np.int32],
+    color: int,
+    thickness: int,
 ):
-    """Bresenham's line algorithm with support for custom linewidths."""
+    """Draw an 8-connected line into a uint8-grayscale bitmap `img` from point
+    `pt1` to `pt2` using the given uint8 `color` and `thickness`.
 
-    # Calculate the half-width for the line
-    half_width = width // 2
-
+    NOTE: In-place operation on `img`.
+    NOTE: Type-specific drop-in replacement for `cv2.line()`.
+    """
     # Bresenham's line algorithm
-    x1, y1 = p1
-    x2, y2 = p2
+    hw = thickness // 2  # Half-width
+    x1, y1 = pt1
+    x2, y2 = pt2
     dx = abs(x2 - x1)
     dy = abs(y2 - y1)
     sx = 1 if x1 < x2 else -1
@@ -38,13 +41,16 @@ def draw_8line(
     err = dx - dy
 
     while True:
-        for i in range(-half_width, half_width + 1):
-            for j in range(-half_width, half_width + 1):
+        for i in range(-hw, hw + 1):
+            for j in range(-hw, hw + 1):
                 px = x1 + i
                 py = y1 + j
 
-                if px >= 0 and px < img.shape[1] and py >= 0 and py < img.shape[0]:
-                    img[py, px] = 255
+                # fmt: off
+                if (px >= 0 and px < img.shape[1] and \
+                    py >= 0 and py < img.shape[0]):
+                    img[py, px] = color
+                # fmt: on
 
         if x1 == x2 and y1 == y2:
             break
@@ -59,63 +65,75 @@ def draw_8line(
 
 
 # ------------------------------------------------------------------------------
-#   draw_8line_with_arrowhead
+#   draw_quiver_u8
 # ------------------------------------------------------------------------------
 
 
 @nb.njit(
-    "(uint8[:, :], int32[:], int32[:], int32, int32)",
+    "(uint8[:, :], int32[:], int32[:], uint8, int32, int32)",
     cache=True,
     nogil=True,
 )
-def draw_8line_with_arrowhead(
+def draw_quiver_u8(
     img: npt.NDArray[np.uint8],
-    p1: npt.NDArray[np.int32],
-    p2: npt.NDArray[np.int32],
-    width: int,
-    arrowhead_size: int,
+    pt1: npt.NDArray[np.int32],
+    pt2: npt.NDArray[np.int32],
+    color: int,
+    thickness: int,
+    tipLength: float,
 ):
+    """Draw a quiver (an 8-connected line ending with an arrowhead) into a
+    uint8-grayscale bitmap `img` from point `pt1` to `pt2` using the given uint8
+    `color` and `thickness`. `tipLength` denotes the length of the arrow tip in
+    relation to the arrow length.
+
+    NOTE: In-place operation on `img`.
+    NOTE: Type-specific drop-in replacement for `cv2.arrowedLine()`.
+    """
     # Calculate arrowhead points
-    dx = p2[0] - p1[0]
-    dy = p2[1] - p1[1]
+    dx = pt2[0] - pt1[0]
+    dy = pt2[1] - pt1[1]
     length = np.sqrt(dx**2 + dy**2)
-    adx = arrowhead_size * dx / length
-    ady = arrowhead_size * dy / length
+    adx = tipLength * dx / length
+    ady = tipLength * dy / length
 
-    a1 = np.array((p2[0] - adx + ady, p2[1] - ady - adx), dtype=np.int32)
-    a2 = np.array((p2[0] - adx - ady, p2[1] - ady + adx), dtype=np.int32)
+    a1 = np.array((pt2[0] - adx + ady, pt2[1] - ady - adx), dtype=np.int32)
+    a2 = np.array((pt2[0] - adx - ady, pt2[1] - ady + adx), dtype=np.int32)
 
-    draw_8line(img, p1, p2, width)
-    draw_8line(img, a1, p2, width)
-    draw_8line(img, a2, p2, width)
+    draw_8line_u8(img, pt1, pt2, color, thickness)
+    draw_8line_u8(img, a1, pt2, color, thickness)
+    draw_8line_u8(img, a2, pt2, color, thickness)
 
 
 # ------------------------------------------------------------------------------
 #   main
 # ------------------------------------------------------------------------------
 
-center = np.array([200, 200], dtype=np.int32)
 radius = 100
+center = np.array([200, 200], dtype=np.int32)
 N_points = 360
-linewidth = 2
+
+color = 255
+thickness = 2
 arrowhead_size = 20
 
 img_empty = np.zeros((400, 400), dtype=np.uint8)
 img = np.copy(img_empty)
-p2 = np.array([0, 0], dtype=np.int32)
+pt2 = np.array([0, 0], dtype=np.int32)
 
 tick = perf_counter()
 for theta in np.linspace(0, 2 * np.pi, N_points):
     np.copyto(img, img_empty)
-    p2[0] = np.round(center[0] + radius * np.sin(theta))
-    p2[1] = np.round(center[1] + radius * np.cos(theta))
+    pt2[0] = np.round(center[0] + radius * np.sin(theta))
+    pt2[1] = np.round(center[1] + radius * np.cos(theta))
 
-    draw_8line_with_arrowhead(
+    draw_quiver_u8(
         img,
-        p1=center,
-        p2=p2,
-        width=linewidth,
-        arrowhead_size=arrowhead_size,
+        pt1=center,
+        pt2=pt2,
+        color=color,
+        thickness=thickness,
+        tipLength=arrowhead_size,
     )
 
     if 1:
