@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""
+TODO: Read https://stackoverflow.com/questions/41195973/how-to-use-bresenhams-line-drawing-algorithm-with-sub-pixel-bias
+"""
 
 from time import perf_counter
 import numpy as np
@@ -16,6 +19,7 @@ import cv2
     "(uint8[:, :], int32[:], int32[:], uint8, int32)",
     cache=True,
     nogil=True,
+    fastmath=True,
 )
 def draw_8line_u8(
     img: npt.NDArray[np.uint8],
@@ -34,8 +38,8 @@ def draw_8line_u8(
     hw = thickness // 2  # Half-width
     x1, y1 = pt1
     x2, y2 = pt2
-    dx = abs(x2 - x1)
-    dy = abs(y2 - y1)
+    dx = np.abs(x2 - x1)
+    dy = np.abs(y2 - y1)
     sx = 1 if x1 < x2 else -1
     sy = 1 if y1 < y2 else -1
     err = dx - dy
@@ -70,9 +74,10 @@ def draw_8line_u8(
 
 
 @nb.njit(
-    "(uint8[:, :], int32[:], int32[:], uint8, int32, int32)",
+    "(uint8[:, :], int32[:], int32[:], uint8, int32, float32)",
     cache=True,
     nogil=True,
+    fastmath=True,
 )
 def draw_quiver_u8(
     img: npt.NDArray[np.uint8],
@@ -90,15 +95,30 @@ def draw_quiver_u8(
     NOTE: In-place operation on `img`.
     NOTE: Type-specific drop-in replacement for `cv2.arrowedLine()`.
     """
-    # Calculate arrowhead points
-    dx = pt2[0] - pt1[0]
-    dy = pt2[1] - pt1[1]
-    length = np.sqrt(dx**2 + dy**2)
-    adx = tipLength * dx / length
-    ady = tipLength * dy / length
 
-    a1 = np.array((pt2[0] - adx + ady, pt2[1] - ady - adx), dtype=np.int32)
-    a2 = np.array((pt2[0] - adx - ady, pt2[1] - ady + adx), dtype=np.int32)
+    x1, y1 = pt1
+    x2, y2 = pt2
+    dx = x2 - x1
+    dy = y2 - y1
+    length = np.sqrt(dx**2 + dy**2)
+    tip_size = length * tipLength
+    tip_sharpness = np.pi / 4
+
+    angle = np.arctan2(y1 - y2, x1 - x2)
+    a1 = np.array(
+        (
+            np.round(x2 + tip_size * np.cos(angle + tip_sharpness)),
+            np.round(y2 + tip_size * np.sin(angle + tip_sharpness)),
+        ),
+        dtype=np.int32,
+    )
+    a2 = np.array(
+        (
+            np.round(x2 + tip_size * np.cos(angle - tip_sharpness)),
+            np.round(y2 + tip_size * np.sin(angle - tip_sharpness)),
+        ),
+        dtype=np.int32,
+    )
 
     draw_8line_u8(img, pt1, pt2, color, thickness)
     draw_8line_u8(img, a1, pt2, color, thickness)
@@ -115,7 +135,7 @@ N_points = 360
 
 color = 255
 thickness = 2
-arrowhead_size = 20
+arrowhead_size = 0.2
 
 img_empty = np.zeros((400, 400), dtype=np.uint8)
 img = np.copy(img_empty)
@@ -125,7 +145,7 @@ tick = perf_counter()
 for theta in np.linspace(0, 2 * np.pi, N_points):
     np.copyto(img, img_empty)
     pt2[0] = np.round(center[0] + radius * np.sin(theta))
-    pt2[1] = np.round(center[1] + radius * np.cos(theta))
+    pt2[1] = np.round(center[1] - radius * np.cos(theta))
 
     draw_quiver_u8(
         img,
