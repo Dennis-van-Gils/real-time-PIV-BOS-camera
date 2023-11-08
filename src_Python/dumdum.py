@@ -143,38 +143,92 @@ def draw_quiver_u8(
 #   main
 # ------------------------------------------------------------------------------
 
-radius = 100
-center = np.array([200, 200], dtype=np.int32)
-N_points = 360
+if __name__ == "__main__":
+    img_w, img_h = 600, 400
+    img_empty = np.zeros((img_h, img_w), dtype=np.uint8)
 
-color = 255
-linewidth = 2
-tip_size = 0.2
-tip_angle = np.pi / 4
+    img_half_w = img_w // 2
+    img_half_h = img_h // 2
+    img_center_to_corner_distance = np.sqrt(img_half_w**2 + img_half_h**2)
 
-img_empty = np.zeros((400, 400), dtype=np.uint8)
-img = np.copy(img_empty)
-pt2 = np.array([0, 0], dtype=np.int32)
+    start_radius = 50
+    N_circle_points = 360
 
-tick = perf_counter()
-for theta in np.linspace(0, 2 * np.pi, N_points):
-    np.copyto(img, img_empty)
-    pt2[0] = np.round(center[0] + radius * np.sin(theta))
-    pt2[1] = np.round(center[1] - radius * np.cos(theta))
+    color = 255
+    linewidth = 2
+    tip_size = 0.2
+    tip_angle = np.pi / 4
 
-    draw_quiver_u8(
-        img,
-        pt1=center,
-        pt2=pt2,
-        color=color,
-        linewidth=linewidth,
-        tip_size=tip_size,
-        tip_angle=tip_angle,
-    )
+    # Create grid of quivers, spaced equally apart
+    # --------------------------------------------
 
-    if 1:
-        cv2.imshow("output", img)
-        cv2.setWindowTitle("output", f"{theta * 180 / np.pi:.1f}")
-        cv2.waitKey(1)
+    spacing = 50
+    d_spacing = np.sqrt(2 * (spacing // 2) ** 2)
+    N_quivers_x = int((img_w - spacing) // spacing + 1)
+    N_quivers_y = int((img_h - spacing) // spacing + 1)
+    N_quivers = N_quivers_x * N_quivers_y
 
-print(f"{(perf_counter() - tick)/N_points*1000:.3f} ms")
+    arr_x = np.arange(N_quivers_x) * spacing + spacing // 2
+    arr_y = np.arange(N_quivers_y) * spacing + spacing // 2
+    arr_x = np.asarray(arr_x, dtype=np.int32)
+    arr_y = np.asarray(arr_y, dtype=np.int32)
+    grid_x = np.empty(N_quivers, dtype=np.int32)
+    for i in np.arange(N_quivers_y):
+        grid_x[i * N_quivers_x : (i + 1) * N_quivers_x] = arr_x
+    grid_y = np.repeat(arr_y, N_quivers_x)
+
+    # Animate all quivers by spinning each
+    # ------------------------------------
+
+    img = np.copy(img_empty)
+    pt1 = np.zeros((N_quivers, 2), dtype=np.int32)  # Start points
+    pt2 = np.zeros((N_quivers * N_circle_points, 2), dtype=np.int32)  # End points
+    thetas = np.linspace(0, 2 * np.pi, N_circle_points)
+
+    for theta_idx, theta in enumerate(thetas):
+        for quiver_idx in range(N_quivers):
+            # Start point
+            x1 = grid_x[quiver_idx]
+            y1 = grid_y[quiver_idx]
+
+            # The radius `r` of each quiver depends on its distance `d` from the
+            # image center. It falls of towards 0 at the quivers in the very
+            # corners.
+            d = np.sqrt((img_half_w - x1) ** 2 + (img_half_h - y1) ** 2)
+            d = d / (img_center_to_corner_distance - d_spacing)
+            r = start_radius * (1 - d)
+
+            # End point
+            x2 = np.round(x1 + r * np.sin(theta))
+            y2 = np.round(y1 - r * np.cos(theta))
+
+            pt1[quiver_idx][0] = x1
+            pt1[quiver_idx][1] = y1
+            pt2[quiver_idx + theta_idx * N_quivers][0] = x2
+            pt2[quiver_idx + theta_idx * N_quivers][1] = y2
+
+    # Pure draw and plot
+    # ------------------
+
+    tick = perf_counter()
+    for theta_idx, theta in enumerate(thetas):
+        np.copyto(img, img_empty)
+
+        for quiver_idx in range(N_quivers):
+            draw_quiver_u8(
+                img,
+                pt1=pt1[quiver_idx],
+                pt2=pt2[quiver_idx + theta_idx * N_quivers],
+                color=color,
+                linewidth=linewidth,
+                tip_size=tip_size,
+                tip_angle=tip_angle,
+            )
+
+        if 1:
+            cv2.imshow("output", img)
+            cv2.setWindowTitle("output", f"{theta * 180 / np.pi:.1f}")
+            cv2.waitKey(1)
+
+    ms_per_quiver = (perf_counter() - tick) / N_circle_points / N_quivers * 1000
+    print(f"Per quiver: {ms_per_quiver:.4f} ms")
