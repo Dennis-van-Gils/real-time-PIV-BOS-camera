@@ -26,16 +26,15 @@ def draw_8line_u8(
     pt1: npt.NDArray[np.int32],
     pt2: npt.NDArray[np.int32],
     color: int,
-    thickness: int,
+    linewidth: int,
 ):
     """Draw an 8-connected line into a uint8-grayscale bitmap `img` from point
-    `pt1` to `pt2` using the given uint8 `color` and `thickness`.
+    `pt1` to `pt2` using the given uint8 `color` and `linewidth`.
 
     NOTE: In-place operation on `img`.
-    NOTE: Type-specific drop-in replacement for `cv2.line()`.
     """
     # Bresenham's line algorithm
-    hw = thickness // 2  # Half-width
+    hw = linewidth // 2  # Half-width
     x1, y1 = pt1
     x2, y2 = pt2
     dx = np.abs(x2 - x1)
@@ -74,7 +73,7 @@ def draw_8line_u8(
 
 
 @nb.njit(
-    "(uint8[:, :], int32[:], int32[:], uint8, int32, float32)",
+    "(uint8[:, :], int32[:], int32[:], uint8, int32, float32, float32)",
     cache=True,
     nogil=True,
     fastmath=True,
@@ -84,45 +83,60 @@ def draw_quiver_u8(
     pt1: npt.NDArray[np.int32],
     pt2: npt.NDArray[np.int32],
     color: int,
-    thickness: int,
-    tipLength: float,
+    linewidth: int,
+    tip_size: float,
+    tip_angle: float,
 ):
-    """Draw a quiver (an 8-connected line ending with an arrowhead) into a
-    uint8-grayscale bitmap `img` from point `pt1` to `pt2` using the given uint8
-    `color` and `thickness`. `tipLength` denotes the length of the arrow tip in
-    relation to the arrow length.
+    """Draw a quiver (a line ending in an arrow tip) into a `uint8` grayscale
+    image.
 
-    NOTE: In-place operation on `img`.
-    NOTE: Type-specific drop-in replacement for `cv2.arrowedLine()`.
+    Args:
+        img (``numpy.ndarray[np.uint8]``):
+            The grayscale image as a 2D numpy array containing `uint8` values.
+            NOTE: In-place operation on `img`.
+
+        pt1 (``numpy.ndarray[np.uint32]``):
+            Start of the quiver as (x, y) coordinate.
+
+        pt2 (``numpy.ndarray[np.uint32]``):
+            End of the quiver as (x, y) coordinate.
+
+        color (``int``):
+            Color value as `uint8`.
+
+        linewidth (``int``):
+            Linewidth of each line segment making up the quiver.
+
+        tip_size (``float``):
+            The length of the arrow tip with respect to the arrow length.
+
+        tip_angle (``float``):
+            The angle of the arrow tip in radians. E.g., `np.pi/4` for a wide
+            tip or `np.pi/8` for a slender tip.
     """
 
     x1, y1 = pt1
     x2, y2 = pt2
     dx = x2 - x1
     dy = y2 - y1
-    length = np.sqrt(dx**2 + dy**2)
-    tip_size = length * tipLength
-    tip_sharpness = np.pi / 4
+    length = np.sqrt(dx**2 + dy**2)  # TODO: Turn into input arg
+    angle = np.arctan2(-dy, -dx)  # TODO: Turn into input arg
+    tip_size = length * tip_size
 
-    angle = np.arctan2(y1 - y2, x1 - x2)
-    a1 = np.array(
+    draw_8line_u8(img, pt1, pt2, color, linewidth)
+
+    tip = np.array(
         (
-            np.round(x2 + tip_size * np.cos(angle + tip_sharpness)),
-            np.round(y2 + tip_size * np.sin(angle + tip_sharpness)),
+            np.round(x2 + tip_size * np.cos(angle + tip_angle)),
+            np.round(y2 + tip_size * np.sin(angle + tip_angle)),
         ),
         dtype=np.int32,
     )
-    a2 = np.array(
-        (
-            np.round(x2 + tip_size * np.cos(angle - tip_sharpness)),
-            np.round(y2 + tip_size * np.sin(angle - tip_sharpness)),
-        ),
-        dtype=np.int32,
-    )
+    draw_8line_u8(img, tip, pt2, color, linewidth)
 
-    draw_8line_u8(img, pt1, pt2, color, thickness)
-    draw_8line_u8(img, a1, pt2, color, thickness)
-    draw_8line_u8(img, a2, pt2, color, thickness)
+    tip[0] = np.round(x2 + tip_size * np.cos(angle - tip_angle))
+    tip[1] = np.round(y2 + tip_size * np.sin(angle - tip_angle))
+    draw_8line_u8(img, tip, pt2, color, linewidth)
 
 
 # ------------------------------------------------------------------------------
@@ -134,8 +148,9 @@ center = np.array([200, 200], dtype=np.int32)
 N_points = 360
 
 color = 255
-thickness = 2
-arrowhead_size = 0.2
+linewidth = 2
+tip_size = 0.2
+tip_angle = np.pi / 4
 
 img_empty = np.zeros((400, 400), dtype=np.uint8)
 img = np.copy(img_empty)
@@ -152,8 +167,9 @@ for theta in np.linspace(0, 2 * np.pi, N_points):
         pt1=center,
         pt2=pt2,
         color=color,
-        thickness=thickness,
-        tipLength=arrowhead_size,
+        linewidth=linewidth,
+        tip_size=tip_size,
+        tip_angle=tip_angle,
     )
 
     if 1:
