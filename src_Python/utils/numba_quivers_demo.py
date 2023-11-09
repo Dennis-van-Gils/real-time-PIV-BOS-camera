@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import sys
 from time import perf_counter
 
 from numba_quivers import draw_quiver_map_u8, draw_quiver_map_u24
@@ -108,10 +107,8 @@ def build_quiver_arrays(
 # ------------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    print("__main__")
-    sys.stdout.flush()
-
-    img_w, img_h = 600, 400
+    USE_COLOR = 1
+    img_w, img_h = 900, 600
 
     thetas, pts1, pts2, colors_u8, colors_u24 = build_quiver_arrays(
         img_w,
@@ -122,7 +119,6 @@ if __name__ == "__main__":
         colormap_name="jet",
     )
 
-    use_color = True
     quiver_kwargs = {
         "linewidth": 2,
         "tip_size": 0.2,
@@ -131,33 +127,36 @@ if __name__ == "__main__":
 
     N_quivers = len(pts1)
     N_frames = len(thetas)
-
-    if use_color:
-        img_empty = np.zeros((img_h, img_w, 3), dtype=np.uint8)
-    else:
-        img_empty = np.zeros((img_h, img_w), dtype=np.uint8)
-    img = np.copy(img_empty)
+    print(f"{img_w} x {img_h}")
+    print(f"N_quivers = {N_quivers}")
+    print(f"N_frames  = {N_frames}\n")
 
     # Pure draw and plot
     # ------------------
+    img_empty = np.zeros(
+        (img_h, img_w, 3) if USE_COLOR else (img_h, img_w),
+        dtype=np.uint8,
+    )
+    img = np.copy(img_empty)
 
-    tick = perf_counter()
+    T = 0
     for frame_idx, theta in enumerate(thetas):
         np.copyto(img, img_empty)
         pts2_set = pts2[frame_idx * N_quivers : (frame_idx + 1) * N_quivers]
 
-        if use_color:
+        tick = perf_counter()
+        if USE_COLOR:
             draw_quiver_map_u24(img, pts1, pts2_set, colors_u24, **quiver_kwargs)
         else:
             draw_quiver_map_u8(img, pts1, pts2_set, colors_u8, **quiver_kwargs)
+        T += perf_counter() - tick
 
-        if 1:
-            cv2.imshow("output", img)
-            cv2.setWindowTitle("output", f"{theta * 180 / np.pi:.1f}")
-            cv2.waitKey(1)
+        cv2.imshow("output", img)
+        cv2.setWindowTitle("output", f"{theta * 180 / np.pi:.1f}")
+        # cv2.imwrite(f"export_{frame_idx:04d}.png", img)
+        cv2.waitKey(10)
 
-    duration = perf_counter() - tick
-    ms_per_frame = duration / N_frames * 1000
-    ms_per_quiver = duration / N_frames / N_quivers * 1000
+    ms_per_frame = T / N_frames * 1000
+    ms_per_quiver = T / N_frames / N_quivers * 1000
     print(f"Per frame : {ms_per_frame :.4f} ms")
     print(f"Per quiver: {ms_per_quiver:.4f} ms")
