@@ -11,6 +11,8 @@ demo_images/PIV_challenge_2014_case_E/*
 
 src_Python/output_debug.txt
 src_Python/output_VM.png
+src_Python/output_cv2.png
+src_Python/output_mpl.png
 
 .vscode/
 

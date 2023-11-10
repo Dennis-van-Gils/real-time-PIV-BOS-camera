@@ -26,6 +26,8 @@ def build_quiver_arrays(
     npt.NDArray[np.float64],
     npt.NDArray[np.int32],
     npt.NDArray[np.int32],
+    npt.NDArray[np.float32],
+    npt.NDArray[np.float32],
     npt.NDArray[np.uint8],
     npt.NDArray[np.uint8],
 ]:
@@ -68,38 +70,33 @@ def build_quiver_arrays(
     # Animate all quivers by spinning each one revolution
     # ---------------------------------------------------
 
-    pts1 = np.zeros((N_quivers, 2), dtype=np.int32)
-    pts2 = np.zeros((N_quivers * N_frames, 2), dtype=np.int32)
+    dx = np.zeros(N_quivers * N_frames, dtype=np.float32)
+    dy = np.zeros(N_quivers * N_frames, dtype=np.float32)
     thetas = np.linspace(0, 2 * np.pi, N_frames)
 
     for frame_idx, theta in enumerate(thetas):
         for quiver_idx in range(N_quivers):
             # Start point
-            x1 = grid_x[quiver_idx]
-            y1 = grid_y[quiver_idx]
+            x = grid_x[quiver_idx]
+            y = grid_y[quiver_idx]
 
             # The radius `r` of each quiver depends on its distance `d` from the
             # image center. It falls of towards 0 at the quivers in the very
             # corners.
-            d = np.sqrt((img_half_w - x1) ** 2 + (img_half_h - y1) ** 2)
+            d = np.sqrt((img_half_w - x) ** 2 + (img_half_h - y) ** 2)
             d = d / (img_center_to_corner_distance - d_spacing)
             r = np.maximum(start_radius * (1 - d), 0)
 
-            # End point
-            x2 = np.round(x1 + r * np.sin(theta))
-            y2 = np.round(y1 - r * np.cos(theta))
+            # End point shifts with respect to the start point
+            i = quiver_idx + frame_idx * N_quivers
+            dx[i] = r * np.sin(theta)
+            dy[i] = -r * np.cos(theta)
 
             if frame_idx == 0:
-                pts1[quiver_idx][0] = x1
-                pts1[quiver_idx][1] = y1
-
                 lut_idx = int(np.round(r / start_radius * (N_COLORS_LUT - 1)))
                 colors_u24[quiver_idx] = cv2_lut[lut_idx]
 
-            pts2[quiver_idx + frame_idx * N_quivers][0] = x2
-            pts2[quiver_idx + frame_idx * N_quivers][1] = y2
-
-    return thetas, pts1, pts2, colors_u8, colors_u24
+    return thetas, grid_x, grid_y, dx, dy, colors_u8, colors_u24
 
 
 # ------------------------------------------------------------------------------
@@ -110,7 +107,7 @@ if __name__ == "__main__":
     USE_COLOR = 1
     img_w, img_h = 900, 600
 
-    thetas, pts1, pts2, colors_u8, colors_u24 = build_quiver_arrays(
+    thetas, x, y, dx, dy, colors_u8, colors_u24 = build_quiver_arrays(
         img_w,
         img_h,
         quiver_spacing=50,
@@ -119,13 +116,13 @@ if __name__ == "__main__":
         colormap_name="jet",
     )
 
-    quiver_kwargs = {
+    kwargs = {
         "linewidth": 2,
-        "tip_size": 0.2,
-        "tip_angle": np.pi / 4,
+        "tip_size": 0.5,
+        "tip_angle": np.pi / 10,
     }
 
-    N_quivers = len(pts1)
+    N_quivers = len(x)
     N_frames = len(thetas)
     print(f"{img_w} x {img_h}")
     print(f"N_quivers = {N_quivers}")
@@ -139,16 +136,16 @@ if __name__ == "__main__":
     )
     img = np.copy(img_empty)
 
-    T = 0
+    T = 0  # Accumulate cpu time
     for frame_idx, theta in enumerate(thetas):
         np.copyto(img, img_empty)
-        pts2_set = pts2[frame_idx * N_quivers : (frame_idx + 1) * N_quivers]
+        s = slice(frame_idx * N_quivers, (frame_idx + 1) * N_quivers)
 
         tick = perf_counter()
         if USE_COLOR:
-            draw_quiver_map_u24(img, pts1, pts2_set, colors_u24, **quiver_kwargs)
+            draw_quiver_map_u24(img, x, y, dx[s], dy[s], colors_u24, **kwargs)
         else:
-            draw_quiver_map_u8(img, pts1, pts2_set, colors_u8, **quiver_kwargs)
+            draw_quiver_map_u8(img, x, y, dx[s], dy[s], colors_u8, **kwargs)
         T += perf_counter() - tick
 
         cv2.imshow("output", img)

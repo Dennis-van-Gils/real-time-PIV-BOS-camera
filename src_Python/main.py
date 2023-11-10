@@ -11,7 +11,7 @@ VM: Displacement vector map
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "07-11-2023"
+__date__ = "10-11-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
@@ -500,20 +500,10 @@ if __name__ == "__main__":
                     cv2.imwrite(fn_export, canvas)
 
                 if cfg.DEBUG:
+                    cv2.imwrite("output_cv2.png", canvas)
                     cv2.waitKey(0)
 
             else:
-                if cfg.DEBUG:
-                    plotting.vector_map_to_quiver_plot(
-                        A,
-                        VM_grid_x,
-                        VM_grid_y,
-                        VM_dx,
-                        VM_dy,
-                        VM_magn,
-                        frame_title,
-                    )
-
                 canvas = plotting.vector_map_to_cv2_quiver_plot(
                     B_orig,
                     VM_grid_x,
@@ -526,15 +516,20 @@ if __name__ == "__main__":
                 cv2.setWindowTitle("VM_results", f"{frame_title}")
 
                 if cfg.DEBUG:
-                    cv2.waitKey(0)
+                    plotting.vector_map_to_mpl_quiver_plot(
+                        B_orig,
+                        VM_grid_x,
+                        VM_grid_y,
+                        VM_dx,
+                        VM_dy,
+                        VM_magn,
+                        frame_title,
+                    )
 
-                # TODO: fix missing ref to `plt`
-                """
-                if cfg.DEBUG:
-                    plt.savefig("output_VM.png", dpi=300, bbox_inches="tight")  # type: ignore
-                    # plt.waitforbuttonpress()  # type: ignore
-                    plt.show()  # type: ignore
-                """
+                    cv2.imwrite("output_cv2.png", canvas)
+                    plt.savefig("output_mpl.png", dpi=300, bbox_inches="tight")
+                    # plt.waitforbuttonpress()
+                    plt.show()
 
         # ----------------------------------------------------------------------
         #   Check for key presses

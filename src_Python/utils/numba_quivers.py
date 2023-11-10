@@ -20,15 +20,13 @@ to ensure maximum performance.
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "09-11-2023"
+__date__ = "10-11-2023"
 __version__ = "1.0"
 
 import numpy as np
 import numpy.typing as npt
 import numba as nb
 
-
-MINIMUM_QUIVER_TIP_SIZE = 5
 
 # ------------------------------------------------------------------------------
 #   draw_8line_u8
@@ -38,8 +36,10 @@ MINIMUM_QUIVER_TIP_SIZE = 5
 @nb.njit(
     (
         nb.types.Array(nb.uint8, 2, "C"),
-        nb.types.Array(nb.int32, 1, "C"),
-        nb.types.Array(nb.int32, 1, "C"),
+        nb.int32,
+        nb.int32,
+        nb.int32,
+        nb.int32,
         nb.uint8,
         nb.int32,
     ),
@@ -49,8 +49,10 @@ MINIMUM_QUIVER_TIP_SIZE = 5
 )
 def draw_8line_u8(
     img: npt.NDArray[np.uint8],
-    pt1: npt.NDArray[np.int32],
-    pt2: npt.NDArray[np.int32],
+    x1: int,
+    y1: int,
+    x2: int,
+    y2: int,
     color: int,
     linewidth: int,
 ):
@@ -59,8 +61,6 @@ def draw_8line_u8(
     """
     # Bresenham's line algorithm
     hw = linewidth // 2  # Half-width
-    x1, y1 = pt1
-    x2, y2 = pt2
     dx = np.abs(x2 - x1)
     dy = np.abs(y2 - y1)
     sx = 1 if x1 < x2 else -1
@@ -99,8 +99,10 @@ def draw_8line_u8(
 @nb.njit(
     (
         nb.types.Array(nb.uint8, 3, "C"),
-        nb.types.Array(nb.int32, 1, "C"),
-        nb.types.Array(nb.int32, 1, "C"),
+        nb.int32,
+        nb.int32,
+        nb.int32,
+        nb.int32,
         nb.types.Array(nb.uint8, 1, "C"),
         nb.int32,
     ),
@@ -110,8 +112,10 @@ def draw_8line_u8(
 )
 def draw_8line_u24(
     img: npt.NDArray[np.uint8],
-    pt1: npt.NDArray[np.int32],
-    pt2: npt.NDArray[np.int32],
+    x1: int,
+    y1: int,
+    x2: int,
+    y2: int,
     color: npt.NDArray[np.uint8],
     linewidth: int,
 ):
@@ -120,8 +124,6 @@ def draw_8line_u24(
     """
     # Bresenham's line algorithm
     hw = linewidth // 2  # Half-width
-    x1, y1 = pt1
-    x2, y2 = pt2
     dx = np.abs(x2 - x1)
     dy = np.abs(y2 - y1)
     sx = 1 if x1 < x2 else -1
@@ -162,8 +164,10 @@ def draw_8line_u24(
 @nb.njit(
     (
         nb.types.Array(nb.uint8, 2, "C"),
-        nb.types.Array(nb.int32, 1, "C"),
-        nb.types.Array(nb.int32, 1, "C"),
+        nb.int32,
+        nb.int32,
+        nb.int32,
+        nb.int32,
         nb.uint8,
         nb.int32,
         nb.float32,
@@ -175,8 +179,10 @@ def draw_8line_u24(
 )
 def draw_quiver_u8(
     img: npt.NDArray[np.uint8],
-    pt1: npt.NDArray[np.int32],
-    pt2: npt.NDArray[np.int32],
+    x: int,
+    y: int,
+    dx: int,
+    dy: int,
     color: int,
     linewidth: int,
     tip_size: float,
@@ -186,25 +192,19 @@ def draw_quiver_u8(
     image.
     NOTE: In-place operation on `img`.
     """
-    x1, y1 = pt1
-    x2, y2 = pt2
-    dx = x2 - x1
-    dy = y2 - y1
+    x2 = x + dx
+    y2 = y + dy
     length = np.sqrt(dx**2 + dy**2)
     angle = np.arctan2(-dy, -dx)
     tip_size = length * tip_size
 
-    if tip_size < MINIMUM_QUIVER_TIP_SIZE and tip_size != 0:
-        tip_size = MINIMUM_QUIVER_TIP_SIZE
-
-    draw_8line_u8(img, pt1, pt2, color, linewidth)
-    tip = np.empty(2, dtype=np.int32)
-    tip[0] = np.round(x2 + tip_size * np.cos(angle + tip_angle))
-    tip[1] = np.round(y2 + tip_size * np.sin(angle + tip_angle))
-    draw_8line_u8(img, tip, pt2, color, linewidth)
-    tip[0] = np.round(x2 + tip_size * np.cos(angle - tip_angle))
-    tip[1] = np.round(y2 + tip_size * np.sin(angle - tip_angle))
-    draw_8line_u8(img, tip, pt2, color, linewidth)
+    draw_8line_u8(img, x, y, x2, y2, color, linewidth)
+    tip_x = np.round(x2 + tip_size * np.cos(angle + tip_angle))
+    tip_y = np.round(y2 + tip_size * np.sin(angle + tip_angle))
+    draw_8line_u8(img, tip_x, tip_y, x2, y2, color, linewidth)
+    tip_x = np.round(x2 + tip_size * np.cos(angle - tip_angle))
+    tip_y = np.round(y2 + tip_size * np.sin(angle - tip_angle))
+    draw_8line_u8(img, tip_x, tip_y, x2, y2, color, linewidth)
 
 
 # ------------------------------------------------------------------------------
@@ -215,8 +215,10 @@ def draw_quiver_u8(
 @nb.njit(
     (
         nb.types.Array(nb.uint8, 3, "C"),
-        nb.types.Array(nb.int32, 1, "C"),
-        nb.types.Array(nb.int32, 1, "C"),
+        nb.int32,
+        nb.int32,
+        nb.int32,
+        nb.int32,
         nb.types.Array(nb.uint8, 1, "C"),
         nb.int32,
         nb.float32,
@@ -228,8 +230,10 @@ def draw_quiver_u8(
 )
 def draw_quiver_u24(
     img: npt.NDArray[np.uint8],
-    pt1: npt.NDArray[np.int32],
-    pt2: npt.NDArray[np.int32],
+    x: int,
+    y: int,
+    dx: int,
+    dy: int,
     color: npt.NDArray[np.uint8],
     linewidth: int,
     tip_size: float,
@@ -239,25 +243,19 @@ def draw_quiver_u24(
     uint8]-color image.
     NOTE: In-place operation on `img`.
     """
-    x1, y1 = pt1
-    x2, y2 = pt2
-    dx = x2 - x1
-    dy = y2 - y1
+    x2 = x + dx
+    y2 = y + dy
     length = np.sqrt(dx**2 + dy**2)
     angle = np.arctan2(-dy, -dx)
     tip_size = length * tip_size
 
-    if tip_size < MINIMUM_QUIVER_TIP_SIZE and tip_size != 0:
-        tip_size = MINIMUM_QUIVER_TIP_SIZE
-
-    draw_8line_u24(img, pt1, pt2, color, linewidth)
-    tip = np.empty(2, dtype=np.int32)
-    tip[0] = np.round(x2 + tip_size * np.cos(angle + tip_angle))
-    tip[1] = np.round(y2 + tip_size * np.sin(angle + tip_angle))
-    draw_8line_u24(img, tip, pt2, color, linewidth)
-    tip[0] = np.round(x2 + tip_size * np.cos(angle - tip_angle))
-    tip[1] = np.round(y2 + tip_size * np.sin(angle - tip_angle))
-    draw_8line_u24(img, tip, pt2, color, linewidth)
+    draw_8line_u24(img, x, y, x2, y2, color, linewidth)
+    tip_x = np.round(x2 + tip_size * np.cos(angle + tip_angle))
+    tip_y = np.round(y2 + tip_size * np.sin(angle + tip_angle))
+    draw_8line_u24(img, tip_x, tip_y, x2, y2, color, linewidth)
+    tip_x = np.round(x2 + tip_size * np.cos(angle - tip_angle))
+    tip_y = np.round(y2 + tip_size * np.sin(angle - tip_angle))
+    draw_8line_u24(img, tip_x, tip_y, x2, y2, color, linewidth)
 
 
 # ------------------------------------------------------------------------------
@@ -268,8 +266,10 @@ def draw_quiver_u24(
 @nb.njit(
     (
         nb.types.Array(nb.uint8, 2, "C"),
-        nb.types.Array(nb.int32, 2, "C"),
-        nb.types.Array(nb.int32, 2, "C"),
+        nb.types.Array(nb.int32, 1, "C"),
+        nb.types.Array(nb.int32, 1, "C"),
+        nb.types.Array(nb.float32, 1, "C"),
+        nb.types.Array(nb.float32, 1, "C"),
         nb.types.Array(nb.uint8, 1, "C"),
         nb.int32,
         nb.float32,
@@ -281,8 +281,10 @@ def draw_quiver_u24(
 )
 def draw_quiver_map_u8(
     img: npt.NDArray[np.uint8],
-    pts1: npt.NDArray[np.int32],
-    pts2: npt.NDArray[np.int32],
+    x: npt.NDArray[np.int32],
+    y: npt.NDArray[np.int32],
+    dx: npt.NDArray[np.float32],
+    dy: npt.NDArray[np.float32],
     colors: npt.NDArray[np.uint8],
     linewidth: int,
     tip_size: float,
@@ -297,13 +299,17 @@ def draw_quiver_map_u8(
             uint8-grayscale values.
             NOTE: In-place operation on `img`.
 
-        pts1 (``numpy.ndarray[np.int32]``):
-            Array of shape (N_quivers, 2) containing the start coordinates per
-            quiver as [x, y].
+        x/y (``numpy.ndarray[np.int32]``):
+            Array of shape (N_quivers,) containing the start coordinates per
+            quiver.
 
-        pts2 (``numpy.ndarray[np.int32]``):
-            Array of shape (N_quivers, 2) containing the end coordinates per
-            quiver as [x, y].
+        dx/dy (``numpy.ndarray[np.float32]``):
+            Array of shape (N_quivers,) containing the end coordinates per
+            quiver as [x + dx, y + dy].
+
+            NaN values for `dx` and `dy` are allowed and will simply prevent
+            that specific quiver from being draw altogether. Non-NaN values will
+            get rounded to integers.
 
         colors (``numpy.ndarray[np.uint8]``):
             Array of shape (N_quivers,) containing uint8-grayscale values.
@@ -318,11 +324,16 @@ def draw_quiver_map_u8(
             The angle of the arrow tip in radians. E.g., `np.pi/4` for a wide
             tip or `np.pi/8` for a slender tip.
     """
-    for i in range(len(pts1)):
+    for i in range(len(x)):
+        if np.isnan(dx[i]) or np.isnan(dy[i]):
+            continue
+
         draw_quiver_u8(
             img,
-            pts1[i],
-            pts2[i],
+            x[i],
+            y[i],
+            int(np.round(dx[i])),
+            int(np.round(dy[i])),
             colors[i],
             linewidth,
             tip_size,
@@ -338,8 +349,10 @@ def draw_quiver_map_u8(
 @nb.njit(
     (
         nb.types.Array(nb.uint8, 3, "C"),
-        nb.types.Array(nb.int32, 2, "C"),
-        nb.types.Array(nb.int32, 2, "C"),
+        nb.types.Array(nb.int32, 1, "C"),
+        nb.types.Array(nb.int32, 1, "C"),
+        nb.types.Array(nb.float32, 1, "C"),
+        nb.types.Array(nb.float32, 1, "C"),
         nb.types.Array(nb.uint8, 2, "C"),
         nb.int32,
         nb.float32,
@@ -351,8 +364,10 @@ def draw_quiver_map_u8(
 )
 def draw_quiver_map_u24(
     img: npt.NDArray[np.uint8],
-    pts1: npt.NDArray[np.int32],
-    pts2: npt.NDArray[np.int32],
+    x: npt.NDArray[np.int32],
+    y: npt.NDArray[np.int32],
+    dx: npt.NDArray[np.float32],
+    dy: npt.NDArray[np.float32],
     colors: npt.NDArray[np.uint8],
     linewidth: int,
     tip_size: float,
@@ -367,13 +382,17 @@ def draw_quiver_map_u24(
             containing [uint8, uint8, uint8]-color values.
             NOTE: In-place operation on `img`.
 
-        pts1 (``numpy.ndarray[np.int32]``):
-            Array of shape (N_quivers, 2) containing the start coordinates per
-            quiver as [x, y].
+        x/y (``numpy.ndarray[np.int32]``):
+            Array of shape (N_quivers,) containing the start coordinates per
+            quiver.
 
-        pts2 (``numpy.ndarray[np.int32]``):
-            Array of shape (N_quivers, 2) containing the end coordinates per
-            quiver as [x, y].
+        dx/dy (``numpy.ndarray[np.float32]``):
+            Array of shape (N_quivers,) containing the end coordinates per
+            quiver as [x + dx, y + dy].
+
+            NaN values for `dx` and `dy` are allowed and will simply prevent
+            that specific quiver from being draw altogether. Non-NaN values will
+            get rounded to integers.
 
         colors (``numpy.ndarray[np.uint8]``):
             Array of shape (N_quivers, 3) containing [uint8, uint8, uint8]-color
@@ -389,11 +408,16 @@ def draw_quiver_map_u24(
             The angle of the arrow tip in radians. E.g., `np.pi/4` for a wide
             tip or `np.pi/8` for a slender tip.
     """
-    for i in range(len(pts1)):
+    for i in range(len(x)):
+        if np.isnan(dx[i]) or np.isnan(dy[i]):
+            continue
+
         draw_quiver_u24(
             img,
-            pts1[i],
-            pts2[i],
+            x[i],
+            y[i],
+            int(np.round(dx[i])),
+            int(np.round(dy[i])),
             colors[i],
             linewidth,
             tip_size,
