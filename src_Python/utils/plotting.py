@@ -218,6 +218,7 @@ def get_colors_from_cv2_colormap_lut(
         nb.types.Array(nb.float32, 1, "C"),
         nb.types.UniTuple(nb.int64, 2),
         nb.float32,
+        nb.boolean,
     ),
     cache=True,
     nogil=True,
@@ -227,6 +228,7 @@ def _vector_map_to_hsv_colors(
     VM_angle: npt.NDArray[np.float32],
     VM_grid_shape_2D: tuple[int, int],
     pixel_displacement_at_max_colormap_value: float,
+    show_clipped_as_white: bool,
 ) -> npt.NDArray[np.uint8]:
     """Numba-accelerated core for function `vector_map_to_hsv_colors()`."""
     # NOTE: Argument `pixel_displacement_at_max_colormap_value` must be passed
@@ -236,19 +238,22 @@ def _vector_map_to_hsv_colors(
     VM_magn = np.nan_to_num(VM_magn)
     VM_angle = np.nan_to_num(VM_angle)
 
+    # Check for 'out-of-range over' values
+    HSV_sat = np.ones(VM_magn.shape, dtype=np.uint8) * 255
+    HSV_val = VM_magn / pixel_displacement_at_max_colormap_value * 255
+    mask = HSV_val > 255
+    HSV_val[mask] = 255
+    if show_clipped_as_white:
+        HSV_sat[mask] = 0
+
     # Create a linearized HSV canvas and color it in
     canvas = np.empty((len(VM_magn), 3), dtype=np.uint8)
     canvas[:, 0] = np.floor(VM_angle / (360 / 179))  # Range [0, 179]
-    canvas[:, 1] = 255
-    canvas[:, 2] = (
-        np.clip(VM_magn / pixel_displacement_at_max_colormap_value, 0, 1) * 255
-    )
+    canvas[:, 1] = HSV_sat
+    canvas[:, 2] = HSV_val
 
     # Reshape linear canvas to 2D canvas
-    canvas = np.reshape(
-        canvas,
-        (VM_grid_shape_2D[0], VM_grid_shape_2D[1], 3),
-    )
+    canvas = np.reshape(canvas, (VM_grid_shape_2D[0], VM_grid_shape_2D[1], 3))
 
     return canvas
 
@@ -259,6 +264,7 @@ def vector_map_to_hsv_colors(
     VM_grid_shape_2D: tuple[int, int],
     output_resolution: tuple[int, int] | None = None,
     interpolation: int = cv2.INTER_CUBIC,
+    show_clipped_as_white: bool = False,
 ) -> npt.NDArray[np.uint8]:
     """Generate and return an `uint8` RGB image where the passed vector data
     gets interpreted as an HSV image as follows:
@@ -294,6 +300,11 @@ def vector_map_to_hsv_colors(
 
             Default: cv2.INTER_CUBIC
 
+        show_clipped_as_white (``bool``, optional):
+            TODO: descr.
+
+            Default: False
+
     Returns:
         The RGB image as a 2D numpy array containing `[uint8, uint8, uint8]`
         RGB color values.
@@ -303,6 +314,7 @@ def vector_map_to_hsv_colors(
         VM_angle,
         VM_grid_shape_2D,
         cfg.PIXEL_DISPLACEMENT_AT_MAX_COLORMAP_VALUE,
+        show_clipped_as_white,
     )
     cv2.cvtColor(canvas, cv2.COLOR_HSV2BGR, dst=canvas)
 

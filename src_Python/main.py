@@ -473,21 +473,22 @@ if __name__ == "__main__":
                     VM_angle,
                     (IW_mesh.N_IWs_y, IW_mesh.N_IWs_x),
                     output_resolution=output_resolution,
-                    interpolation=cv2.INTER_CUBIC,
+                    interpolation=cv2.INTER_NEAREST,
                     # interpolation=cv2.INTER_LINEAR,
-                    # interpolation=cv2.INTER_NEAREST,
+                    # interpolation=cv2.INTER_CUBIC,
+                    show_clipped_as_white=False,
                 )
 
                 cv2.imshow("VM_results", canvas)
                 cv2.setWindowTitle("VM_results", f"{frame_title}")
-                cv2.imshow(
-                    "Image",
-                    cv2.resize(
-                        B_orig,
-                        output_resolution,
-                        interpolation=cv2.INTER_NEAREST,
-                    ),
-                )
+                # cv2.imshow(
+                #     "Image",
+                #     cv2.resize(
+                #         B_orig,
+                #         output_resolution,
+                #         interpolation=cv2.INTER_NEAREST,
+                #     ),
+                # )
 
                 EXPORT = False
                 if EXPORT:
