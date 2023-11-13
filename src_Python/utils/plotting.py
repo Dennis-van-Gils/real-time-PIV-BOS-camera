@@ -3,7 +3,7 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "10-11-2023"
+__date__ = "13-11-2023"
 __version__ = "1.0"
 
 import sys
@@ -212,6 +212,41 @@ def get_colors_from_cv2_colormap_lut(
 # ------------------------------------------------------------------------------
 
 
+@nb.njit(
+    (nb.types.Array(nb.uint8, 3, "C"))(
+        nb.types.Array(nb.float32, 1, "C"),
+        nb.types.Array(nb.float32, 1, "C"),
+        nb.types.UniTuple(nb.int64, 2),
+        nb.float32,
+    ),
+    cache=True,
+    nogil=True,
+)
+def _vector_map_to_hsv_colors(
+    VM_magn: npt.NDArray[np.float32],
+    VM_angle: npt.NDArray[np.float32],
+    VM_grid_shape_2D: tuple[int, int],
+    VM_magn_multiplier: float = 255,
+) -> npt.NDArray[np.uint8]:
+    """Numba-accelerated core for function `vector_map_to_hsv_colors()`."""
+    VM_magn = np.nan_to_num(VM_magn)
+    VM_angle = np.nan_to_num(VM_angle)
+
+    # Create a linearized HSV canvas and color it in
+    canvas = np.empty((len(VM_magn), 3), dtype=np.uint8)
+    canvas[:, 0] = np.floor(VM_angle / (360 / 179))  # Range [0, 179]
+    canvas[:, 1] = 255
+    canvas[:, 2] = np.clip(VM_magn * VM_magn_multiplier, 0, 255)
+
+    # Reshape linear canvas to 2D canvas
+    canvas = np.reshape(
+        canvas,
+        (VM_grid_shape_2D[0], VM_grid_shape_2D[1], 3),
+    )
+
+    return canvas
+
+
 def vector_map_to_hsv_colors(
     VM_magn: npt.NDArray[np.float32],
     VM_angle: npt.NDArray[np.float32],
@@ -264,23 +299,23 @@ def vector_map_to_hsv_colors(
         The RGB image as a 2D numpy array containing `[uint8, uint8, uint8]`
         RGB color values.
     """
-    if output_resolution is None:
-        output_resolution = VM_grid_shape_2D
-
-    VM_magn = np.nan_to_num(np.reshape(VM_magn, VM_grid_shape_2D))
-    VM_angle = np.nan_to_num(np.reshape(VM_angle, VM_grid_shape_2D))
-
-    # Create an HSV canvas and color it in
-    canvas = np.zeros((*VM_grid_shape_2D, 3), dtype=np.uint8)
-    canvas[..., 0] = np.floor(VM_angle / (360 / 179))  # Range [0, 179]
-    canvas[..., 1] = 255
-    canvas[..., 2] = np.clip(VM_magn * VM_magn_multiplier, 0, 255)
-
+    canvas = _vector_map_to_hsv_colors(
+        VM_magn,
+        VM_angle,
+        VM_grid_shape_2D,
+        VM_magn_multiplier,
+    )
     cv2.cvtColor(canvas, cv2.COLOR_HSV2BGR, dst=canvas)
-    if output_resolution != VM_grid_shape_2D:
-        canvas = cv2.resize(canvas, output_resolution, interpolation=interpolation)
 
-    return np.asarray(canvas, dtype=np.uint8)
+    if output_resolution is not None and output_resolution != VM_grid_shape_2D:
+        canvas = cv2.resize(
+            canvas,
+            output_resolution,
+            interpolation=interpolation,
+        )
+        canvas = np.asarray(canvas, dtype=np.uint8)
+
+    return canvas
 
 
 # ------------------------------------------------------------------------------
@@ -295,7 +330,7 @@ def vector_map_to_mpl_quiver_plot(
     VM_dx: npt.NDArray[np.float32],
     VM_dy: npt.NDArray[np.float32],
     VM_magn: npt.NDArray[np.float32],
-    frame_title: str,
+    plot_title: str,
 ):
     """ """
     self = vector_map_to_mpl_quiver_plot
@@ -320,12 +355,12 @@ def vector_map_to_mpl_quiver_plot(
             color=colormap(VM_colors),
             linewidths=1,
         )
-        self.h_title = plt.title(f"{frame_title}")
+        self.h_title = plt.title(f"{plot_title}")
 
     self.h_imshow.set_data(background_img)
     self.h_quiver.set_UVC(VM_dx * cfg.QUIVER_SIZE, VM_dy * cfg.QUIVER_SIZE)
     self.h_quiver.set_color(colormap(VM_colors))
-    self.h_title.set_text(f"{frame_title}")
+    self.h_title.set_text(f"{plot_title}")
 
     plt.draw()
     plt.pause(0.0001)
