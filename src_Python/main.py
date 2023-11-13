@@ -11,7 +11,7 @@ VM: Displacement vector map
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "10-11-2023"
+__date__ = "13-11-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
@@ -472,7 +472,6 @@ if __name__ == "__main__":
                     VM_magn,
                     VM_angle,
                     (IW_mesh.N_IWs_y, IW_mesh.N_IWs_x),
-                    VM_magn_multiplier=300,  # TODO: Turn `300` into `cfg`-param
                     output_resolution=output_resolution,
                     interpolation=cv2.INTER_CUBIC,
                     # interpolation=cv2.INTER_LINEAR,

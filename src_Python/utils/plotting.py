@@ -226,9 +226,13 @@ def _vector_map_to_hsv_colors(
     VM_magn: npt.NDArray[np.float32],
     VM_angle: npt.NDArray[np.float32],
     VM_grid_shape_2D: tuple[int, int],
-    VM_magn_multiplier: float = 255,
+    pixel_displacement_at_max_colormap_value: float,
 ) -> npt.NDArray[np.uint8]:
     """Numba-accelerated core for function `vector_map_to_hsv_colors()`."""
+    # NOTE: Argument `pixel_displacement_at_max_colormap_value` must be passed
+    # in. We can not reference to `cfg.PIXEL_DISPLACEMENT_AT_MAX_COLORMAP_VALUE`
+    # inside of this jitted function, because otherwise the reference /value/
+    # gets baked in instead of the reference itself.
     VM_magn = np.nan_to_num(VM_magn)
     VM_angle = np.nan_to_num(VM_angle)
 
@@ -236,7 +240,9 @@ def _vector_map_to_hsv_colors(
     canvas = np.empty((len(VM_magn), 3), dtype=np.uint8)
     canvas[:, 0] = np.floor(VM_angle / (360 / 179))  # Range [0, 179]
     canvas[:, 1] = 255
-    canvas[:, 2] = np.clip(VM_magn * VM_magn_multiplier, 0, 255)
+    canvas[:, 2] = (
+        np.clip(VM_magn / pixel_displacement_at_max_colormap_value, 0, 1) * 255
+    )
 
     # Reshape linear canvas to 2D canvas
     canvas = np.reshape(
@@ -251,7 +257,6 @@ def vector_map_to_hsv_colors(
     VM_magn: npt.NDArray[np.float32],
     VM_angle: npt.NDArray[np.float32],
     VM_grid_shape_2D: tuple[int, int],
-    VM_magn_multiplier: float = 255,
     output_resolution: tuple[int, int] | None = None,
     interpolation: int = cv2.INTER_CUBIC,
 ) -> npt.NDArray[np.uint8]:
@@ -271,12 +276,6 @@ def vector_map_to_hsv_colors(
         VM_grid_shape_2D (``tuple[int, int]``):
             2D-shape of the grid corresponding to the above arrays, i.e.
             [N_IWs_y, N_IWs_x].
-
-        VM_magn_multiplier (``float``, optional):
-            The vector magnitudes get multiplied with this factor to make up the
-            Value channel, in turn being clipped over the range [0, 255].
-
-            Default: 255
 
         output_resolution (``tuple[int, int] | None``, optional)
             The returned RGB image nominally has a 2D-raster shape given
@@ -303,7 +302,7 @@ def vector_map_to_hsv_colors(
         VM_magn,
         VM_angle,
         VM_grid_shape_2D,
-        VM_magn_multiplier,
+        cfg.PIXEL_DISPLACEMENT_AT_MAX_COLORMAP_VALUE,
     )
     cv2.cvtColor(canvas, cv2.COLOR_HSV2BGR, dst=canvas)
 
@@ -335,7 +334,7 @@ def vector_map_to_mpl_quiver_plot(
     """ """
     self = vector_map_to_mpl_quiver_plot
     colormap = this.mpl_colormap
-    VM_colors = VM_magn / cfg.COLOR_DIV
+    VM_colors = VM_magn / cfg.PIXEL_DISPLACEMENT_AT_MAX_COLORMAP_VALUE
 
     if not plt.fignum_exists("VM_quiver_plot"):  # type: ignore
         plt.figure("VM_quiver_plot")
@@ -397,7 +396,9 @@ def vector_map_to_cv2_quiver_plot(
         y=VM_grid_y,
         dx=VM_dx * cfg.QUIVER_SIZE,
         dy=VM_dy * cfg.QUIVER_SIZE,
-        colors=get_colors_from_cv2_colormap_lut(VM_magn / cfg.COLOR_DIV),
+        colors=get_colors_from_cv2_colormap_lut(
+            VM_magn / cfg.PIXEL_DISPLACEMENT_AT_MAX_COLORMAP_VALUE
+        ),
         linewidth=linewidth,
         tip_size=tip_size,
         tip_angle=tip_angle,
