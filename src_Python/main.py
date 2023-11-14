@@ -506,6 +506,10 @@ if __name__ == "__main__":
             cv2.imshow("VM_results", canvas)
             cv2.setWindowTitle("VM_results", f"{frame_title}")
 
+            if do_show_original_video:
+                cv2.imshow("Original", B_orig)
+                cv2.setWindowTitle("Original", f"Original: {frame_title}")
+
             # Save vector map results to disk?
             EXPORT = False
             if EXPORT:
@@ -532,15 +536,6 @@ if __name__ == "__main__":
                 cv2.imwrite("output_cv2.png", canvas)
                 plt.savefig("output_mpl.png", dpi=300, bbox_inches="tight")
                 plt.show()
-
-            # cv2.imshow(
-            #     "Image",
-            #     cv2.resize(
-            #         B_orig,
-            #         output_resolution,
-            #         interpolation=cv2.INTER_NEAREST,
-            #     ),
-            # )
 
         # ----------------------------------------------------------------------
         #   Handle keypresses
@@ -571,18 +566,27 @@ if __name__ == "__main__":
         if key_pressed == "q":
             print("Key Q: Quit")
             break
+
         elif key_pressed == "b":
             do_reacquire_BOS_frame_0 = True
             print("Key B: Reacquire BOS frame 0")
+
         elif key_pressed == "c":
             do_colormap_clip_warning = not do_colormap_clip_warning
-            print(f"Key C: Colormap clip warning {bool2on(do_colormap_clip_warning)}")
+            print("Key C: Colormap clip warning ", end="")
+            print(f"{bool2on(do_colormap_clip_warning)}")
+
         elif key_pressed == "e":
             do_export_frames = not do_export_frames
-            print(f"Key E: Export frames to disk {bool2on(do_export_frames)}")
+            print("Key E: Export frames to disk ", end="")
+            print(f"{bool2on(do_export_frames)}")
+
         elif key_pressed == "o":
             do_show_original_video = not do_show_original_video
-            print(f"Key O: Original video frames {bool2on(do_show_original_video)}")
+            print("Key O: Original video frames ", end="")
+            print(f"{bool2on(do_show_original_video)}")
+            if not do_show_original_video:
+                cv2.destroyWindow("Original")
 
     # --------------------------------------------------------------------------
     #   Exit
