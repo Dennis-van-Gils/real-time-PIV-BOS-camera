@@ -128,14 +128,12 @@ this = sys.modules[__name__]
 
 this.mpl_colormap = build_mpl_colormap(  # type: ignore
     mpl_colormap_name=cfg.COLORMAP_NAME,
-    mpl_set_under=cfg.COLORMAP_OUT_OF_RANGE_UNDER,
-    mpl_set_over=cfg.COLORMAP_OUT_OF_RANGE_OVER,
+    mpl_set_over=cfg.COLORMAP_CLIP_COLOR,
 )
 
 this.cv2_colormap_lut = build_cv2_colormap_lut(  # type: ignore
     mpl_colormap_name=cfg.COLORMAP_NAME,
-    mpl_set_under=cfg.COLORMAP_OUT_OF_RANGE_UNDER,
-    mpl_set_over=cfg.COLORMAP_OUT_OF_RANGE_OVER,
+    mpl_set_over=cfg.COLORMAP_CLIP_COLOR,
 )
 
 # ------------------------------------------------------------------------------
@@ -342,11 +340,15 @@ def vector_map_to_mpl_quiver_plot(
     VM_dy: npt.NDArray[np.float32],
     VM_magn: npt.NDArray[np.float32],
     plot_title: str,
+    show_clipped: bool = False,
 ):
     """ """
     self = vector_map_to_mpl_quiver_plot
     colormap = this.mpl_colormap
+
     VM_colors = VM_magn / cfg.PIXEL_DISPLACEMENT_AT_MAX_COLORMAP_VALUE
+    if not show_clipped:
+        VM_colors[VM_colors > 1] = 1  # Disable clip warning by clamping to 1
 
     if not plt.fignum_exists("VM_quiver_plot"):  # type: ignore
         plt.figure("VM_quiver_plot")
@@ -394,6 +396,7 @@ def vector_map_to_cv2_quiver_plot(
     linewidth: int = 2,
     tip_size: float = 0.5,
     tip_angle: float = np.pi / 10,
+    show_clipped: bool = False,
 ) -> npt.NDArray[np.uint8]:
     """ """
     if output_resolution is None:
@@ -402,15 +405,17 @@ def vector_map_to_cv2_quiver_plot(
     canvas = cv2.cvtColor(background_img * 255, cv2.COLOR_GRAY2BGR)
     canvas = np.asarray(canvas, dtype=np.uint8)
 
+    VM_colors = VM_magn / cfg.PIXEL_DISPLACEMENT_AT_MAX_COLORMAP_VALUE
+    if not show_clipped:
+        VM_colors[VM_colors > 1] = 1  # Disable clip warning by clamping to 1
+
     numba_quivers.draw_quiver_map_u24(
         img=canvas,
         x=VM_grid_x,
         y=VM_grid_y,
         dx=VM_dx * cfg.QUIVER_SIZE,
         dy=VM_dy * cfg.QUIVER_SIZE,
-        colors=get_colors_from_cv2_colormap_lut(
-            VM_magn / cfg.PIXEL_DISPLACEMENT_AT_MAX_COLORMAP_VALUE
-        ),
+        colors=get_colors_from_cv2_colormap_lut(VM_colors),
         linewidth=linewidth,
         tip_size=tip_size,
         tip_angle=tip_angle,
