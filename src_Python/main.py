@@ -11,7 +11,7 @@ VM: Displacement vector map
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "13-11-2023"
+__date__ = "14-11-2023"
 __version__ = "1.0"
 # pylint: disable=missing-function-docstring
 
@@ -21,7 +21,8 @@ import platform
 import concurrent.futures
 from time import perf_counter
 
-import msvcrt
+if os.name == "nt":
+    import msvcrt
 
 import psutil
 import numpy as np
@@ -29,7 +30,8 @@ import numpy.typing as npt
 import matplotlib.pyplot as plt
 import cv2
 
-# The import order is important. We must handle the user configuration first.
+# The import order is important. We must handle the user configuration first
+# before we load in the `utils` modules.
 import init_config as cfg
 
 # Parse command line arguments.
@@ -60,9 +62,26 @@ elif cfg.FFT_LIB == cfg.FFT_LIBS.SCIPY:
 else:
     from utils.dvg_fftconvolver_rocketfft import FFT_Convolver2D_Full
 
+# Global user-interaction flags
+do_reacquire_BOS_frame_0 = False
+do_colormap_clip_warning = False
+do_export_frames = False
+do_show_original_video = False
+
+
+# ------------------------------------------------------------------------------
+#   Tiny helper functions
+# ------------------------------------------------------------------------------
+
+
+def bool2on(state: bool) -> str:
+    return "ON" if state else "OFF"
+
+
 # ------------------------------------------------------------------------------
 #   Main
 # ------------------------------------------------------------------------------
+
 
 if __name__ == "__main__":
     # Set maximum process priority in the OS
@@ -463,47 +482,17 @@ if __name__ == "__main__":
             # fmt: on
 
             if cfg.MODE in [cfg.MODES.BOS]:
-                output_resolution = (
-                    frame_server.img_w,
-                    frame_server.img_h,
-                )
-
                 canvas = plotting.vector_map_to_hsv_colors(
                     VM_magn,
                     VM_angle,
-                    (IW_mesh.N_IWs_y, IW_mesh.N_IWs_x),
-                    output_resolution=output_resolution,
+                    VM_grid_shape_2D=(IW_mesh.N_IWs_y, IW_mesh.N_IWs_x),
+                    output_resolution=(frame_server.img_w, frame_server.img_h),
                     interpolation=cv2.INTER_NEAREST,
                     # interpolation=cv2.INTER_LINEAR,
                     # interpolation=cv2.INTER_CUBIC,
-                    show_clipped_as_white=False,
+                    show_clipped_as_white=do_colormap_clip_warning,
                 )
-
-                cv2.imshow("VM_results", canvas)
-                cv2.setWindowTitle("VM_results", f"{frame_title}")
-                # cv2.imshow(
-                #     "Image",
-                #     cv2.resize(
-                #         B_orig,
-                #         output_resolution,
-                #         interpolation=cv2.INTER_NEAREST,
-                #     ),
-                # )
-
-                EXPORT = False
-                if EXPORT:
-                    if cfg.MODE in [cfg.MODES.PIV2]:
-                        export_idx = frame_server.counter // 2 - 1
-                    else:
-                        export_idx = frame_server.counter - 1
-                    fn_export = f"export_{export_idx:04d}.png"
-                    cv2.imwrite(fn_export, canvas)
-
-                if cfg.DEBUG:
-                    cv2.imwrite("output_cv2.png", canvas)
-                    cv2.waitKey(0)
-
-            else:
+            else:  # [PIV & PIV2]
                 canvas = plotting.vector_map_to_cv2_quiver_plot(
                     B_orig,
                     VM_grid_x,
@@ -511,38 +500,93 @@ if __name__ == "__main__":
                     VM_dx,
                     VM_dy,
                     VM_magn,
+                    show_clipped=do_colormap_clip_warning,
                 )
-                cv2.imshow("VM_results", canvas)
-                cv2.setWindowTitle("VM_results", f"{frame_title}")
 
-                if cfg.DEBUG:
-                    plotting.vector_map_to_mpl_quiver_plot(
-                        B_orig,
-                        VM_grid_x,
-                        VM_grid_y,
-                        VM_dx,
-                        VM_dy,
-                        VM_magn,
-                        frame_title,
-                    )
+            cv2.imshow("VM_results", canvas)
+            cv2.setWindowTitle("VM_results", f"{frame_title}")
 
-                    cv2.imwrite("output_cv2.png", canvas)
-                    plt.savefig("output_mpl.png", dpi=300, bbox_inches="tight")
-                    # plt.waitforbuttonpress()
-                    plt.show()
+            # Save vector map results to disk?
+            EXPORT = False
+            if EXPORT:
+                if cfg.MODE in [cfg.MODES.PIV2]:
+                    export_idx = frame_server.counter // 2 - 1
+                else:
+                    export_idx = frame_server.counter - 1
+                fn_export = f"export_{export_idx:04d}.png"
+                cv2.imwrite(fn_export, canvas)
+
+            # DEBUG: Show the slower Matplotlib quiver plot and save to disk
+            if cfg.DEBUG:
+                plotting.vector_map_to_mpl_quiver_plot(
+                    B_orig,
+                    VM_grid_x,
+                    VM_grid_y,
+                    VM_dx,
+                    VM_dy,
+                    VM_magn,
+                    frame_title,
+                    show_clipped=do_colormap_clip_warning,
+                )
+
+                cv2.imwrite("output_cv2.png", canvas)
+                plt.savefig("output_mpl.png", dpi=300, bbox_inches="tight")
+                plt.show()
+
+            # cv2.imshow(
+            #     "Image",
+            #     cv2.resize(
+            #         B_orig,
+            #         output_resolution,
+            #         interpolation=cv2.INTER_NEAREST,
+            #     ),
+            # )
 
         # ----------------------------------------------------------------------
-        #   Check for key presses
+        #   Handle keypresses
         # ----------------------------------------------------------------------
 
-        if cv2.waitKey(1) & 0xFF == ord("q"):
+        key_pressed = None
+
+        # fmt: off
+        # Listen for keypresses from within OpenCV plot
+        cv2_key = cv2.waitKey(1)
+        if cv2_key == ord("q"):   key_pressed = "q"
+        elif cv2_key == ord("b"): key_pressed = "b"
+        elif cv2_key == ord("c"): key_pressed = "c"
+        elif cv2_key == ord("e"): key_pressed = "e"
+        elif cv2_key == ord("o"): key_pressed = "o"
+
+        # Listen for keypresses from within terminal, Windows only
+        if os.name == "nt" and msvcrt.kbhit():
+            ms_key = msvcrt.getch()
+            if ms_key == b"q"  : key_pressed = "q"
+            elif ms_key == b"b": key_pressed = "b"
+            elif ms_key == b"c": key_pressed = "c"
+            elif ms_key == b"e": key_pressed = "e"
+            elif ms_key == b"o": key_pressed = "o"
+        # fmt: on
+
+        # Execute keypress
+        if key_pressed == "q":
+            print("Key Q: Quit")
             break
+        elif key_pressed == "b":
+            do_reacquire_BOS_frame_0 = True
+            print("Key B: Reacquire BOS frame 0")
+        elif key_pressed == "c":
+            do_colormap_clip_warning = not do_colormap_clip_warning
+            print(f"Key C: Colormap clip warning {bool2on(do_colormap_clip_warning)}")
+        elif key_pressed == "e":
+            do_export_frames = not do_export_frames
+            print(f"Key E: Export frames to disk {bool2on(do_export_frames)}")
+        elif key_pressed == "o":
+            do_show_original_video = not do_show_original_video
+            print(f"Key O: Original video frames {bool2on(do_show_original_video)}")
 
-        # NOTE: Windows only
-        if msvcrt.kbhit():
-            k = msvcrt.getch()
-            if k == b"q":
-                break
+    # --------------------------------------------------------------------------
+    #   Exit
+    # --------------------------------------------------------------------------
 
     print(f"\nOverall run time: {perf_counter() - tick_overall:.1f} s")
 
