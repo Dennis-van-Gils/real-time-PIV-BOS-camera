@@ -215,7 +215,7 @@ def read_file_live_preview(filename=None):
 
         if filename in (None, ""):
             print(
-                "WARNING: No configuration file was selected. Using default "
+                "\nWARNING: No configuration file was selected. Using default "
                 "parameters."
             )
             return
@@ -223,12 +223,15 @@ def read_file_live_preview(filename=None):
     if not os.path.isfile(filename):
         raise FileNotFoundError(f"Could not open `{filename}`.")
 
-    print(f"Reading configuration file: {filename}")
+    print(f"\nReading configuration file:\n {filename}")
     parser = configparser.ConfigParser()
     parser.read(filename)
 
     # [Source]
     global IMAGE_SOURCE
+    global IMAGE_PATH
+    global IMAGE_FILES
+    global N_IMAGES
     global CAMERA_ID
     global WANTED_RESOLUTION
 
@@ -236,6 +239,19 @@ def read_file_live_preview(filename=None):
         IMAGE_SOURCES,
         parser["Source"]["image_source"].upper(),
     )
+    try:
+        IMAGE_PATH = parser["Source"]["image_path"]
+    except KeyError:
+        pass
+    else:
+        if IMAGE_SOURCE == IMAGE_SOURCES.DISK:
+            IMAGE_FILES = sorted(glob.glob(IMAGE_PATH))
+            N_IMAGES = len(IMAGE_FILES)
+            if N_IMAGES < 2:
+                raise Exception(
+                    "Less than 2 images found in the supplied image path "
+                    f'"{IMAGE_PATH}".\nExiting.'
+                )
     CAMERA_ID = parser.getint("Source", "camera_id")
     WANTED_RESOLUTION = parse_int_list(parser["Source"]["wanted_resolution"])
 
