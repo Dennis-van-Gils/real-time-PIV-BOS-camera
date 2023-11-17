@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# pylint: disable=missing-function-docstring
 """Initializes all user configuration parameters. Provides function
 `read_file()` to load a configuration file from disk.
 
@@ -12,9 +13,8 @@ Namespace `cfg` now contains all user settings
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "14-11-2023"
+__date__ = "17-11-2023"
 __version__ = "1.0"
-# pylint: disable=missing-function-docstring
 
 import os
 import enum
@@ -122,7 +122,7 @@ def read_file(filename=None):
 
         if filename in (None, ""):
             print(
-                "WARNING: No configuration file was selected. Using default "
+                "\nWARNING: No configuration file was selected. Using default "
                 "parameters."
             )
             return
@@ -130,7 +130,7 @@ def read_file(filename=None):
     if not os.path.isfile(filename):
         raise FileNotFoundError(f"Could not open `{filename}`.")
 
-    print(f"Reading configuration file: {filename}")
+    print(f"\nReading configuration file:\n  {filename}")
     parser = configparser.ConfigParser()
     parser.read(filename)
 

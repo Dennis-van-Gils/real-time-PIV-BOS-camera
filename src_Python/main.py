@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# pylint: disable=missing-function-docstring
 """Image processing algorithm for 2D Particle imaging velocimetry (PIV) and
 Background-oriented Schlieren (BOS)
 
@@ -11,9 +12,36 @@ VM: Displacement vector map
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "14-11-2023"
+__date__ = "17-11-2023"
 __version__ = "1.0"
-# pylint: disable=missing-function-docstring
+
+w = 60
+print("=" * w)
+print("Real-time flow visualisation for".center(w))
+print("particle-image velocimetry (PIV) &".center(w))
+print("background-oriented Schlieren (BOS)\n".center(w))
+print(f"{__url__}".center(w))
+print("=" * w)
+
+info_usage = f"""
+Usage: python main.py [configuration file (optional)]
+  E.g. python main.py
+       python main.py config.ini
+       python main.py configs/config_BOS_demo_1.ini
+  Opens a file navigator when no file is supplied.
+
+  Edit the configuration file to fit your needs. See,
+  {__url__}/blob/main/src_Python/config.ini"""
+
+info_keypresses = """
+Keypresses
+  ? | Show this keypresses overview.
+  b | Reacquire BOS frame 0.
+  c | Colormap clip warning ON/OFF.
+  o | Original video frames ON/OFF.
+  r | Record frames to disk ON/OFF.
+  t | Print timing info     ON/OFF.
+  q | Quit."""
 
 import os
 import sys
@@ -21,28 +49,28 @@ import platform
 import concurrent.futures
 from time import perf_counter
 
-if os.name == "nt":
-    import msvcrt
-
 import psutil
 import numpy as np
 import numpy.typing as npt
 import matplotlib.pyplot as plt
 import cv2
 
-# The import order is important. We must handle the user configuration first
-# before we load in the `utils` modules.
+if os.name == "nt":
+    import msvcrt
+
+# We must process the configuration file before we import the `utils` modules
 import init_config as cfg
 
-# Parse command line arguments.
-# Expecting None or the filename of the configuration file to read in.
+# Parse command line arguments
 if len(sys.argv) > 1:
     config_filename = sys.argv[1]
 else:
     config_filename = None
+    print(info_usage)
+
 cfg.read_file(config_filename)
 
-# Now we can import the remaining modules
+# Now we can import the `utils` modules
 from utils import debugging
 from utils import plotting
 from utils.FrameServer import FrameServer
@@ -65,9 +93,9 @@ else:
 # Global user-interaction flags
 do_reacquire_BOS_frame_0 = False
 do_colormap_clip_warning = False
-do_export_frames = False
 do_show_original_video = False
-
+do_record_to_disk = False
+do_show_timing_info = False
 
 # ------------------------------------------------------------------------------
 #   Tiny helper functions
@@ -94,7 +122,6 @@ if __name__ == "__main__":
     except:  # pylint: disable=bare-except
         print("Warning: Could not set process to high priority.")
 
-    # Display info
     print(f"\nRunning on computer `{platform.node()}`")
     print(f"  CPU: {platform.processor()}")
     print(f"  OS : {platform.system()}")
@@ -201,7 +228,7 @@ if __name__ == "__main__":
     #   Populate lists
     # --------------------------------------------------------------------------
 
-    print("\nSetting up...\n")
+    print("\nStages")
     print("  IW_size |  N_IWs | N_workers")
     print("  --------|--------|----------")
 
@@ -282,8 +309,8 @@ if __name__ == "__main__":
         (0, 0),
     )
 
-    # Display info
-    print(f"\ndone in {perf_counter() - tick:.3f} sec\n")
+    print(f"\nSetting up done in {perf_counter() - tick:.1f} sec")
+    print(f"{info_keypresses}\n")
 
     # --------------------------------------------------------------------------
     #   Walk over all image frames from disk / Acquire frames from the camera
@@ -332,11 +359,12 @@ if __name__ == "__main__":
             # overlapping.
             A_ = np.asarray(fliplrud(A), order="C")
 
-        # Display info
+        # Timing info
         frame_title = frame_server.title
         duration = perf_counter() - tick
-        print(f"{frame_title:<30s} read {duration:.3f} | proc ", end="")
-        sys.stdout.flush()
+        if do_show_timing_info:
+            print(f"{frame_title:<30s} read {duration:.3f} | proc ", end="")
+            sys.stdout.flush()
 
         # ----------------------------------------------------------------------
         #   Walk over all multigrid stages
@@ -431,9 +459,10 @@ if __name__ == "__main__":
             )
             # fmt: on
 
-        # Display info
+        # Timing info
         duration = perf_counter() - tick
-        print(f"{duration:.3f}")
+        if do_show_timing_info:
+            print(f"{duration:.3f}")
 
         # ----------------------------------------------------------------------
         #   Debugging output
@@ -547,52 +576,67 @@ if __name__ == "__main__":
         # Listen for keypresses from within OpenCV plot
         cv2_key = cv2.waitKey(1)
         if cv2_key == ord("q"):   key_pressed = "q"
+        elif cv2_key == ord("?"): key_pressed = "?"
+        elif cv2_key == ord("/"): key_pressed = "?"
         elif cv2_key == ord("b"): key_pressed = "b"
         elif cv2_key == ord("c"): key_pressed = "c"
-        elif cv2_key == ord("e"): key_pressed = "e"
         elif cv2_key == ord("o"): key_pressed = "o"
+        elif cv2_key == ord("r"): key_pressed = "r"
+        elif cv2_key == ord("t"): key_pressed = "t"
 
         # Listen for keypresses from within terminal, Windows only
         if os.name == "nt" and msvcrt.kbhit():
             ms_key = msvcrt.getch()
             if ms_key == b"q"  : key_pressed = "q"
+            elif ms_key == b"?": key_pressed = "?"
+            elif ms_key == b"/": key_pressed = "?"
             elif ms_key == b"b": key_pressed = "b"
             elif ms_key == b"c": key_pressed = "c"
-            elif ms_key == b"e": key_pressed = "e"
             elif ms_key == b"o": key_pressed = "o"
+            elif ms_key == b"r": key_pressed = "r"
+            elif ms_key == b"t": key_pressed = "t"
         # fmt: on
 
         # Execute keypress
         if key_pressed == "q":
-            print("Key Q: Quit")
+            print("Key q | Quit")
             break
+
+        elif key_pressed == "?":
+            print(info_keypresses)
+            print()
 
         elif key_pressed == "b":
             do_reacquire_BOS_frame_0 = True
-            print("Key B: Reacquire BOS frame 0")
+            print("Key b | Reacquire BOS frame 0")
 
         elif key_pressed == "c":
             do_colormap_clip_warning = not do_colormap_clip_warning
-            print("Key C: Colormap clip warning ", end="")
+            print("Key c | Colormap clip warning ", end="")
             print(f"{bool2on(do_colormap_clip_warning)}")
-
-        elif key_pressed == "e":
-            do_export_frames = not do_export_frames
-            print("Key E: Export frames to disk ", end="")
-            print(f"{bool2on(do_export_frames)}")
 
         elif key_pressed == "o":
             do_show_original_video = not do_show_original_video
-            print("Key O: Original video frames ", end="")
+            print("Key o | Original video frames ", end="")
             print(f"{bool2on(do_show_original_video)}")
             if not do_show_original_video:
                 cv2.destroyWindow("Original")
+
+        elif key_pressed == "r":
+            do_record_to_disk = not do_record_to_disk
+            print("Key r | Record frames to disk ", end="")
+            print(f"{bool2on(do_record_to_disk)}")
+
+        elif key_pressed == "t":
+            do_show_timing_info = not do_show_timing_info
+            print("Key t | Print timing info ", end="")
+            print(f"{bool2on(do_show_timing_info)}")
 
     # --------------------------------------------------------------------------
     #   Exit
     # --------------------------------------------------------------------------
 
-    print(f"\nOverall run time: {perf_counter() - tick_overall:.1f} s")
+    print(f"\nOverall run time: {perf_counter() - tick_overall:.1f} sec")
 
     cv2.destroyAllWindows()
     frame_server.close()
