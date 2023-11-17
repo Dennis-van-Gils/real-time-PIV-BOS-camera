@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# pylint: disable=invalid-name, missing-function-docstring
 """
 DO NOT USE: Suffers from edge effects, because we do not zero-pad.
 Performs lightning-fast convolutions.
@@ -86,7 +87,6 @@ __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
 __date__ = "24-10-2023"
 __version__ = "1.0.0"
-# pylint: disable=invalid-name, missing-function-docstring
 
 # import sys
 import numpy as np

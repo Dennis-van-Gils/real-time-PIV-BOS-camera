@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# pylint: disable=invalid-name, missing-function-docstring
 """Performs lightning-fast convolutions.
 All code is fully jitted by `numba` and running in `No Python` mode.
 
@@ -13,7 +14,6 @@ __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
 __date__ = "24-10-2023"
 __version__ = "1.0.0"
-# pylint: disable=invalid-name, missing-function-docstring
 
 import numpy as np
 import numpy.typing as npt
@@ -336,6 +336,4 @@ if __name__ == "__main__":
         print("                [ms] per iter")
         print("shape           fast_multiply   fast_multiply_p")
         for i in range(len(shapes)):
-            print(
-                f"{str(shapes[i]):16s}{results1[i]:<16.5f}{results2[i]:<16.5f}"
-            )
+            print(f"{str(shapes[i]):16s}{results1[i]:<16.5f}{results2[i]:<16.5f}")
