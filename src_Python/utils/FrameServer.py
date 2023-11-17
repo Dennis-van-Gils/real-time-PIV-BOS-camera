@@ -7,7 +7,7 @@ webcamera or other video camera device.
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "31-10-2023"
+__date__ = "17-11-2023"
 __version__ = "1.0"
 
 import os
@@ -166,7 +166,10 @@ class FrameServer:
 
         elif self.source == cfg.IMAGE_SOURCES.WEBCAM:
             success, img = self.cam_cv2.read()
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            if success:
+                img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            else:
+                raise Exception("Could not obtain image from camera.")
 
         elif self.source == cfg.IMAGE_SOURCES.XIMEA:
             self.cam_xi.get_image(self.img_xi)
@@ -209,6 +212,8 @@ class FrameServer:
         if self.source == cfg.IMAGE_SOURCES.DISK:
             print(f"  image_path: {cfg.IMAGE_PATH}")
             print(f"  N_images  : {cfg.N_IMAGES}")
+        else:
+            print(f"  camera_id : {cfg.CAMERA_ID}")
         print(
             f"  resolution: {self.img_w} x {self.img_h} = "
             f"{self.img_N_pixels/1e6:.1f} Mpx"
