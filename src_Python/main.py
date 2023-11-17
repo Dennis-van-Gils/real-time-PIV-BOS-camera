@@ -61,13 +61,11 @@ if os.name == "nt":
 # We must process the configuration file before we import the `utils` modules
 import init_config as cfg
 
-# Parse command line arguments
 if len(sys.argv) > 1:
     config_filename = sys.argv[1]
 else:
     config_filename = None
     print(info_usage)
-
 cfg.read_file(config_filename)
 
 # Now we can import the `utils` modules
@@ -95,7 +93,7 @@ do_reacquire_BOS_frame_0 = False
 do_colormap_clip_warning = False
 do_show_original_video = False
 do_record_to_disk = False
-do_show_timing_info = False
+do_print_timing_info = False
 
 # ------------------------------------------------------------------------------
 #   Tiny helper functions
@@ -362,7 +360,7 @@ if __name__ == "__main__":
         # Timing info
         frame_title = frame_server.title
         duration = perf_counter() - tick
-        if do_show_timing_info:
+        if do_print_timing_info:
             print(f"{frame_title:<30s} read {duration:.3f} | proc ", end="")
             sys.stdout.flush()
 
@@ -461,7 +459,7 @@ if __name__ == "__main__":
 
         # Timing info
         duration = perf_counter() - tick
-        if do_show_timing_info:
+        if do_print_timing_info:
             print(f"{duration:.3f}")
 
         # ----------------------------------------------------------------------
@@ -628,9 +626,9 @@ if __name__ == "__main__":
             print(f"{bool2on(do_record_to_disk)}")
 
         elif key_pressed == "t":
-            do_show_timing_info = not do_show_timing_info
+            do_print_timing_info = not do_print_timing_info
             print("Key t | Print timing info ", end="")
-            print(f"{bool2on(do_show_timing_info)}")
+            print(f"{bool2on(do_print_timing_info)}")
 
     # --------------------------------------------------------------------------
     #   Exit
