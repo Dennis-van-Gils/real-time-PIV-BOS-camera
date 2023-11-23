@@ -1,12 +1,12 @@
-psutil
-numpy
-numba
-icc_rt
-scipy
+# Core requirements
 matplotlib
-pyfftw
-rocket-fft
+numba
+numpy
 opencv-python
-opencv-contrib-python
-imagecodecs 
-pyqt6
+psutil
+rocket-fft
+
+# Optional requirements
+pyfftw
+pyside6
+scipy
