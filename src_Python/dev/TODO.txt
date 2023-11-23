@@ -4,6 +4,8 @@
 TODO
 ----
 
+- Rename Git repo to `real-time-PIV-BOS-camera`
+
 - In `main.py`, implement "export to disk", like as in `live_preview.py`
 
 - Expand config.ini with desired camera resolution and exposure time (Ximea)

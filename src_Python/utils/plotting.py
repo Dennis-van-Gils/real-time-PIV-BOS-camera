@@ -2,11 +2,11 @@
 # -*- coding: utf-8 -*-
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
-__url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "13-11-2023"
-__version__ = "1.0"
+__url__ = "https://github.com/Dennis-van-Gils/real-time-PIV-BOS-camera"
+__date__ = "23-11-2023"
 
 import sys
+from typing import Optional
 
 import init_config as cfg
 from utils import numba_quivers
@@ -260,7 +260,7 @@ def vector_map_to_hsv_colors(
     VM_magn: npt.NDArray[np.float32],
     VM_angle: npt.NDArray[np.float32],
     VM_grid_shape_2D: tuple[int, int],
-    output_resolution: tuple[int, int] | None = None,
+    output_resolution: Optional[tuple[int, int]] = None,
     interpolation: int = cv2.INTER_CUBIC,
     show_clipped_as_white: bool = False,
 ) -> npt.NDArray[np.uint8]:
@@ -391,7 +391,7 @@ def vector_map_to_cv2_quiver_plot(
     VM_dx: npt.NDArray[np.float32],
     VM_dy: npt.NDArray[np.float32],
     VM_magn: npt.NDArray[np.float32],
-    output_resolution: tuple[int, int] | None = None,
+    output_resolution: Optional[tuple[int, int]] = None,
     interpolation: int = cv2.INTER_AREA,
     linewidth: int = 2,
     tip_size: float = 0.5,

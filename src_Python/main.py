@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # pylint: disable=missing-function-docstring
-"""Image processing algorithm for 2D Particle imaging velocimetry (PIV) and
-Background-oriented Schlieren (BOS)
+"""Real-time fluid flow visualization for Particle Image Velocimetry (PIV) &
+Background-Oriented Schlieren (BOS) camera setups.
 
 Used abbrevations
 -----------------
@@ -11,15 +11,16 @@ VM: Displacement vector map
 """
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
-__url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
-__date__ = "17-11-2023"
+__url__ = "https://github.com/Dennis-van-Gils/real-time-PIV-BOS-camera"
+__date__ = "23-11-2023"
 __version__ = "1.0"
 
-w = 60
+w = 61
 print("=" * w)
-print("Real-time flow visualisation for".center(w))
-print("particle-image velocimetry (PIV) &".center(w))
-print("background-oriented Schlieren (BOS)\n".center(w))
+print("Real-time fluid flow visualization for".center(w))
+print("Particle Image Velocimetry (PIV) &".center(w))
+print("Background-Oriented Schlieren (BOS)".center(w))
+print("camera setups\n".center(w))
 print(f"{__url__}".center(w))
 print("=" * w)
 

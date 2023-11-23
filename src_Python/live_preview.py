@@ -2,11 +2,10 @@
 # -*- coding: utf-8 -*-
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
-__url__ = "https://github.com/Dennis-van-Gils/2D-PIV-BOS"
+__url__ = "https://github.com/Dennis-van-Gils/real-time-PIV-BOS-camera"
 __date__ = "17-11-2023"
-__version__ = "1.0"
 
-w = 60
+w = 61
 print("=" * w)
 print("Live camera preview".center(w))
 print(f"{__url__}".center(w))
