@@ -3,11 +3,21 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/real-time-PIV-BOS-camera"
-__date__ = "22-10-2023"
+__date__ = "24-11-2023"
 
 import numpy as np
 import numpy.typing as npt
 import numba as nb
+
+
+# ------------------------------------------------------------------------------
+#   bool2on
+# ------------------------------------------------------------------------------
+
+
+def bool2on(state: bool) -> str:
+    return "ON" if state else "OFF"
+
 
 # ------------------------------------------------------------------------------
 #   remove_mean_background

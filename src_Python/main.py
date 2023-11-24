@@ -12,7 +12,7 @@ VM: Displacement vector map
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/real-time-PIV-BOS-camera"
-__date__ = "23-11-2023"
+__date__ = "24-11-2023"
 __version__ = "1.0"
 
 w = 61
@@ -75,6 +75,7 @@ from utils import plotting
 from utils.FrameServer import FrameServer
 from utils.process_IWs import IW_Mesh, process_IWs
 from utils.my_fun import (
+    bool2on,
     remove_mean_background,
     fliplrud,
     compute_displacement_vectors_from_C_maps,
@@ -95,14 +96,6 @@ do_colormap_clip_warning = False
 do_show_original_video = False
 do_record_to_disk = False
 do_print_timing_info = False
-
-# ------------------------------------------------------------------------------
-#   Tiny helper functions
-# ------------------------------------------------------------------------------
-
-
-def bool2on(state: bool) -> str:
-    return "ON" if state else "OFF"
 
 
 # ------------------------------------------------------------------------------
