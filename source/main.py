@@ -12,7 +12,7 @@ VM: Displacement vector map
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/real-time-PIV-BOS-camera"
-__date__ = "24-11-2023"
+__date__ = "07-12-2023"
 __version__ = "1.0"
 
 w = 61
@@ -32,7 +32,7 @@ Usage: python main.py [configuration file (optional)]
   Opens a file navigator when no file is supplied.
 
   Edit the configuration file to fit your needs. See,
-  {__url__}/blob/main/src_Python/config.ini"""
+  {__url__}/blob/main/source/config.ini"""
 
 info_keypresses = """
 Keypresses

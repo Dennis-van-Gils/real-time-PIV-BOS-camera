@@ -3,7 +3,7 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/real-time-PIV-BOS-camera"
-__date__ = "17-11-2023"
+__date__ = "07-12-2023"
 
 w = 61
 print("=" * w)
@@ -18,7 +18,7 @@ Usage: python live_preview.py [configuration file (optional)]
   Opens `live_preview.ini` when no file is supplied.
 
   Edit the configuration file to fit your needs. See,
-  {__url__}/blob/main/src_Python/live_preview.ini"""
+  {__url__}/blob/main/source/live_preview.ini"""
 
 info_keypresses = """
 Keypresses
