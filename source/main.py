@@ -527,7 +527,15 @@ if __name__ == "__main__":
             cv2.setWindowTitle("VM_results", f"{frame_title}")
 
             if do_show_original_video:
-                cv2.imshow("Original", B_orig)
+                # Convert float32 [0 - 1] intensities to uint8 [0 - 255]
+                img_gray = np.asarray(B_orig * 255, dtype=np.uint8)
+
+                # Recolor clipped intensities as full red
+                img_rgb = cv2.cvtColor(img_gray, cv2.COLOR_GRAY2RGB)
+                clipped_idxs = (img_gray >= 254).nonzero()
+                img_rgb[clipped_idxs] = [0, 0, 255]  # bgr
+
+                cv2.imshow("Original", img_rgb)
                 cv2.setWindowTitle("Original", f"Original: {frame_title}")
 
             # Save vector map results to disk?
