@@ -538,16 +538,6 @@ if __name__ == "__main__":
                 cv2.imshow("Original", img_rgb)
                 cv2.setWindowTitle("Original", f"Original: {frame_title}")
 
-            # Save vector map results to disk?
-            EXPORT = False
-            if EXPORT:
-                if cfg.MODE in [cfg.MODES.PIV2]:
-                    export_idx = frame_server.counter // 2 - 1
-                else:
-                    export_idx = frame_server.counter - 1
-                fn_export = f"export_{export_idx:04d}.png"
-                cv2.imwrite(fn_export, canvas)
-
             # DEBUG: Show the slower Matplotlib quiver plot and save to disk
             if cfg.DEBUG:
                 plotting.vector_map_to_mpl_quiver_plot(
@@ -564,6 +554,17 @@ if __name__ == "__main__":
                 cv2.imwrite("output_cv2.png", canvas)
                 plt.savefig("output_mpl.png", dpi=300, bbox_inches="tight")
                 plt.show()
+
+            # ------------------------------------------------------------------
+            #   Export frames to disk
+            # ------------------------------------------------------------------
+
+            if do_record_to_disk:
+                fn_export = f"{frame_title.replace(' ', '_')}.png"
+                if cv2.imwrite(fn_export, canvas):
+                    print(f"Saved {fn_export}")
+                else:
+                    print(f"Failed to save {fn_export}")
 
         # ----------------------------------------------------------------------
         #   Handle keypresses
