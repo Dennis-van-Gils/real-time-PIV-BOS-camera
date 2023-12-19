@@ -12,7 +12,7 @@ VM: Displacement vector map
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/real-time-PIV-BOS-camera"
-__date__ = "07-12-2023"
+__date__ = "19-12-2023"
 __version__ = "1.0"
 
 w = 61
@@ -91,7 +91,6 @@ else:
     from utils.dvg_fftconvolver_rocketfft import FFT_Convolver2D_Full
 
 # Global user-interaction flags
-do_reacquire_BOS_frame_0 = False
 do_colormap_clip_warning = False
 do_show_original_video = False
 do_record_to_disk = False
@@ -598,9 +597,15 @@ if __name__ == "__main__":
             print(info_keypresses)
             print()
 
-        elif key_pressed == "b":
-            do_reacquire_BOS_frame_0 = True
-            print("Key b | Reacquire BOS frame 0")
+        elif key_pressed == "b" and cfg.MODE in [cfg.MODES.BOS]:
+            print("Key b | Reacquire BOS frame 0 ", end="")
+
+            new_A = frame_server.serve()
+            remove_mean_background(new_A)
+            new_A_ = np.asarray(fliplrud(new_A), order="C")
+            np.copyto(A, new_A)
+            np.copyto(A_, new_A_)
+            print("DONE")
 
         elif key_pressed == "c":
             do_colormap_clip_warning = not do_colormap_clip_warning
