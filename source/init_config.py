@@ -10,6 +10,7 @@ Example usage for `main.py`:
 
 Namespace `cfg` now contains all user settings
 """
+
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/real-time-PIV-BOS-camera"
@@ -91,8 +92,9 @@ N_STAGES = len(IW_SIZES)
 
 # [Plotting]
 COLORMAP_NAME = "jet"
-COLORMAP_CLIP_COLOR = (1.0, 0, 0.58)
-PIXEL_DISPLACEMENT_AT_MAX_COLORMAP_VALUE = 1.0
+COLORMAP_MAX_PIXEL_DISPLACEMENT = 1.0
+COLORMAP_CLIP_WARNING = False
+COLORMAP_CLIP_COLOR = (1.0, 0, 0.58)  # Vibrant pink
 QUIVER_SIZE = 10
 
 # [Advanced]
@@ -170,17 +172,21 @@ def read_file(filename=None):
 
     # [Plotting]
     global COLORMAP_NAME
+    global COLORMAP_MAX_PIXEL_DISPLACEMENT
+    global COLORMAP_CLIP_WARNING
     global COLORMAP_CLIP_COLOR
-    global PIXEL_DISPLACEMENT_AT_MAX_COLORMAP_VALUE
     global QUIVER_SIZE
 
     COLORMAP_NAME = parser["Plotting"]["colormap_name"]
+    COLORMAP_MAX_PIXEL_DISPLACEMENT = parser.getfloat(
+        "Plotting",
+        "colormap_max_pixel_displacement",
+    )
+    COLORMAP_CLIP_WARNING = parser.getboolean(
+        "Plotting", "colormap_clip_warning"
+    )
     COLORMAP_CLIP_COLOR = parse_float_list(
         parser["Plotting"]["colormap_clip_color"],
-    )
-    PIXEL_DISPLACEMENT_AT_MAX_COLORMAP_VALUE = parser.getfloat(
-        "Plotting",
-        "pixel_displacement_at_max_colormap_value",
     )
     QUIVER_SIZE = parser.getfloat("Plotting", "quiver_size")
 

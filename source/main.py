@@ -9,10 +9,11 @@ Used abbrevations
 IW: Interrogation window
 VM: Displacement vector map
 """
+
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/real-time-PIV-BOS-camera"
-__date__ = "19-12-2023"
+__date__ = "29-07-2026"
 __version__ = "1.0"
 
 w = 61
@@ -39,6 +40,8 @@ Keypresses
   ? | Show this keypresses overview.
   b | Reacquire BOS frame 0.
   c | Colormap clip warning ON/OFF.
+  + | Increase colormap sensitivity.
+  - | Decrease colormap sensitivity.
   o | Original video frames ON/OFF.
   r | Record frames to disk ON/OFF.
   t | Print timing info     ON/OFF.
@@ -91,7 +94,6 @@ else:
     from utils.dvg_fftconvolver_rocketfft import FFT_Convolver2D_Full
 
 # Global user-interaction flags
-do_colormap_clip_warning = False
 do_show_original_video = False
 do_record_to_disk = False
 do_print_timing_info = False
@@ -210,7 +212,8 @@ if __name__ == "__main__":
     lVM_dx: list[npt.NDArray[np.float32]] = []      # NDArray shape (N_IWs, )
     lVM_dy: list[npt.NDArray[np.float32]] = []      # NDArray shape (N_IWs, )
 
-    # Computed vector magnitudes and angles per stage of the multigrid
+    # Computed vector magnitudes (in units of pixels) and angles (in units
+    # of degrees) per stage of the multigrid
     lVM_magn: list[npt.NDArray[np.float32]] = []    # NDArray shape (N_IWs, )
     lVM_angle: list[npt.NDArray[np.float32]] = []   # NDArray shape (N_IWs, )
     # fmt: on
@@ -510,7 +513,6 @@ if __name__ == "__main__":
                     interpolation=cv2.INTER_NEAREST,
                     # interpolation=cv2.INTER_LINEAR,
                     # interpolation=cv2.INTER_CUBIC,
-                    show_clipped_as_white=do_colormap_clip_warning,
                 )
             else:  # [PIV & PIV2]
                 canvas = plotting.vector_map_to_cv2_quiver_plot(
@@ -520,7 +522,6 @@ if __name__ == "__main__":
                     VM_dx,
                     VM_dy,
                     VM_magn,
-                    show_clipped=do_colormap_clip_warning,
                 )
 
             cv2.imshow("VM_results", canvas)
@@ -548,7 +549,6 @@ if __name__ == "__main__":
                     VM_dy,
                     VM_magn,
                     frame_title,
-                    show_clipped=do_colormap_clip_warning,
                 )
 
                 cv2.imwrite("output_cv2.png", canvas)
@@ -580,6 +580,10 @@ if __name__ == "__main__":
         elif cv2_key == ord("/"): key_pressed = "?"
         elif cv2_key == ord("b"): key_pressed = "b"
         elif cv2_key == ord("c"): key_pressed = "c"
+        elif cv2_key == ord("+"): key_pressed = "+"
+        elif cv2_key == ord("="): key_pressed = "+"
+        elif cv2_key == ord("-"): key_pressed = "-"
+        elif cv2_key == ord("_"): key_pressed = "-"
         elif cv2_key == ord("o"): key_pressed = "o"
         elif cv2_key == ord("r"): key_pressed = "r"
         elif cv2_key == ord("t"): key_pressed = "t"
@@ -592,6 +596,10 @@ if __name__ == "__main__":
             elif ms_key == b"/": key_pressed = "?"
             elif ms_key == b"b": key_pressed = "b"
             elif ms_key == b"c": key_pressed = "c"
+            elif ms_key == b"+": key_pressed = "+"
+            elif ms_key == b"=": key_pressed = "+"
+            elif ms_key == b"-": key_pressed = "-"
+            elif ms_key == b"_": key_pressed = "-"
             elif ms_key == b"o": key_pressed = "o"
             elif ms_key == b"r": key_pressed = "r"
             elif ms_key == b"t": key_pressed = "t"
@@ -617,9 +625,23 @@ if __name__ == "__main__":
             print("DONE")
 
         elif key_pressed == "c":
-            do_colormap_clip_warning = not do_colormap_clip_warning
+            cfg.COLORMAP_CLIP_WARNING = not cfg.COLORMAP_CLIP_WARNING
             print("Key c | Colormap clip warning ", end="")
-            print(f"{bool2on(do_colormap_clip_warning)}")
+            print(f"{bool2on(cfg.COLORMAP_CLIP_WARNING)}")
+
+        elif key_pressed == "+":
+            cfg.COLORMAP_MAX_PIXEL_DISPLACEMENT /= 1.1
+            print(
+                "Key + | colormap_max_pixel_displacement "
+                f"= {cfg.COLORMAP_MAX_PIXEL_DISPLACEMENT:.3f}"
+            )
+
+        elif key_pressed == "-":
+            cfg.COLORMAP_MAX_PIXEL_DISPLACEMENT *= 1.1
+            print(
+                "Key - | colormap_max_pixel_displacement "
+                f"= {cfg.COLORMAP_MAX_PIXEL_DISPLACEMENT:.3f}"
+            )
 
         elif key_pressed == "o":
             do_show_original_video = not do_show_original_video

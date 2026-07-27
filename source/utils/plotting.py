@@ -3,7 +3,7 @@
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/real-time-PIV-BOS-camera"
-__date__ = "23-11-2023"
+__date__ = "29-07-2026"
 
 import sys
 from typing import Optional
@@ -21,7 +21,6 @@ import cv2
 mpl.use("TkAgg")
 
 N_COLORS_LUT = 1024
-
 
 # ------------------------------------------------------------------------------
 #   build_mpl_colormap
@@ -225,14 +224,15 @@ def _vector_map_to_hsv_colors(
     VM_magn: npt.NDArray[np.float32],
     VM_angle: npt.NDArray[np.float32],
     VM_grid_shape_2D: tuple[int, int],
-    pixel_displacement_at_max_colormap_value: float,
-    show_clipped_as_white: bool,
+    colormap_max_pixel_displacement: float,
+    colormap_clip_warning: bool,
 ) -> npt.NDArray[np.uint8]:
     """Numba-accelerated core for function `vector_map_to_hsv_colors()`."""
-    # NOTE: Argument `pixel_displacement_at_max_colormap_value` must be passed
-    # in. We can not reference to `cfg.PIXEL_DISPLACEMENT_AT_MAX_COLORMAP_VALUE`
-    # inside of this jitted function, because otherwise the reference /value/
-    # gets baked in instead of the reference itself.
+    # NOTE: Arguments `colormap_max_pixel_displacement` and
+    # `colormap_clip_warning` must be passed in. We can not reference to
+    # `cfg.COLORMAP_MAX_PIXEL_DISPLACEMENT` and the likes inside of this jitted
+    # function, because otherwise the reference /value/ gets baked in instead of
+    # the reference itself.
     VM_magn = np.nan_to_num(VM_magn)
 
     # Angle definition: Starts with full red at 0' hue, increasing CCW.
@@ -244,11 +244,11 @@ def _vector_map_to_hsv_colors(
 
     # Check for 'out-of-range over' values
     HSV_sat = np.ones(VM_magn.shape, dtype=np.uint8) * 255
-    HSV_val = VM_magn / pixel_displacement_at_max_colormap_value * 255
+    HSV_val = VM_magn / colormap_max_pixel_displacement * 255
     mask = HSV_val > 255
     HSV_val[mask] = 255
-    if show_clipped_as_white:
-        HSV_sat[mask] = 0
+    if colormap_clip_warning:
+        HSV_sat[mask] = 0  # Show clipped as white
 
     # Create a linearized HSV canvas and color it in
     canvas = np.empty((len(VM_magn), 3), dtype=np.uint8)
@@ -268,7 +268,6 @@ def vector_map_to_hsv_colors(
     VM_grid_shape_2D: tuple[int, int],
     output_resolution: Optional[tuple[int, int]] = None,
     interpolation: int = cv2.INTER_CUBIC,
-    show_clipped_as_white: bool = False,
 ) -> npt.NDArray[np.uint8]:
     """Generate and return an `uint8` RGB image where the passed vector data
     gets interpreted as an HSV image as follows:
@@ -304,11 +303,6 @@ def vector_map_to_hsv_colors(
 
             Default: cv2.INTER_CUBIC
 
-        show_clipped_as_white (``bool``, optional):
-            TODO: descr.
-
-            Default: False
-
     Returns:
         The RGB image as a 2D numpy array containing `[uint8, uint8, uint8]`
         RGB color values.
@@ -317,8 +311,8 @@ def vector_map_to_hsv_colors(
         VM_magn,
         VM_angle,
         VM_grid_shape_2D,
-        cfg.PIXEL_DISPLACEMENT_AT_MAX_COLORMAP_VALUE,
-        show_clipped_as_white,
+        cfg.COLORMAP_MAX_PIXEL_DISPLACEMENT,
+        cfg.COLORMAP_CLIP_WARNING,
     )
     cv2.cvtColor(canvas, cv2.COLOR_HSV2BGR, dst=canvas)
 
@@ -346,14 +340,13 @@ def vector_map_to_mpl_quiver_plot(
     VM_dy: npt.NDArray[np.float32],
     VM_magn: npt.NDArray[np.float32],
     plot_title: str,
-    show_clipped: bool = False,
 ):
     """ """
     self = vector_map_to_mpl_quiver_plot
     colormap = this.mpl_colormap
 
-    VM_colors = VM_magn / cfg.PIXEL_DISPLACEMENT_AT_MAX_COLORMAP_VALUE
-    if not show_clipped:
+    VM_colors = VM_magn / cfg.COLORMAP_MAX_PIXEL_DISPLACEMENT
+    if not cfg.COLORMAP_CLIP_WARNING:
         VM_colors[VM_colors > 1] = 1  # Disable clip warning by clamping to 1
 
     if not plt.fignum_exists("VM_quiver_plot"):  # type: ignore
@@ -402,7 +395,6 @@ def vector_map_to_cv2_quiver_plot(
     linewidth: int = 2,
     tip_size: float = 0.5,
     tip_angle: float = np.pi / 10,
-    show_clipped: bool = False,
 ) -> npt.NDArray[np.uint8]:
     """ """
     if output_resolution is None:
@@ -411,8 +403,8 @@ def vector_map_to_cv2_quiver_plot(
     canvas = cv2.cvtColor(background_img * 255, cv2.COLOR_GRAY2BGR)
     canvas = np.asarray(canvas, dtype=np.uint8)
 
-    VM_colors = VM_magn / cfg.PIXEL_DISPLACEMENT_AT_MAX_COLORMAP_VALUE
-    if not show_clipped:
+    VM_colors = VM_magn / cfg.COLORMAP_MAX_PIXEL_DISPLACEMENT
+    if not cfg.COLORMAP_CLIP_WARNING:
         VM_colors[VM_colors > 1] = 1  # Disable clip warning by clamping to 1
 
     numba_quivers.draw_quiver_map_u24(
