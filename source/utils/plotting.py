@@ -234,7 +234,13 @@ def _vector_map_to_hsv_colors(
     # inside of this jitted function, because otherwise the reference /value/
     # gets baked in instead of the reference itself.
     VM_magn = np.nan_to_num(VM_magn)
-    VM_angle = np.nan_to_num(VM_angle)
+
+    # Angle definition: Starts with full red at 0' hue, increasing CCW.
+    #   0': pixel displacement fully towards the right (red)
+    #  90': pixel displacement fully towards the top (green/yellow)
+    # 180': pixel displacement fully towards the left (cyan)
+    # 270': pixel displacement fully towards the bottom (purple)
+    VM_angle = (180 - np.nan_to_num(VM_angle)) % 360
 
     # Check for 'out-of-range over' values
     HSV_sat = np.ones(VM_magn.shape, dtype=np.uint8) * 255
