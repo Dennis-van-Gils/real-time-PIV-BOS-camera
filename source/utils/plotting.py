@@ -237,12 +237,21 @@ def _vector_map_to_hsv_colors(
     # the reference itself.
     VM_magn = np.nan_to_num(VM_magn)
 
-    # Angle definition: Starts with full red at 0' hue, increasing CCW.
-    #   0': pixel displacement fully towards the right (red)
-    #  90': pixel displacement fully towards the top (green/yellow)
-    # 180': pixel displacement fully towards the left (cyan)
-    # 270': pixel displacement fully towards the bottom (purple)
-    VM_angle = (180 - np.nan_to_num(VM_angle)) % 360
+    # Angle definition:
+    # Full red (hue = 0°) is at the full right of the color wheel and the hue
+    # angle increases CW. The vector direction in below table is taken from the
+    # viewpoint of the user looking at the image on screen. This is an upside-
+    # down representation of the pixel space, because pixels increase their
+    # y-coordinate running towards the bottom of the image. Hence, the hue angle
+    # increases in the CW direction as seen from the user's perspective.
+    #
+    #  hue | color name   | vector direction
+    # --------------------------------------
+    #   0° | red          | fully right
+    #  90° | yellow green | fully down
+    # 180° | cyan         | fully left
+    # 270° | violet       | fully up
+    VM_angle = np.nan_to_num(VM_angle)
 
     # Check for 'out-of-range over' values
     HSV_sat = np.ones(VM_magn.shape, dtype=np.uint8) * 255
