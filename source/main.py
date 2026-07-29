@@ -38,15 +38,18 @@ Usage: python main.py [configuration file (optional)]
 
 info_keypresses = """
 Keypresses
-  ? | Show this keypresses overview.
-  b | Reacquire BOS frame 0.
-  c | Colormap clip warning ON/OFF.
-  + | Increase colormap sensitivity.
-  - | Decrease colormap sensitivity.
-  o | Original video frames ON/OFF.
-  r | Record frames to disk ON/OFF.
-  t | Print timing info     ON/OFF.
-  q | Quit."""
+  General
+    ? | Show this keypresses overview.
+    o | Original video frames ON/OFF.
+    r | Record frames to disk ON/OFF.
+    t | Print timing info     ON/OFF.
+    q | Quit.
+  Colormap related
+    c | Colormap clip warning ON/OFF.
+    + | Increase colormap sensitivity.
+    - | Decrease colormap sensitivity.
+  BOS related
+    b | Reacquire BOS frame 0."""
 
 import os
 import sys
