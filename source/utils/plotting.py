@@ -16,7 +16,7 @@ import numpy.typing as npt
 import numba as nb
 import matplotlib as mpl
 from matplotlib import pyplot as plt
-import cv2
+import cv2  # pyright: ignore[reportMissingImports]
 
 mpl.use("TkAgg")
 
@@ -111,8 +111,10 @@ def build_cv2_colormap_lut(
     if mpl_set_over is not None:
         mpl_cm.set_over(mpl_set_over)
 
+    # pylint: disable=protected-access
     mpl_cm._init()  # Build the lut # type: ignore
     mpl_lut = mpl_cm._lut  # type: ignore
+    # pylint: enable=protected-access
     cv2_lut = np.asarray(mpl_lut * 255, dtype=np.uint8)  # [0., 1.] to [0, 255]
     cv2_lut = cv2_lut[:, 2::-1]  # Drop `A` from `RGBA`and turn `RGB` into `BGR`
 

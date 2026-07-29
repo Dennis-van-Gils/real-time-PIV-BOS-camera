@@ -15,6 +15,7 @@ __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/real-time-PIV-BOS-camera"
 __date__ = "29-07-2026"
 __version__ = "1.0"
+# pylint: disable=wrong-import-position, multiple-statements
 
 w = 61
 print("=" * w)
@@ -57,7 +58,7 @@ import psutil
 import numpy as np
 import numpy.typing as npt
 import matplotlib.pyplot as plt
-import cv2
+import cv2  # pyright: ignore[reportMissingImports]
 
 if os.name == "nt":
     import msvcrt
@@ -589,6 +590,7 @@ if __name__ == "__main__":
         elif cv2_key == ord("t"): key_pressed = "t"
 
         # Listen for keypresses from within terminal, Windows only
+        # pylint: disable=possibly-used-before-assignment
         if os.name == "nt" and msvcrt.kbhit():
             ms_key = msvcrt.getch()
             if ms_key == b"q"  : key_pressed = "q"
@@ -603,6 +605,7 @@ if __name__ == "__main__":
             elif ms_key == b"o": key_pressed = "o"
             elif ms_key == b"r": key_pressed = "r"
             elif ms_key == b"t": key_pressed = "t"
+        # pylint: enable=possibly-used-before-assignment
         # fmt: on
 
         # Execute keypress

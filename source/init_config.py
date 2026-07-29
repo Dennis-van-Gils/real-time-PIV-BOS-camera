@@ -14,7 +14,8 @@ Namespace `cfg` now contains all user settings
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/real-time-PIV-BOS-camera"
-__date__ = "17-11-2023"
+__date__ = "27-09-2026"
+# pylint: disable=global-statement, broad-exception-caught
 
 import os
 import enum
@@ -110,8 +111,12 @@ N_FFT_THREADS = 1
 
 def read_file(filename=None):
     if filename in (None, ""):
+        # Lazy loading of tkinter module
+        # pylint: disable=import-outside-toplevel
         import tkinter as tk
         from tkinter import filedialog
+
+        # pylint: enable=import-outside-toplevel
 
         root = tk.Tk()
         root.withdraw()
@@ -152,7 +157,7 @@ def read_file(filename=None):
         IMAGE_FILES = sorted(glob.glob(IMAGE_PATH))
         N_IMAGES = len(IMAGE_FILES)
         if N_IMAGES < 2:
-            raise Exception(
+            raise ValueError(
                 "Less than 2 images found in the supplied image path "
                 f'"{IMAGE_PATH}".\nExiting.'
             )
@@ -207,8 +212,12 @@ def read_file(filename=None):
 
 def read_file_live_preview(filename=None):
     if filename in (None, ""):
+        # Lazy loading of tkinter module
+        # pylint: disable=import-outside-toplevel
         import tkinter as tk
         from tkinter import filedialog
+
+        # pylint: enable=import-outside-toplevel
 
         root = tk.Tk()
         root.withdraw()
@@ -253,7 +262,7 @@ def read_file_live_preview(filename=None):
             IMAGE_FILES = sorted(glob.glob(IMAGE_PATH))
             N_IMAGES = len(IMAGE_FILES)
             if N_IMAGES < 2:
-                raise Exception(
+                raise ValueError(
                     "Less than 2 images found in the supplied image path "
                     f'"{IMAGE_PATH}".\nExiting.'
                 )
@@ -269,7 +278,7 @@ def read_file_live_preview(filename=None):
 def parse_int_list(str_in):
     try:
         return list(int(k.strip()) for k in str_in[1:-1].split(","))
-    except Exception as err:
+    except Exception as _err:
         raise configparser.ParsingError(str_in) from None
 
 
@@ -281,5 +290,5 @@ def parse_int_list(str_in):
 def parse_float_list(str_in):
     try:
         return list(float(k.strip()) for k in str_in[1:-1].split(","))
-    except Exception as err:
+    except Exception as _err:
         return None
