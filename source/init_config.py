@@ -38,16 +38,8 @@ PLOT_VECTOR_MAP_RESULTS = True
 
 # Show detailed IW analysis at the specified pixel location (x, y)?
 # - Specify a tuple as `(x, y)` to show IW analysis.
-# - Set to `None` or empty tuple `()` to skip.
-# DEBUG_IW_PX = (500, 500)
-
-if not "DEBUG_IW_PX" in locals():
-    DEBUG_IW_PX = None
-
-if isinstance(DEBUG_IW_PX, tuple) and len(DEBUG_IW_PX) == 2:  # type: ignore
-    pass
-else:
-    DEBUG_IW_PX = None
+# - Set to an empty tuple `()` to skip.
+DEBUG_IW_PX: tuple[int, int] | tuple = ()
 
 # ------------------------------------------------------------------------------
 #   Enumerations

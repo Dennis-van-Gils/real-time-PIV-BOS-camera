@@ -4,10 +4,11 @@
 coming from files read of disk or from a video capture device such as a
 webcamera or other video camera device.
 """
+
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/real-time-PIV-BOS-camera"
-__date__ = "17-11-2023"
+__date__ = "29-07-2026"
 
 import os
 import sys
@@ -15,10 +16,9 @@ import time
 
 import numpy as np
 import numpy.typing as npt
-import cv2
+import cv2  # pyright: ignore[reportMissingImports]
 
 import init_config as cfg
-
 
 if cfg.IMAGE_SOURCE == cfg.IMAGE_SOURCES.XIMEA:
     from utils.ximea import xiapi
@@ -168,7 +168,7 @@ class FrameServer:
             if success:
                 img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             else:
-                raise Exception("Could not obtain image from camera.")
+                raise IOError("Could not obtain image from camera.")
 
         elif self.source == cfg.IMAGE_SOURCES.XIMEA:
             self.cam_xi.get_image(self.img_xi)
