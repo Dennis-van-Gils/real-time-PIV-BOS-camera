@@ -476,7 +476,7 @@ if __name__ == "__main__":
                 lVM_dy,
             )
 
-        if cfg.DEBUG_IW_PX is not None:
+        if len(cfg.DEBUG_IW_PX) == 2:
             debugging.plot_IW_analysis(
                 cfg.DEBUG_IW_PX[0],
                 cfg.DEBUG_IW_PX[1],
