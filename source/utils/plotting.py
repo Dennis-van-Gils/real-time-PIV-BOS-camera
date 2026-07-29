@@ -128,13 +128,13 @@ def build_cv2_colormap_lut(
 this = sys.modules[__name__]
 
 this.mpl_colormap = build_mpl_colormap(  # type: ignore
-    mpl_colormap_name=cfg.COLORMAP_NAME,
-    mpl_set_over=cfg.COLORMAP_CLIP_COLOR,
+    mpl_colormap_name=cfg.colormap_name,
+    mpl_set_over=cfg.colormap_clip_color,
 )
 
 this.cv2_colormap_lut = build_cv2_colormap_lut(  # type: ignore
-    mpl_colormap_name=cfg.COLORMAP_NAME,
-    mpl_set_over=cfg.COLORMAP_CLIP_COLOR,
+    mpl_colormap_name=cfg.colormap_name,
+    mpl_set_over=cfg.colormap_clip_color,
 )
 
 # ------------------------------------------------------------------------------
@@ -232,7 +232,7 @@ def _vector_map_to_hsv_colors(
     """Numba-accelerated core for function `vector_map_to_hsv_colors()`."""
     # NOTE: Arguments `colormap_max_pixel_displacement` and
     # `colormap_clip_warning` must be passed in. We can not reference to
-    # `cfg.COLORMAP_MAX_PIXEL_DISPLACEMENT` and the likes inside of this jitted
+    # `cfg.colormap_max_pixel_displacement` and the likes inside of this jitted
     # function, because otherwise the reference /value/ gets baked in instead of
     # the reference itself.
     VM_magn = np.nan_to_num(VM_magn)
@@ -313,8 +313,8 @@ def vector_map_to_hsv_colors(
         VM_magn,
         VM_angle,
         VM_grid_shape_2D,
-        cfg.COLORMAP_MAX_PIXEL_DISPLACEMENT,
-        cfg.COLORMAP_CLIP_WARNING,
+        cfg.colormap_max_pixel_displacement,
+        cfg.colormap_clip_warning,
     )
     cv2.cvtColor(canvas, cv2.COLOR_HSV2BGR, dst=canvas)
 
@@ -347,8 +347,8 @@ def vector_map_to_mpl_quiver_plot(
     self = vector_map_to_mpl_quiver_plot
     colormap = this.mpl_colormap
 
-    VM_colors = VM_magn / cfg.COLORMAP_MAX_PIXEL_DISPLACEMENT
-    if not cfg.COLORMAP_CLIP_WARNING:
+    VM_colors = VM_magn / cfg.colormap_max_pixel_displacement
+    if not cfg.colormap_clip_warning:
         VM_colors[VM_colors > 1] = 1  # Disable clip warning by clamping to 1
 
     if not plt.fignum_exists("VM_quiver_plot"):  # type: ignore
@@ -372,7 +372,7 @@ def vector_map_to_mpl_quiver_plot(
         self.h_title = plt.title(f"{plot_title}")
 
     self.h_imshow.set_data(background_img)
-    self.h_quiver.set_UVC(VM_dx * cfg.QUIVER_SIZE, VM_dy * cfg.QUIVER_SIZE)
+    self.h_quiver.set_UVC(VM_dx * cfg.quiver_size, VM_dy * cfg.quiver_size)
     self.h_quiver.set_color(colormap(VM_colors))
     self.h_title.set_text(f"{plot_title}")
 
@@ -405,16 +405,16 @@ def vector_map_to_cv2_quiver_plot(
     canvas = cv2.cvtColor(background_img * 255, cv2.COLOR_GRAY2BGR)
     canvas = np.asarray(canvas, dtype=np.uint8)
 
-    VM_colors = VM_magn / cfg.COLORMAP_MAX_PIXEL_DISPLACEMENT
-    if not cfg.COLORMAP_CLIP_WARNING:
+    VM_colors = VM_magn / cfg.colormap_max_pixel_displacement
+    if not cfg.colormap_clip_warning:
         VM_colors[VM_colors > 1] = 1  # Disable clip warning by clamping to 1
 
     numba_quivers.draw_quiver_map_u24(
         img=canvas,
         x=VM_grid_x,
         y=VM_grid_y,
-        dx=VM_dx * cfg.QUIVER_SIZE,
-        dy=VM_dy * cfg.QUIVER_SIZE,
+        dx=VM_dx * cfg.quiver_size,
+        dy=VM_dy * cfg.quiver_size,
         colors=get_colors_from_cv2_colormap_lut(VM_colors),
         linewidth=linewidth,
         tip_size=tip_size,

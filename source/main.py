@@ -628,22 +628,22 @@ if __name__ == "__main__":
             print("DONE")
 
         elif key_pressed == "c":
-            cfg.COLORMAP_CLIP_WARNING = not cfg.COLORMAP_CLIP_WARNING
+            cfg.colormap_clip_warning = not cfg.colormap_clip_warning
             print("Key c | Colormap clip warning ", end="")
-            print(f"{bool2on(cfg.COLORMAP_CLIP_WARNING)}")
+            print(f"{bool2on(cfg.colormap_clip_warning)}")
 
         elif key_pressed == "+":
-            cfg.COLORMAP_MAX_PIXEL_DISPLACEMENT /= 1.1
+            cfg.colormap_max_pixel_displacement /= 1.1
             print(
                 "Key + | colormap_max_pixel_displacement "
-                f"= {cfg.COLORMAP_MAX_PIXEL_DISPLACEMENT:.3f}"
+                f"= {cfg.colormap_max_pixel_displacement:.3f}"
             )
 
         elif key_pressed == "-":
-            cfg.COLORMAP_MAX_PIXEL_DISPLACEMENT *= 1.1
+            cfg.colormap_max_pixel_displacement *= 1.1
             print(
                 "Key - | colormap_max_pixel_displacement "
-                f"= {cfg.COLORMAP_MAX_PIXEL_DISPLACEMENT:.3f}"
+                f"= {cfg.colormap_max_pixel_displacement:.3f}"
             )
 
         elif key_pressed == "o":

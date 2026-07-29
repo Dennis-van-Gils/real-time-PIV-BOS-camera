@@ -92,11 +92,11 @@ IW_OVERLAP = 0.5
 N_STAGES = len(IW_SIZES)
 
 # [Plotting]
-COLORMAP_NAME = "jet"
-COLORMAP_MAX_PIXEL_DISPLACEMENT = 1.0
-COLORMAP_CLIP_WARNING = False
-COLORMAP_CLIP_COLOR = (1.0, 0, 0.58)  # Vibrant pink
-QUIVER_SIZE = 10
+colormap_name = "jet"
+colormap_max_pixel_displacement = 1.0
+colormap_clip_warning = False
+colormap_clip_color = (1.0, 0, 0.58)  # Vibrant pink
+quiver_size = 10
 
 # [Advanced]
 FFT_LIB = FFT_LIBS.ROCKETFFT
@@ -176,24 +176,24 @@ def read_file(filename=None):
     N_STAGES = len(IW_SIZES)
 
     # [Plotting]
-    global COLORMAP_NAME
-    global COLORMAP_MAX_PIXEL_DISPLACEMENT
-    global COLORMAP_CLIP_WARNING
-    global COLORMAP_CLIP_COLOR
-    global QUIVER_SIZE
+    global colormap_name
+    global colormap_max_pixel_displacement
+    global colormap_clip_warning
+    global colormap_clip_color
+    global quiver_size
 
-    COLORMAP_NAME = parser["Plotting"]["colormap_name"]
-    COLORMAP_MAX_PIXEL_DISPLACEMENT = parser.getfloat(
+    colormap_name = parser["Plotting"]["colormap_name"]
+    colormap_max_pixel_displacement = parser.getfloat(
         "Plotting",
         "colormap_max_pixel_displacement",
     )
-    COLORMAP_CLIP_WARNING = parser.getboolean(
+    colormap_clip_warning = parser.getboolean(
         "Plotting", "colormap_clip_warning"
     )
-    COLORMAP_CLIP_COLOR = parse_float_list(
+    colormap_clip_color = parse_float_list(
         parser["Plotting"]["colormap_clip_color"],
     )
-    QUIVER_SIZE = parser.getfloat("Plotting", "quiver_size")
+    quiver_size = parser.getfloat("Plotting", "quiver_size")
 
     # [Advanced]
     global FFT_LIB
