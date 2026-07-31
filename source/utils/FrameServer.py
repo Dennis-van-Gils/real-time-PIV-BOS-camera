@@ -8,7 +8,8 @@ webcamera or other video camera device.
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/real-time-PIV-BOS-camera"
-__date__ = "29-07-2026"
+__date__ = "31-07-2026"
+# pylint: disable=missing-function-docstring
 
 import os
 import sys

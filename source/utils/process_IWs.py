@@ -33,17 +33,19 @@ Taken solution:
 
     Commented-out code blocks cary the tag `COMMENTED OUT: JITCLASSED IW_MESH`
 """
+
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/real-time-PIV-BOS-camera"
-__date__ = "27-10-2023"
+__date__ = "31-07-2026"
+# pylint: disable=missing-function-docstring
 
 import numpy as np
 import numpy.typing as npt
 import numba as nb
 
-from utils.my_fun import all_smaller_or_equal_to
 import init_config as cfg
+from utils.my_fun import all_smaller_or_equal_to
 
 if cfg.FFT_LIB == cfg.FFT_LIBS.PYFFTW:
     from utils.dvg_fftconvolver_pyfftw import FFT_Convolver2D_Full
@@ -324,7 +326,7 @@ def lookup_IW_idx(
 
     Returns (``int``): Index of the IW.
     """
-    (IW_size, IW_overlap, N_IWs, N_IWs_x, N_IWs_y) = IW_params
+    IW_size, IW_overlap, _N_IWs, N_IWs_x, N_IWs_y = IW_params
     IW_idx_x = int((px_x - IW_size // 2) / (IW_size * (1 - IW_overlap)) + 0.5)
     IW_idx_y = int((px_y - IW_size // 2) / (IW_size * (1 - IW_overlap)) + 0.5)
     IW_idx_x = np.minimum(IW_idx_x, N_IWs_x - 1)

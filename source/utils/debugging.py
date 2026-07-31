@@ -1,18 +1,21 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""Provides debugging functions."""
+
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/real-time-PIV-BOS-camera"
-__date__ = "27-10-2023"
+__date__ = "31-07-2026"
+# pylint: disable=missing-function-docstring
 
 import numpy as np
-
-from utils.process_IWs import IW_Mesh, PRESHIFT_ATTENUATION
-import init_config as cfg
 
 from matplotlib import pyplot as plt
 from matplotlib.patches import Rectangle
 from matplotlib import axes
+
+from utils.process_IWs import IW_Mesh, PRESHIFT_ATTENUATION
+import init_config as cfg
 
 # ------------------------------------------------------------------------------
 #   backwards_calculate_C_peak

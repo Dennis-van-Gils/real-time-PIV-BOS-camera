@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""Provides plotting functions to deal with vector displacement maps."""
+
 __author__ = "Dennis van Gils"
 __authoremail__ = "vangils.dennis@gmail.com"
 __url__ = "https://github.com/Dennis-van-Gils/real-time-PIV-BOS-camera"
-__date__ = "29-07-2026"
+__date__ = "31-07-2026"
+# pylint: disable=missing-function-docstring
 
 import sys
 from typing import Optional
-
-import init_config as cfg
-from utils import numba_quivers
 
 import numpy as np
 import numpy.typing as npt
@@ -17,6 +17,9 @@ import numba as nb
 import matplotlib as mpl
 from matplotlib import pyplot as plt
 import cv2  # pyright: ignore[reportMissingImports]
+
+import init_config as cfg
+from utils import numba_quivers
 
 mpl.use("TkAgg")
 
@@ -352,7 +355,6 @@ def vector_map_to_mpl_quiver_plot(
     VM_magn: npt.NDArray[np.float32],
     plot_title: str,
 ):
-    """ """
     self = vector_map_to_mpl_quiver_plot
     colormap = this.mpl_colormap
 
@@ -407,7 +409,6 @@ def vector_map_to_cv2_quiver_plot(
     tip_size: float = 0.5,
     tip_angle: float = np.pi / 10,
 ) -> npt.NDArray[np.uint8]:
-    """ """
     if output_resolution is None:
         output_resolution = (background_img.shape[1], background_img.shape[0])
 
